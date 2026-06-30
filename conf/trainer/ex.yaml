@@ -20,8 +20,20 @@ detect_anomaly: False
 
 
 logger:
-  _target_: pytorch_lightning.loggers.TensorBoardLogger
-  save_dir: ${local_path}/logs/${implementation}
-  name: ${name}
-  version: ${version}_${model_name}
+  - _target_: pytorch_lightning.loggers.TensorBoardLogger
+    save_dir: ${local_path}/logs/${implementation}
+    name: ${name}
+    version: ${version}_${model_name}
+  - _target_: pytorch_lightning.loggers.WandbLogger
+    project: ${wandb_project}
+    entity: ${wandb_entity}
+    name: ${name}_${version}_${model_name}
+    save_dir: ${local_path}/logs/${implementation}
+    group: ${implementation}
+    notes: ${comments}
+    tags:
+      - ${implementation}
+      - ${name}
+      - ${stage}
+    log_model: false
 

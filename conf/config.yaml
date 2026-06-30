@@ -11,5 +11,11 @@ name: "???"
 local_path: ${project_root:}
 user_path: ${project_root:}
 
+# Weights & Biases (credentials via setup.local.sh or `wandb login`)
+wandb_project: Berry2Vec
+wandb_entity: dasom-oh
+comments: ""
+stage: ""
+
 # checkpoint
 ckpt_path: null

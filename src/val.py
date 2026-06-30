@@ -39,7 +39,9 @@ def main(cfg):
 
     ##TRAINER
     trainer: Trainer = instantiate(cfg.trainer, _convert_="all")
-    trainer.logger.log_hyperparams(cfg)
+    hparams = OmegaConf.to_container(cfg, resolve=True)
+    for logger in trainer.loggers:
+        logger.log_hyperparams(hparams)
 
     ##TRAINING
     trainer.validate(model, data, ckpt_path = cfg.ckpt_path)
