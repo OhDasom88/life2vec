@@ -1,0 +1,9 @@
+
+defaults:
+  - /data_new/sources
+
+_target_: src.data_new.populations.from_agri_growth.FromAgriGrowth
+name: agri_growth_set
+growth_data: ${data_new.sources.agri_growth}
+min_events: 5
+seed: 2023

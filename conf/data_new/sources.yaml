@@ -32,3 +32,8 @@ education_sampled:
   _target_: src.data_new.sources.education.EducationTokens
   name: education_sampled
   downsample: True
+
+agri_growth:
+  _target_: src.data_new.sources.agri_growth.AgriGrowthTokens
+  name: agri_growth
+  downsample: False

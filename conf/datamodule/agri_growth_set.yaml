@@ -1,0 +1,12 @@
+defaults:
+  - /data_new/corpus@corpus: agri_growth_set
+  - /data_new/vocabulary@vocabulary: agri_growth_set
+  - /task@task: agri_mlm
+
+_target_: src.data_new.datamodule.L2VDataModule
+
+batch_size: 4
+num_workers: 0
+
+subset: False
+subset_id: 0
