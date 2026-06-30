@@ -35,6 +35,14 @@ early_stopping:
   strict: True
   min_delta: 0.001
 
+early_stopping_pretrain:
+  _target_: pytorch_lightning.callbacks.EarlyStopping
+  monitor: "val/perplexity"
+  mode: "min"
+  patience: 5
+  strict: true
+  min_delta: 0.001
+
 early_stopping_psy:
   _target_: pytorch_lightning.callbacks.EarlyStopping
   monitor: "val/kappa"

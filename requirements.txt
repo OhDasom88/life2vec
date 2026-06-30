@@ -39,8 +39,8 @@ torch-einops-utils==0.1.5
 # Data processing
 numpy==1.26.4
 pandas==2.3.3
-dask==2026.6.0
-distributed==2026.6.0
+dask==2023.8.1
+distributed==2023.8.1
 h5py==3.14.0
 numba==0.65.1
 llvmlite==0.47.0
@@ -80,6 +80,7 @@ greenlet==3.5.3
 ray==2.56.0
 scikit-optimize==0.10.2
 tensorboardX==2.6.5
+wandb==0.19.11
 pyaml==26.2.1
 
 ipykernel==7.3.0
