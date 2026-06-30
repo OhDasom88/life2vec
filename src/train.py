@@ -1,6 +1,6 @@
 import re
 import hydra
-from hydra.utils import instantiate
+from hydra.utils import instantiate, get_original_cwd
 from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything, Trainer
 import sys
@@ -13,18 +13,22 @@ log = logging.getLogger(__name__)
 
 
 def last_ckpt(dir_):
-    ckpt_path = Path(HOME_PATH, dir_, "last.ckpt")
+    ckpt_path = Path(dir_) / "last.ckpt"
     if ckpt_path.exists():
-        log.info("Checkpoint exists:\n\t%s" %str(ckpt_path))
+        log.info("Checkpoint exists:\n\t%s" % str(ckpt_path))
         return str(ckpt_path)
     else:
-        log.info("Checkpoint DOES NOT exists:\n\t%s" %str(ckpt_path))
+        log.info("Checkpoint DOES NOT exists:\n\t%s" % str(ckpt_path))
         return None
+
+def project_root(*_args):
+    return get_original_cwd()
 
 def home_path():
     return HOME_PATH
 
 try:
+    OmegaConf.register_new_resolver("project_root", project_root)
     OmegaConf.register_new_resolver("last_ckpt", last_ckpt)
 except Exception as e:
     print(e)

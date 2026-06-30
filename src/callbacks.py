@@ -565,7 +565,8 @@ class ReseedTrainDataLoader(pl.Callback):
             log.info("Setting new dataloader seed= %d", new_seed)
             trainer.train_dataloader.sampler.generator.manual_seed(new_seed)
 
-    class RebalancedSampling(pl.Callback):
+
+class RebalancedSampling(pl.Callback):
     def init_rebalancing(self, trainer, pl_module):
         self.n_classes = pl_module.hparams.num_classes
         self.n_targets = pl_module.hparams.num_targets

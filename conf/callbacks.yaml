@@ -6,7 +6,7 @@
 
 checkpoint:
   _target_: pytorch_lightning.callbacks.ModelCheckpoint
-  dirpath: ${user_path}/${local_path}/checkpoints/${implementation}/${name}/${version}
+  dirpath: ${local_path}/checkpoints/${implementation}/${name}/${version}
   verbose: true
   filename: ${version}-{epoch:02d}
   save_last: true
@@ -18,7 +18,7 @@ checkpoint:
 
 checkpoint_cls:
   _target_: pytorch_lightning.callbacks.ModelCheckpoint
-  dirpath: ${user_path}/${local_path}/checkpoints/${implementation}/${name}/${model_name}/${version}
+  dirpath: ${local_path}/checkpoints/${implementation}/${name}/${model_name}/${version}
   verbose: true
   filename: ${version}-{epoch:02d}
   save_last: true
@@ -45,7 +45,7 @@ early_stopping_psy:
 
 checkpoint_psy:
   _target_: pytorch_lightning.callbacks.ModelCheckpoint
-  dirpath: ${user_path}/${local_path}/checkpoints/${implementation}/${name}/${model_name}/${version}
+  dirpath: ${local_path}/checkpoints/${implementation}/${name}/${model_name}/${version}
   verbose: true
   filename: ${version}-{epoch:02d}
   save_last: true

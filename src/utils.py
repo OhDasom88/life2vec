@@ -19,7 +19,7 @@ def silence_warnings() -> None:
     
 
 class SilenceWarnings(Callback):
-    def on_init_start(self, trainer: Trainer) -> None:
+    def on_fit_start(self, trainer: Trainer, pl_module) -> None:
         silence_warnings()
 
 

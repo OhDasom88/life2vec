@@ -1,6 +1,7 @@
 import inspect
 import json
 import logging
+import os
 import pickle
 from dataclasses import asdict, dataclass, field, is_dataclass
 from functools import wraps
@@ -26,7 +27,8 @@ import pandas as pd
 
 from src.utils import stringify
 
-DATA_ROOT = Path.home() / ... / "data"
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+DATA_ROOT = Path(os.environ.get("LIFE2VEC_DATA_ROOT", _REPO_ROOT / "data"))
 T = TypeVar("T")
 
 

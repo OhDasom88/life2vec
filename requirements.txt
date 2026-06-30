@@ -19,7 +19,7 @@ torchaudio==2.6.0+cu124
 # Training framework (life2vec uses pytorch-lightning 1.x APIs e.g. DDPPlugin)
 setuptools<81
 pytorch-lightning==1.9.5
-torchmetrics==0.11.4
+torchmetrics==0.10.3
 lightning-utilities==0.15.3
 
 # Experiment configuration
@@ -37,7 +37,7 @@ hyper-connections==0.4.11
 torch-einops-utils==0.1.5
 
 # Data processing
-numpy==2.2.6
+numpy==1.26.4
 pandas==2.3.3
 dask==2026.6.0
 distributed==2026.6.0
@@ -53,7 +53,7 @@ locket==1.0.0
 fsspec==2026.4.0
 
 # Loss functions and evaluation
-focal-loss==0.0.7
+focal-loss-torch==0.1.2
 coral-pytorch==1.4.0
 imbalanced-learn==0.14.2
 scikit-learn==1.7.2
@@ -82,16 +82,7 @@ scikit-optimize==0.10.2
 tensorboardX==2.6.5
 pyaml==26.2.1
 
-# Notebooks
 ipykernel==7.3.0
-ipython==8.39.0
-jupyter-client==8.9.1
-jupyter-core==5.9.1
-
-# focal-loss transitive dependency
-tensorflow==2.21.0
-
-# Shared utilities
 tqdm==4.68.3
 packaging==26.0
 typing_extensions==4.15.0

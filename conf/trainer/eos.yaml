@@ -20,7 +20,7 @@ detect_anomaly: False
 
 logger:
   _target_: pytorch_lightning.loggers.TensorBoardLogger
-  save_dir: ../${local_path}/logs/${implementation}
+  save_dir: ${local_path}/logs/${implementation}
   name: ${name}
   version: ${model_name}_${version}
 

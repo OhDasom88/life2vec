@@ -8,8 +8,8 @@ version: "???"
 implementation: "???"
 name: "???"
 
-local_path: ".."
-user_path: ".."
+local_path: ${project_root:}
+user_path: ${project_root:}
 
 # checkpoint
 ckpt_path: null

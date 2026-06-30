@@ -20,6 +20,6 @@ detect_anomaly: False ### If you want to check how the gradient is flowing (very
 
 logger:
   _target_: pytorch_lightning.loggers.TensorBoardLogger
-  save_dir: ~/${local_path}/logs/${implementation}
+  save_dir: ${local_path}/logs/${implementation}
   name: ${name}
   version: ${version}

@@ -14,7 +14,6 @@ import logging
 from src.transformer.embeddings import Embeddings
 from src.transformer.transformer_utils import Norm, ReZero, ScaleNorm, SigSoftmax, hard_softmax,  l2_norm, Center, Swish
 from src.transformer.transformer_utils import EncoderLayer
-from src.models.han import ContextAttention, masked_softmax
 
 log = logging.getLogger(__name__)
 
