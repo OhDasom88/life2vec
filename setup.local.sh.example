@@ -1,0 +1,12 @@
+# Copy to setup.local.sh and fill in your secrets (setup.local.sh is gitignored).
+#
+#   cp setup.local.sh.example setup.local.sh
+#
+# Get an API key from https://wandb.ai/authorize
+
+export WANDB_API_KEY="your_wandb_api_key_here"
+
+# Optional overrides
+# export WANDB_ENTITY="dasom-oh"
+# export WANDB_PROJECT="Berry2Vec"
+# export WANDB_MODE="offline"
