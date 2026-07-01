@@ -1,0 +1,13 @@
+defaults:
+  - /data_new/sources
+  - /data_new/population@population: agri_fruiting_set
+
+_target_: src.data_new.datamodule.Corpus
+
+name: agri_fruiting_set
+
+sources:
+  - ${data_new.sources.agri_growth_finetune}
+
+reference_date: "2024-11-01"
+threshold: "2025-01-01"

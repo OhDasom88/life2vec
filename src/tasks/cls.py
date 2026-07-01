@@ -221,6 +221,21 @@ class CLS_HAN(CLS):
 
 
 @dataclass
+class AgriFruiting(CLS):
+    """Predict last-observation fruiting count from growth sequences."""
+
+    def get_document(self, person_sentences: pd.DataFrame) -> PersonDocument:
+        document = super(CLS, self).get_document(person_sentences)
+        document.task_info = cast(JSONSerializable, float(person_sentences.TARGET.iloc[0]))
+        return document
+
+    def encode_document(self, document: PersonDocument) -> "CLSEncodedDocument":
+        encoded = super().encode_document(document)
+        encoded.target = np.array([float(document.task_info)], dtype=np.float32)
+        return encoded
+
+
+@dataclass
 class PSY(CLS):
     # TASK
     def get_document(self, person_sentences: pd.DataFrame) -> PersonDocument:

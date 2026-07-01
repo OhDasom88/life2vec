@@ -1,0 +1,87 @@
+# @package _global_
+
+defaults:
+  - /datamodule: agri_fruiting_set
+  - /trainer: eos
+  - /callbacks
+
+version: 1.0
+implementation: agri
+comments: "Finetune for last-observation fruiting count regression"
+name: fruiting
+model_name: l2v
+
+seed: 2023
+stage: finetuning
+pretrained_model_path: /weights/agri/mlm/pre_training/1_0.pth
+ckpt_path: null
+
+model:
+  _target_: src.transformer.agri_fruiting_model.Transformer_AgriFruiting
+  _convert_: all
+  hparams:
+    seed: ${seed}
+    vocab_size: 86
+    batch_size: ${datamodule.batch_size}
+    max_length: ${datamodule.task.max_length}
+    hidden_size: 128
+    hidden_ff: 512
+    hidden_act: swish
+    n_encoders: 2
+    n_heads: 4
+    n_local: 3
+    local_window_size: 16
+    norm_type: rezero
+    att_dropout: 0.2
+    fw_dropout: 0.2
+    dc_dropout: 0.2
+    emb_dropout: 0.2
+    parametrize_emb: false
+    norm_input_emb: false
+    norm_output_emb: true
+    weight_tying: wt
+    training_task: ${datamodule.task.name}
+    experiment_name: ${name}_${model_name}
+    experiment_version: ${version}
+    attention_type: performer
+    multihead_dc: false
+    num_random_features: 64
+    optimizer_type: adamw
+    learning_rate: 5.e-4
+    weight_decay: 1.e-2
+    weight_decay_dc: 1.e-3
+    beta1: 0.9
+    beta2: 0.999
+    layer_lr_decay: 0.95
+    lr_gamma: 0.8
+    epsilon: 1.e-8
+    freeze_embeddings: true
+    freeze_positions: false
+    num_classes: 1
+    num_targets: 1
+    loss_type: mae
+    weighted_loss: false
+    pooled: false
+    num_pooled_sep: ${datamodule.task.num_pooled_sep}
+    pretrained_model_path: ${pretrained_model_path}
+    stage: ${stage}
+    implementation: ${implementation}
+    version: ${version}
+    save_path: ../predictions/${implementation}/fruiting/l2v/${version}
+
+trainer:
+  accelerator: gpu
+  devices: [0]
+  num_sanity_val_steps: 0
+  min_epochs: 5
+  max_epochs: 200
+  accumulate_grad_batches: 2
+  limit_train_batches: 1.0
+  limit_val_batches: 1.0
+  gradient_clip_val: 1.0
+  gradient_clip_algorithm: norm
+  callbacks:
+    - ${callbacks.checkpoint_fruiting}
+    - ${callbacks.early_stopping_fruiting}
+    - ${callbacks.lr_monitor}
+    - ${callbacks.silence_warnings}

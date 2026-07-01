@@ -37,3 +37,8 @@ agri_growth:
   _target_: src.data_new.sources.agri_growth.AgriGrowthTokens
   name: agri_growth
   downsample: False
+
+agri_growth_finetune:
+  _target_: src.data_new.sources.agri_growth_finetune.AgriGrowthFinetuneTokens
+  name: agri_growth_finetune
+  downsample: False
