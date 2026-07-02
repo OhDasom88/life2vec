@@ -62,6 +62,25 @@ checkpoint_fruiting:
   save_weights_only: false
   save_top_k: 3
 
+checkpoint_fruiting_sweep:
+  _target_: pytorch_lightning.callbacks.ModelCheckpoint
+  dirpath: ${local_path}/checkpoints/${implementation}/${name}/${model_name}/${version}
+  verbose: false
+  filename: ${version}-{epoch:02d}
+  save_last: true
+  monitor: "val/mae_count"
+  mode: "min"
+  save_weights_only: false
+  save_top_k: 1
+
+early_stopping_fruiting_sweep:
+  _target_: pytorch_lightning.callbacks.EarlyStopping
+  monitor: "val/mae_count"
+  mode: "min"
+  patience: 25
+  strict: true
+  min_delta: 0.02
+
 early_stopping_psy:
   _target_: pytorch_lightning.callbacks.EarlyStopping
   monitor: "val/kappa"
