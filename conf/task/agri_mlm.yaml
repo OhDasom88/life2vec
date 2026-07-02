@@ -1,8 +1,14 @@
 _target_: src.tasks.mlm.MLM
 
 name: mlm
-max_length: 512
+max_length: 2048
 no_sep: False
+
+# Segment slots (nn.Embedding size=4 in embeddings.py):
+#   0 = padding
+#   1 = [CLS] + background prefix (fixed in MLM.encode_document)
+#   2, 3, 1, ... = cyclic per sentence in timeline order ([2,3,1] repeat).
+# Not assigned by data source — disambiguates events sharing the same abspos.
 
 p_sequence_timecut: 0.0
 p_sequence_resample: 0.0

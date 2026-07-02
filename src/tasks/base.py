@@ -80,6 +80,10 @@ class Task:
 
     shuffle_within_sentences: bool = True
 
+    # Segment ids for legacy corpora without per-source SEGMENT column.
+    # 0=pad, 1=background prefix ([CLS] block), 2/3/...=event domains at same abspos.
+    segment_pattern: List[int] | None = None
+
     # Task specific
     ...
 
@@ -131,17 +135,16 @@ class Task:
             if self.p_sentence_drop_tokens > .0:
                 document = drop_tokens(document, p=self.p_sentence_drop_tokens)
             
-        # 5. ADD SEGMENT
+        # 5. SEGMENT — cyclic ids per sentence in timeline order. Disambiguates
+        # events that share the same abspos (not tied to data source).
         from itertools import cycle, islice
 
-        segment_pattern = [2, 3, 1]  # Background is segment always 1
-        document.segment = list(islice(cycle(segment_pattern), len(document.sentences)))
+        pattern = self.segment_pattern or [2, 3, 1]  # background prefix uses 1
+        document.segment = list(islice(cycle(pattern), len(document.sentences)))
 
         return document
 
     def clip_document(self, document: PersonDocument) -> PersonDocument:
-
-        assert document.segment is not None
 
         sep_size = 0 if self.no_sep else 1
         prefix_length = len(Background.get_sentence(document.background)) + 1 + sep_size
