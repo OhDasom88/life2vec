@@ -75,6 +75,8 @@ pillow==12.2.0
 # Database
 SQLAlchemy==2.0.51
 greenlet==3.5.3
+neo4j==5.28.2
+pytest==8.3.5
 
 # Hyperparameter tuning (src/tune.py)
 ray==2.56.0
