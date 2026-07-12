@@ -1,0 +1,31 @@
+ M conf/data_new/sources.yaml
+ M requirements.txt
+ M src/data_new/augment.py
+ M src/data_new/datamodule.py
+ M src/data_new/dataset.py
+ M src/data_new/types.py
+ M src/data_new/vocabulary.py
+ M src/tasks/base.py
+ M src/tasks/mlm.py
+ M src/transformer/models.py
+?? conf/data_new/corpus/online2.yaml
+?? conf/data_new/population/online2.yaml
+?? conf/data_new/vocabulary/online2.yaml
+?? conf/datamodule/online2.yaml
+?? conf/experiment/pretrain_online2.yaml
+?? conf/experiment/pretrain_online2_smoke.yaml
+?? conf/task/online2_mlm.yaml
+?? data/labelstudio/
+?? data/rawdata/agrichallenge2023/target.csv
+?? data/rawdata/hackathon/
+?? dataset.bak/
+?? datasets/
+?? docs/online2_operator.md
+?? "output (2).log"
+?? scripts/online2
+?? scripts/online2_smoke_pretrain.py
+?? src/data_new/populations/online2.py
+?? src/data_new/sources/online2.py
+?? src/online2/
+?? src/transformer/external_embeddings.py
+?? tests/

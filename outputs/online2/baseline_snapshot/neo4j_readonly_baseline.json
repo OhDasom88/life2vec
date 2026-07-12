@@ -1,0 +1,97 @@
+{
+  "created_at_utc": "2026-07-12T16:23:16.353609+00:00",
+  "database": "agrichallenge",
+  "uri_host": "192.168.8.189",
+  "bolt": "7687",
+  "credentials": "redacted",
+  "labels": [
+    "Narrative",
+    "Dataset",
+    "SourceFile",
+    "SourceRow",
+    "CellOccurrence",
+    "AtomicValue",
+    "CategoricalToken",
+    "BinningRegistry",
+    "Event",
+    "SameTimeGroup",
+    "Sequence",
+    "Corpus",
+    "BuildRun"
+  ],
+  "relationship_types": [
+    "BUILT",
+    "PRODUCED",
+    "USED_REGISTRY",
+    "HAS_SOURCE_FILE",
+    "CONTAINS_SEQUENCE",
+    "MATERIALIZES",
+    "HAS_ROW",
+    "HAS_CELL",
+    "HAS_ATOMIC_VALUE",
+    "ENCODED_AS",
+    "MAPS_TO",
+    "HAS_TOKEN",
+    "CONTAINS_CELL",
+    "HAS_EVENT"
+  ],
+  "label_counts": {
+    "AtomicValue": 162491,
+    "BinningRegistry": 1,
+    "BuildRun": 1,
+    "CategoricalToken": 881,
+    "CellOccurrence": 2592480,
+    "Corpus": 1,
+    "Dataset": 1,
+    "Event": 222309,
+    "Narrative": 80,
+    "SameTimeGroup": 4872,
+    "Sequence": 967012,
+    "SourceFile": 551,
+    "SourceRow": 222200
+  },
+  "relationship_counts": {
+    "BUILT": 1,
+    "CONTAINS_CELL": 2592480,
+    "CONTAINS_SEQUENCE": 967012,
+    "ENCODED_AS": 6444240,
+    "HAS_ATOMIC_VALUE": 2592480,
+    "HAS_CELL": 2592480,
+    "HAS_EVENT": 15747707,
+    "HAS_ROW": 222200,
+    "HAS_SOURCE_FILE": 551,
+    "HAS_TOKEN": 6444349,
+    "MAPS_TO": 569966,
+    "MATERIALIZES": 967012,
+    "PRODUCED": 1,
+    "USED_REGISTRY": 1
+  },
+  "build_runs": [
+    {
+      "build_id": "build_85c4aba3a72e0e321cfcf6af46eecd20a19a2c0a85fab2b70d0af677dd85840a",
+      "schema_version": "online2-v1",
+      "dataset_tag": "online2",
+      "source_checksum": "8eab9482e2b4a510b504b2743128e08293c59381ea5cb66ebea8214979a26918"
+    }
+  ],
+  "binning_registries": [
+    {
+      "registry_id": "binning:1",
+      "registry_version": "1",
+      "registry_hash": "ce03c683dbeac0b03af3bd2a5b2e179316308f1acee1447feed4772098cb3a11",
+      "fit_population_hash": "ae8eefe703a2450ad3c6b311b2ef372d3099b8601e16636ea7dc71e01293c9bb"
+    }
+  ],
+  "external_event_status": [
+    {
+      "kind": "IMAGE",
+      "status": "pending",
+      "n": 74
+    },
+    {
+      "kind": "INTERPRETATION",
+      "status": "pending",
+      "n": 35
+    }
+  ]
+}

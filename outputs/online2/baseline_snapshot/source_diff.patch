@@ -1,0 +1,921 @@
+diff --git a/conf/data_new/sources.yaml b/conf/data_new/sources.yaml
+index 4a0ea7e..26a2b66 100644
+--- a/conf/data_new/sources.yaml
++++ b/conf/data_new/sources.yaml
+@@ -66,3 +66,14 @@ hackathon_environment:
+   _target_: src.data_new.sources.hackathon_environment.HackathonEnvironmentTokens
+   name: hackathon_environment
+   downsample: False
++
++online2:
++  _target_: src.data_new.sources.online2.Online2ParquetTokenSource
++  name: online2
++  path: ${oc.env:ONLINE2_PARQUET_PATH}
++  build_id: ${oc.env:ONLINE2_BUILD_ID}
++  registry_version: ${oc.env:ONLINE2_REGISTRY_VERSION}
++  expected_checksum: ${oc.env:ONLINE2_PARQUET_SHA256,""}
++  token_fields: [SENTENCE]
++  fields: [SENTENCE]
++  downsample: false
+diff --git a/requirements.txt b/requirements.txt
+index a60667c..0b305d3 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -75,6 +75,8 @@ pillow==12.2.0
+ # Database
+ SQLAlchemy==2.0.51
+ greenlet==3.5.3
++neo4j==5.28.2
++pytest==8.3.5
+ 
+ # Hyperparameter tuning (src/tune.py)
+ ray==2.56.0
+diff --git a/src/data_new/augment.py b/src/data_new/augment.py
+index 9fd463b..5db801b 100644
+--- a/src/data_new/augment.py
++++ b/src/data_new/augment.py
+@@ -16,10 +16,7 @@ def align_document(document: PersonDocument) -> PersonDocument:
+     """Aligns the document with timecut_pos"""
+ 
+     cut = document.timecut_pos
+-    document.sentences = document.sentences[:cut]
+-    document.abspos = document.abspos[:cut]
+-    document.age = document.age[:cut]
+-    return document
++    return document.select_events(range(min(cut, len(document.sentences))))
+ 
+ def make_timecut(
+     document: PersonDocument,
+@@ -48,11 +45,7 @@ def make_timecut(
+         else:
+             break
+ 
+-    document.sentences = document.sentences[:timecut_pos]
+-    document.abspos = document.abspos[:timecut_pos]
+-    document.age = document.age[:timecut_pos]
+-
+-    return document
++    return document.select_events(range(timecut_pos))
+ 
+ 
+ def add_noise2time(document: PersonDocument) -> PersonDocument:
+@@ -77,17 +70,12 @@ def resample_document(document: PersonDocument) -> PersonDocument:
+         np.random.choice(np.arange(0, num_records), size=num_to_remove, replace=False)
+     )
+ 
+-    document.sentences = [
+-        i for idx, i in enumerate(document.sentences) if idx not in idx_to_remove
+-    ]
+-    document.abspos = [
+-        i for idx, i in enumerate(document.abspos) if idx not in idx_to_remove
+-    ]
+-    document.age = [i for idx, i in enumerate(document.age) if idx not in idx_to_remove]
++    keep = [idx for idx in range(num_records) if idx not in idx_to_remove]
++    document.select_events(keep)
+ 
+     # Added for v8_1_43
+     # Each document should start with [0,1]
+-    if document.abspos[0] != 1:
++    if document.abspos and document.abspos[0] != 1:
+         offset = document.abspos[0] - 1
+         document.abspos = [np.maximum(0, i - offset) for i in document.abspos]
+ 
+@@ -101,10 +89,4 @@ def shuffle_sentences(document: PersonDocument) -> PersonDocument:
+     order = list(range(0, len(document.abspos)))
+     random.shuffle(order)
+     order = order
+-    document.sentences = [document.sentences[i] for i in order]
+-    if document.segment is not None:
+-        document.segment = [document.segment[i] for i in order]
+-    document.abspos = [document.abspos[i] for i in order]
+-    document.age = [document.age[i] for i in order]
+-
+-    return document
++    return document.select_events(order)
+diff --git a/src/data_new/datamodule.py b/src/data_new/datamodule.py
+index b3802d3..6f8b1f0 100644
+--- a/src/data_new/datamodule.py
++++ b/src/data_new/datamodule.py
+@@ -28,6 +28,21 @@ from .vocabulary import Vocabulary
+ log = logging.getLogger(__name__)
+ 
+ 
++def timedelta_to_position(delta, time_unit: str):
++    """Convert pandas/dask timedeltas without discarding sub-day precision."""
++    unit_seconds = {
++        "second": 1,
++        "minute": 60,
++        "hour": 3600,
++        "day": 86400,
++    }
++    if time_unit not in unit_seconds:
++        raise ValueError(
++            f"Unsupported time_unit={time_unit!r}; expected one of {sorted(unit_seconds)}"
++        )
++    return (delta.dt.total_seconds() // unit_seconds[time_unit]).astype(int)
++
++
+ def compute_age(date: pd.Series, birthday: pd.Series) -> pd.Series:
+     age = date.dt.year - birthday.dt.year
+     age -= (date + MonthEnd(1)).dt.day_of_year < birthday.dt.day_of_year  # type: ignore
+@@ -66,6 +81,7 @@ class Corpus:
+ 
+     reference_date: str = "2008-01-01" 
+     threshold: str = "2016-01-01"
++    time_unit: str = "day"
+ 
+     def __post_init__(self) -> None:
+ 
+@@ -105,9 +121,13 @@ class Corpus:
+         population: pd.DataFrame = self.population.population()
+         data_split = getattr(self.population.data_split(), split)
+         sentences_parts = [self.sentences(s) for s in self.sources]
++        sort_columns = ["START_DATE"]
++        for column in ("time_group_rank", "event_position", "event_id"):
++            if all(column in part.columns for part in sentences_parts):
++                sort_columns.append(column)
+         combined_sentences = concat_sorted(
+             [sp.loc[lambda x: x.index.isin(data_split)] for sp in sentences_parts],
+-            columns=["START_DATE"],
++            columns=sort_columns,
+         ).join(population)
+ 
+         # Fix age from sources without age using birthday
+@@ -121,11 +141,10 @@ class Corpus:
+             combined_sentences.START_DATE >= self._threshold
+         )
+ 
+-        # Date as days from reference date <- maybe move into task
+-
+-        combined_sentences["START_DATE"] = (
+-            combined_sentences.START_DATE - self._reference_date
+-        ).dt.days.astype(int)
++        delta = combined_sentences.START_DATE - self._reference_date
++        combined_sentences["START_DATE"] = timedelta_to_position(
++            delta, self.time_unit
++        )
+ 
+         ### DASK SPECIFIC
+         combined_sentences = combined_sentences.reset_index().set_index("PERSON_ID", sorted=True, npartitions="auto")
+@@ -158,6 +177,31 @@ class Corpus:
+         cols = ["START_DATE", "SENTENCE"]
+         if "AGE" in tokenized.columns:
+             cols.append("AGE")
++        metadata_columns = (
++            "SEGMENT",
++            "segment_id",
++            "EVENT_ID",
++            "event_id",
++            "SAME_TIME_GROUP_ID",
++            "same_time_group_id",
++            "EVENT_KIND",
++            "event_kind",
++            "MODALITY_REF",
++            "modality_ref",
++            "EMBEDDING_REF",
++            "embedding_ref",
++            "ORDER_SEMANTICS",
++            "order_semantics",
++            "OP_ELIGIBLE",
++            "op_eligible",
++            "SEQUENCE_ID",
++            "sequence_id",
++            "EVENT_POSITION",
++            "event_position",
++            "TIME_GROUP_RANK",
++            "time_group_rank",
++        )
++        cols.extend(column for column in metadata_columns if column in tokenized.columns)
+ 
+         # It is a bit akwkard that we join, then split right after.
+         # However it is easier to deal with strings, I think
+@@ -245,7 +289,7 @@ class L2VDataModule(pl.LightningDataModule):
+ 
+     def __post_init__(self) -> None:
+         super().__init__()
+-        assert self.name != ""
++        assert self.corpus.name != ""
+         self.task.register(self)
+ 
+     @property
+@@ -282,9 +326,10 @@ class L2VDataModule(pl.LightningDataModule):
+             if arguments == self._arguments():
+                 return
+             else:
+-                log.warning("Arguments do not correspond to the recorded ones")
+-                return
+-                raise ValidationError
++                raise ValidationError(
++                    f"Stale dataset cache at {self.dataset_root}: "
++                    "recorded arguments differ from current corpus/vocabulary/task"
++                )
+         except (EOFError, FileNotFoundError):
+             pass
+ 
+@@ -489,8 +534,10 @@ class MultiCorpusL2VDataModule(pl.LightningDataModule):
+                 arguments = pickle.load(f)
+             if arguments == self._arguments():
+                 return
+-            log.warning("Multi-corpus dataset arguments changed; re-run prepare_data")
+-            return
++            raise ValidationError(
++                f"Stale multi-corpus dataset cache at {self.dataset_root}: "
++                "recorded arguments differ from current configuration"
++            )
+         except (EOFError, FileNotFoundError):
+             pass
+ 
+diff --git a/src/data_new/dataset.py b/src/data_new/dataset.py
+index f3e2793..ae95388 100644
+--- a/src/data_new/dataset.py
++++ b/src/data_new/dataset.py
+@@ -123,7 +123,19 @@ class DocumentDataset(HDF5Dataset[PersonDocument, EncodedDocument[TaskT]]):
+ 
+     def serialize(self, x: PersonDocument) -> str:
+         """Dumps the person document to json data"""
+-        return json.dumps(asdict(x), separators=(",", ":"))
++
++        def _json_default(obj: Any) -> Any:
++            if isinstance(obj, np.bool_):
++                return bool(obj)
++            if isinstance(obj, np.integer):
++                return int(obj)
++            if isinstance(obj, np.floating):
++                return float(obj)
++            raise TypeError(
++                f"Object of type {obj.__class__.__name__} is not JSON serializable"
++            )
++
++        return json.dumps(asdict(x), separators=(",", ":"), default=_json_default)
+ 
+ 
+ class ShardedDocumentDataset(ConcatDataset, Generic[TaskT]):
+diff --git a/src/data_new/types.py b/src/data_new/types.py
+index c09151a..d5e5664 100644
+--- a/src/data_new/types.py
++++ b/src/data_new/types.py
+@@ -1,5 +1,5 @@
+ from dataclasses import dataclass
+-from typing import TYPE_CHECKING, Generic, List, NewType, Optional, TypeVar
++from typing import Any, TYPE_CHECKING, Generic, List, NewType, Optional, Sequence, TypeVar
+ 
+ JSONSerializable = NewType("JSONSerializable", object)
+ 
+@@ -22,6 +22,50 @@ class PersonDocument:
+     background: Optional["Background"] = None
+     shuffled: bool = False
+     task_info: Optional[JSONSerializable] = None
++    # Optional event-level metadata.  Legacy corpora can leave every field unset.
++    event_ids: Optional[List[Any]] = None
++    same_time_group_ids: Optional[List[Any]] = None
++    event_kinds: Optional[List[Any]] = None
++    modality_refs: Optional[List[Any]] = None
++    order_semantics: Optional[str] = None
++    op_eligible: Optional[bool] = None
++
++    def event_aligned_fields(self) -> List[str]:
++        """Return fields whose i-th value describes the i-th sentence/event."""
++        fields = ["sentences", "abspos", "age"]
++        for name in (
++            "segment",
++            "event_ids",
++            "same_time_group_ids",
++            "event_kinds",
++            "modality_refs",
++        ):
++            if getattr(self, name) is not None:
++                fields.append(name)
++        return fields
++
++    def validate_event_alignment(self) -> None:
++        """Fail early instead of silently training on misaligned event metadata."""
++        expected = len(self.sentences)
++        mismatched = {
++            name: len(getattr(self, name))
++            for name in self.event_aligned_fields()
++            if len(getattr(self, name)) != expected
++        }
++        if mismatched:
++            raise ValueError(
++                f"Event-aligned fields must have length {expected}: {mismatched}"
++            )
++
++    def select_events(self, indices: Sequence[int]) -> "PersonDocument":
++        """Apply one selection/permutation to every event-aligned field in-place."""
++        self.validate_event_alignment()
++        order = [int(i) for i in indices]
++        for name in self.event_aligned_fields():
++            values = getattr(self, name)
++            setattr(self, name, [values[i] for i in order])
++        self.validate_event_alignment()
++        return self
+ 
+ 
+ @dataclass
+diff --git a/src/data_new/vocabulary.py b/src/data_new/vocabulary.py
+index cfdb13f..416cafe 100644
+--- a/src/data_new/vocabulary.py
++++ b/src/data_new/vocabulary.py
+@@ -1,5 +1,8 @@
+ from dataclasses import dataclass, field
+ from functools import cached_property
++import hashlib
++import json
++from pathlib import Path
+ from typing import TYPE_CHECKING, Dict, List, Tuple, Union, cast
+ 
+ import dask
+@@ -68,6 +71,89 @@ class Vocabulary:
+         self.vocab()
+ 
+ 
++@dataclass
++class RegistryVocabulary(Vocabulary):
++    """Stable vocabulary backed by a frozen, versioned online2 token registry."""
++
++    registry_path: str
++    name: str = "online2"
++    registry_version: str = ""
++    expected_checksum: str = ""
++    general_tokens: List[str] = field(
++        default_factory=lambda: ["[PAD]", "[CLS]", "[SEP]", "[MASK]", "[UNK]"]
++    )
++    background_tokens: List[str] = field(default_factory=list)
++
++    def checksum(self) -> str:
++        return hashlib.sha256(Path(self.registry_path).read_bytes()).hexdigest()
++
++    @cached_property
++    def _vocab(self) -> pd.DataFrame:
++        path = Path(self.registry_path)
++        if not path.exists():
++            raise FileNotFoundError(path)
++        if self.expected_checksum and self.checksum() != self.expected_checksum:
++            raise ValueError("Token registry checksum does not match configuration")
++        if path.suffix.lower() == ".parquet":
++            frame = pd.read_parquet(path)
++        elif path.suffix.lower() in {".json", ".jsonl"}:
++            if path.suffix.lower() == ".jsonl":
++                frame = pd.read_json(path, lines=True)
++            else:
++                payload = json.loads(path.read_text())
++                frame = pd.DataFrame(payload.get("tokens", payload))
++        else:
++            frame = pd.read_csv(path)
++
++        frame = frame.rename(
++            columns={
++                "token_id": "ID",
++                "id": "ID",
++                "token": "TOKEN",
++                "category": "CATEGORY",
++            }
++        )
++        required = {"ID", "TOKEN", "CATEGORY"}
++        if not required.issubset(frame.columns):
++            raise ValueError(
++                f"Token registry must contain {sorted(required)} columns"
++            )
++        if self.registry_version:
++            if "registry_version" not in frame:
++                raise ValueError("Token registry has no registry_version column")
++            versions = set(frame["registry_version"].dropna().astype(str).unique())
++            if versions != {self.registry_version}:
++                raise ValueError(
++                    f"Registry version mismatch: expected {self.registry_version!r}, "
++                    f"found {sorted(versions)}"
++                )
++
++        result = frame.loc[:, ["ID", "TOKEN", "CATEGORY"]].copy()
++        result["ID"] = result["ID"].astype(int)
++        result["TOKEN"] = result["TOKEN"].astype(str)
++        result["CATEGORY"] = result["CATEGORY"].astype(str)
++        result = result.sort_values("ID", kind="mergesort").reset_index(drop=True)
++        if result["ID"].duplicated().any() or result["TOKEN"].duplicated().any():
++            raise ValueError("Token registry IDs and token strings must be unique")
++        expected_ids = list(range(len(result)))
++        if result["ID"].tolist() != expected_ids:
++            raise ValueError("Token registry IDs must be contiguous and start at zero")
++        tokens = set(result["TOKEN"])
++        missing_special = [token for token in self.general_tokens if token not in tokens]
++        if missing_special:
++            raise ValueError(f"Token registry lacks special tokens: {missing_special}")
++        if result.loc[result["TOKEN"] == "[PAD]", "ID"].item() != 0:
++            raise ValueError("[PAD] must have stable token ID 0")
++        if not self.background_tokens:
++            self.background_tokens = result.loc[
++                result["CATEGORY"] == "BACKGROUND", "TOKEN"
++            ].tolist()
++        return result
++
++    def vocab(self) -> pd.DataFrame:
++        return self._vocab.copy()
++
++
+ @dataclass
+ class TSVVocabulary(Vocabulary):
+     # Todo: This could be used to implement an already existing tsv vocab
+diff --git a/src/tasks/base.py b/src/tasks/base.py
+index 33abc3a..07c8f4a 100644
+--- a/src/tasks/base.py
++++ b/src/tasks/base.py
+@@ -1,4 +1,5 @@
+ import random
++from copy import deepcopy
+ from dataclasses import asdict, dataclass
+ from itertools import accumulate
+ from typing import TYPE_CHECKING, Callable, Dict, List, TypeVar
+@@ -97,13 +98,17 @@ class Task:
+         def preprocessor(x: PersonDocument) -> "EncodedDocument[_TaskT]":
+             x = self.augment_document(x, is_train=is_train)
+             x = self.clip_document(x)
+-            return self.encode_document(x)
++            return self.encode_preprocessed_document(x, is_train=is_train)
+ 
+         return preprocessor
+ 
+     def augment_document(
+         self, document: PersonDocument, is_train: bool
+     ) -> PersonDocument:
++        # Dataset records can be reused by validation/test transforms.  Never mutate
++        # the cached PersonDocument (or its nested sentence lists).
++        document = deepcopy(document)
++        document.validate_event_alignment()
+ 
+         if self.shuffle_within_sentences:
+             # TODO: Maybe we should only do this for training?
+@@ -139,9 +144,11 @@ class Task:
+         # events that share the same abspos (not tied to data source).
+         from itertools import cycle, islice
+ 
+-        pattern = self.segment_pattern or [2, 3, 1]  # background prefix uses 1
+-        document.segment = list(islice(cycle(pattern), len(document.sentences)))
++        if document.segment is None:
++            pattern = self.segment_pattern or [2, 3, 1]  # background prefix uses 1
++            document.segment = list(islice(cycle(pattern), len(document.sentences)))
+ 
++        document.validate_event_alignment()
+         return document
+ 
+     def clip_document(self, document: PersonDocument) -> PersonDocument:
+@@ -158,13 +165,17 @@ class Task:
+                 break
+ 
+         if clip_idx is not None:
+-            document.sentences = document.sentences[-clip_idx:]
+-            document.abspos = document.abspos[-clip_idx:]
+-            document.age = document.age[-clip_idx:]
+-            document.segment = document.segment[-clip_idx:]
++            start = len(document.sentences) - clip_idx
++            document.select_events(range(start, len(document.sentences)))
+ 
+         return document
+ 
++    def encode_preprocessed_document(
++        self: _TaskT, document: PersonDocument, is_train: bool
++    ) -> "EncodedDocument[_TaskT]":
++        """Split-aware encoding hook; legacy tasks keep their existing contract."""
++        return self.encode_document(document)
++
+     def encode_document(
+         self: _TaskT, document: PersonDocument
+     ) -> "EncodedDocument[_TaskT]":
+@@ -194,11 +205,35 @@ class Task:
+             birth_year=birthday.year,
+         )
+ 
++        def optional_list(*columns: str):
++            for column in columns:
++                if column in person_sentences.columns:
++                    return person_sentences[column].tolist()
++            return None
++
++        def optional_scalar(*columns: str):
++            for column in columns:
++                if column in person_sentences.columns:
++                    values = person_sentences[column].dropna()
++                    return values.iloc[0] if len(values) else None
++            return None
++
+         return PersonDocument(
+             person_id=person_id,
+             sentences=sentences,
+             abspos=abspos,
+             age=age,
+             timecut_pos=timecut_pos,
++            segment=optional_list("SEGMENT", "segment_id"),
+             background=background,
++            event_ids=optional_list("EVENT_ID", "event_id"),
++            same_time_group_ids=optional_list(
++                "SAME_TIME_GROUP_ID", "same_time_group_id"
++            ),
++            event_kinds=optional_list("EVENT_KIND", "event_kind"),
++            modality_refs=optional_list(
++                "MODALITY_REF", "modality_ref", "EMBEDDING_REF", "embedding_ref"
++            ),
++            order_semantics=optional_scalar("ORDER_SEMANTICS", "order_semantics"),
++            op_eligible=optional_scalar("OP_ELIGIBLE", "op_eligible"),
+         )
+diff --git a/src/tasks/mlm.py b/src/tasks/mlm.py
+index 43416a1..381ec95 100644
+--- a/src/tasks/mlm.py
++++ b/src/tasks/mlm.py
+@@ -1,4 +1,5 @@
+ import logging
++from copy import deepcopy
+ from dataclasses import dataclass
+ from functools import cached_property
+ from itertools import chain
+@@ -7,7 +8,6 @@ from xml.dom.minidom import Document
+ 
+ import numpy as np
+ import torch
+-from random import shuffle
+ 
+ from src.data_new.types import Background, PersonDocument, EncodedDocument
+ from src.tasks.base import Task
+@@ -32,8 +32,21 @@ class MLM(Task):
+     # MLM Specific params
+     mask_ratio: float = 0.30
+     smart_masking: bool = False
+-
+-    def encode_document(self, document: PersonDocument) -> "MLMEncodedDocument":
++    mask_special_tokens: bool = False
++    mask_background_tokens: bool = False
++    non_maskable_tokens: Tuple[str, ...] = ("IMAGE_EMBED_SLOT", "TEXT_EMBED_SLOT")
++    sop_reverse_probability: float = 0.05
++    sop_shuffle_probability: float = 0.05
++    evaluation_seed: int = 2023
++
++    def encode_preprocessed_document(
++        self, document: PersonDocument, is_train: bool
++    ) -> "MLMEncodedDocument":
++        return self.encode_document(document, is_train=is_train)
++
++    def encode_document(
++        self, document: PersonDocument, is_train: bool = True
++    ) -> "MLMEncodedDocument":
+ 
+         prefix_sentence = (
+             ["[CLS]"] + Background.get_sentence(document.background) + ["[SEP]"]
+@@ -41,7 +54,9 @@ class MLM(Task):
+ 
+         ############################################
+         ### CLS TASK
+-        document, targ_cls = self.cls_task(document)
++        document, targ_cls, target_cls_mask = self.cls_task(
++            document, is_train=is_train
++        )
+         ############################################
+ 
+         sentences = [prefix_sentence] + [s + ["[SEP]"] for s in document.sentences]
+@@ -71,7 +86,7 @@ class MLM(Task):
+ 
+         length = len(token_ids)
+ 
+-        input_ids = np.zeros((4, self.max_length))
++        input_ids = np.zeros((4, self.max_length), dtype=np.float32)
+         input_ids[0, :length] = masked_sentences
+         input_ids[1, :length] = abspos_expanded
+         input_ids[2, :length] = age_expanded
+@@ -83,7 +98,7 @@ class MLM(Task):
+         # TODO: Consider renaming, to document/sentences instead of sequence...
+         # would require refactoring of the modelling also though
+ 
+-        original_sequence = np.zeros(self.max_length)
++        original_sequence = np.zeros(self.max_length, dtype=np.int64)
+         original_sequence[:length] = token_ids
+ 
+         sequence_id = np.array(document.person_id)
+@@ -95,6 +110,7 @@ class MLM(Task):
+             target_tokens=masked_tokens,
+             target_pos=masked_indx,
+             target_cls=targ_cls,
++            target_cls_mask=target_cls_mask,
+             original_sequence=original_sequence,
+         )
+ 
+@@ -119,18 +135,100 @@ class MLM(Task):
+         )
+         return cast(List[Tuple[int, int]], token_groups)
+ 
+-    def cls_task(self, document: PersonDocument):
+-        p = np.random.rand(1)
+-        if p <0.05:
+-            document.sentences.reverse()
+-            targ_cls = 1
+-        elif p>0.95:
+-            shuffle(document.sentences)
+-            targ_cls = 2
++    @staticmethod
++    def _group_blocks(document: PersonDocument) -> List[List[int]]:
++        """Return event-index blocks; legacy documents treat each sentence as a group."""
++        group_ids = document.same_time_group_ids
++        if group_ids is None:
++            return [[i] for i in range(len(document.sentences))]
++        blocks: List[List[int]] = []
++        positions = {}
++        for index, group_id in enumerate(group_ids):
++            # Keep a group together even if malformed input made it non-contiguous.
++            if group_id not in positions:
++                positions[group_id] = len(blocks)
++                blocks.append([])
++            blocks[positions[group_id]].append(index)
++        return blocks
++
++    def _sop_is_eligible(
++        self, document: PersonDocument, distinct_group_count: int
++    ) -> bool:
++        if document.same_time_group_ids is None:
++            # Preserve the old SOP behavior for legacy documents.
++            return True
++        semantics_ok = document.order_semantics in {
++            "STRICT_CHRONOLOGICAL",
++            "SPARSE_CHRONOLOGICAL",
++            "CHRONOLOGICAL_WITH_TIES",
++        }
++        declared = (
++            bool(document.op_eligible)
++            if document.op_eligible is not None
++            else semantics_ok
++        )
++        return declared and semantics_ok and distinct_group_count >= 2
++
++    def cls_task(
++        self,
++        document: PersonDocument,
++        is_train: bool = True,
++        force_label: int | None = None,
++    ):
++        """Apply a 3-class SOP permutation to whole SameTimeGroup blocks."""
++        result = deepcopy(document)
++        result.validate_event_alignment()
++        blocks = self._group_blocks(result)
++        eligible = self._sop_is_eligible(result, len(blocks))
++        if not eligible:
++            return result, np.int64(0), np.float32(0.0)
++
++        if is_train:
++            rng = np.random
+         else:
+-            targ_cls = 0
+-
+-        return document, targ_cls
++            # Stable per-person seed; unlike hash(), this is process-independent.
++            person_bytes = str(result.person_id).encode("utf-8")
++            person_seed = int.from_bytes(person_bytes[:8].ljust(8, b"\0"), "little")
++            rng = np.random.RandomState(self.evaluation_seed ^ person_seed)
++
++        if force_label is None:
++            draw = float(rng.random())
++            if draw < self.sop_reverse_probability:
++                label = 1
++            elif (
++                draw < self.sop_reverse_probability + self.sop_shuffle_probability
++                and len(blocks) >= 3
++            ):
++                label = 2
++            else:
++                label = 0
++        else:
++            if force_label not in (0, 1, 2):
++                raise ValueError("SOP label must be 0, 1, or 2")
++            label = force_label
++
++        block_order = list(range(len(blocks)))
++        if label == 1:
++            block_order.reverse()
++        elif label == 2:
++            if len(blocks) < 3:
++                # With two groups, the only non-arranged order is REVERSED.
++                label = 1
++                block_order.reverse()
++            else:
++                identity = tuple(block_order)
++                reversed_order = tuple(reversed(block_order))
++                for _ in range(32):
++                    rng.shuffle(block_order)
++                    if tuple(block_order) not in (identity, reversed_order):
++                        break
++                else:
++                    block_order = block_order[1:2] + block_order[:1] + block_order[2:]
++
++        event_order = [index for block in block_order for index in blocks[block]]
++        result.select_events(event_order)
++        result.shuffled = label != 0
++        return result, np.int64(label), np.float32(1.0)
+ 
+     def mlm_mask(
+         self, token_ids: np.ndarray
+@@ -147,48 +245,77 @@ class MLM(Task):
+         # limit is length of an actual sequence
+         n_tokens = len(token_ids)
+ 
+-        num_tokens_to_mask = np.floor(n_tokens * self.mask_ratio).astype(np.int32)
+-        # firt 10% of tokens won't be changed
+-        pos_unchange = np.floor(num_tokens_to_mask * 0.1).astype(np.int32)
+-        # last 10% of tokens would be random ; the rest will be changed
+-        pos_random = num_tokens_to_mask - pos_unchange
++        requested = int(np.floor(n_tokens * self.mask_ratio))
+ 
+-        # we do not mask SEP and UNK
+-        legal_mask = (token_ids[1:] != sep_id) & (token_ids[1:] != unk_id)
+-        legal_indx = np.arange(start=1, stop=n_tokens)[legal_mask]
+-
+-        indx_to_mask = np.random.choice(
+-            a=legal_indx, size=num_tokens_to_mask, replace=False
++        excluded_ids = {sep_id, unk_id, token2index.get("[PAD]", 0)}
++        if not self.mask_special_tokens:
++            excluded_ids.update(
++                token2index[token]
++                for token in vocabulary.general_tokens
++                if token in token2index
++            )
++            try:
++                general = vocabulary.vocab()
++                excluded_ids.update(
++                    general.loc[general.CATEGORY == "GENERAL", "ID"].astype(int).tolist()
++                )
++            except (AttributeError, KeyError):
++                # Minimal/legacy vocabulary implementations may only expose lists.
++                pass
++        if not self.mask_background_tokens:
++            excluded_ids.update(
++                token2index[token]
++                for token in vocabulary.background_tokens
++                if token in token2index
++            )
++        excluded_ids.update(
++            token2index[token]
++            for token in self.non_maskable_tokens
++            if token in token2index
+         )
++        legal_mask = ~np.isin(token_ids[1:], list(excluded_ids))
++        legal_indx = np.arange(start=1, stop=n_tokens)[legal_mask]
++        max_masked_num = int(np.floor(self.mask_ratio * self.max_length))
++        num_tokens_to_mask = min(requested, len(legal_indx), max_masked_num)
++        # 80% [MASK], 10% unchanged, 10% random.
++        pos_unchange = int(np.floor(num_tokens_to_mask * 0.1))
++        pos_random = num_tokens_to_mask - pos_unchange
+ 
+-        max_masked_num = np.floor(self.mask_ratio * self.max_length).astype(np.int32)
++        indx_to_mask = (
++            np.random.choice(a=legal_indx, size=num_tokens_to_mask, replace=False)
++            if num_tokens_to_mask
++            else np.asarray([], dtype=np.int64)
++        ).astype(np.int64)
+ 
+         # positions of the masked tokens
+-        y_indx = np.full(shape=max_masked_num, fill_value=int(self.max_length - 1))
++        y_indx = np.full(
++            shape=max_masked_num,
++            fill_value=int(self.max_length - 1),
++            dtype=np.int64,
++        )
+         y_indx[: len(indx_to_mask)] = indx_to_mask.copy()
+ 
+         # remember the actual tokens on positions
+-        y_token = np.zeros(shape=max_masked_num)
++        y_token = np.zeros(shape=max_masked_num, dtype=np.int64)
+         y_token[: len(indx_to_mask)] = token_ids[indx_to_mask].copy()
+ 
+         # masked token_ids #rather change the sampling domain for accurate masking
+         # ratio?
+         token_ids[indx_to_mask[pos_unchange:pos_random]] = mask_id
+ 
+-        vocab_size = len(token2index)
+-        n_general_tokens = len(vocabulary.general_tokens)
++        replacement_ids = np.array(
++            sorted(set(token2index.values()) - excluded_ids), dtype=np.int64
++        )
+ 
+         if self.smart_masking:
+ 
+             smart_edge = int(pos_random + int(pos_unchange * 0.3))
+ 
+             # Random 7% of all random cases
+-            token_ids[indx_to_mask[smart_edge:]] = np.random.randint(
+-                # low we do not mask any special tokens
+-                low=n_general_tokens,
+-                high=vocab_size,
+-                size=(1, len(indx_to_mask[smart_edge:])),
+-            )
++            if len(replacement_ids):
++                token_ids[indx_to_mask[smart_edge:]] = np.random.choice(
++                    replacement_ids, size=len(indx_to_mask[smart_edge:])
++                )
+ 
+             # Smart Random 3% of all the cases
+             smart_values = token_ids[indx_to_mask[pos_random:smart_edge]]
+@@ -199,12 +326,10 @@ class MLM(Task):
+             token_ids[indx_to_mask[pos_random:smart_edge]] = smart_values
+ 
+         else:
+-            token_ids[indx_to_mask[pos_random:]] = torch.randint(
+-                # low we do not mask any special tokens
+-                low=n_general_tokens,
+-                high=vocab_size,
+-                size=(1, len(indx_to_mask[pos_random:])),
+-            )
++            if len(replacement_ids) and len(indx_to_mask[pos_random:]):
++                token_ids[indx_to_mask[pos_random:]] = np.random.choice(
++                    replacement_ids, size=len(indx_to_mask[pos_random:])
++                )
+         return token_ids, y_indx, y_token
+ 
+     @staticmethod
+@@ -224,4 +349,5 @@ class MLMEncodedDocument(EncodedDocument[MLM]):
+     target_tokens: np.ndarray
+     target_pos: np.ndarray
+     target_cls: np.ndarray
++    target_cls_mask: np.ndarray
+     original_sequence: np.ndarray
+diff --git a/src/transformer/models.py b/src/transformer/models.py
+index a87c318..fa4746d 100644
+--- a/src/transformer/models.py
++++ b/src/transformer/models.py
+@@ -19,11 +19,37 @@ from src.transformer.transformer import Transformer, MaskedLanguageModel, CLS_De
+ log = logging.getLogger(__name__)
+ HOME_PATH = str(Path.home())
+ 
++def masked_sop_loss(loss_values, mask=None):
++    """Average per-sample SOP losses over eligible rows only.
++
++    ``mask=None`` preserves compatibility with batches encoded before v8.
++    """
++    if mask is None:
++        return loss_values.mean()
++    mask = mask.to(device=loss_values.device, dtype=loss_values.dtype).reshape(-1)
++    values = loss_values.reshape(-1)
++    denominator = mask.sum()
++    if denominator.item() == 0:
++        return values.sum() * 0.0
++    return (values * mask).sum() / denominator
++
++
+ class TransformerEncoder(pl.LightningModule):
+     """Transformer with Masked Language Model"""
+ 
+     def __init__(self, hparams):
+         super(TransformerEncoder, self).__init__()
++        if "vocabulary" in hparams:
++            hparams = dict(hparams)
++            vocabulary = hparams.pop("vocabulary")
++            actual_size = vocabulary.size()
++            configured_size = hparams.get("vocab_size")
++            if configured_size is not None and int(configured_size) != actual_size:
++                raise ValueError(
++                    f"Configured vocab_size={configured_size} does not match "
++                    f"vocabulary size {actual_size}"
++                )
++            hparams["vocab_size"] = actual_size
+         self.hparams.update(hparams)
+         #self.idx2token = self.load_lookup(HOME_PATH + self.hparams.dict_path)
+         self.last_global_step = 0
+@@ -42,7 +68,9 @@ class TransformerEncoder(pl.LightningModule):
+             self.mlm_decoder = MaskedLanguageModel(self.hparams, self.transformer.embedding, act="tanh")
+             self.cls_decoder = CLS_Decoder(self.hparams)
+             ## 2.2. LOSS
+-            self.cls_loss = nn.CrossEntropyLoss(weight=self.cls_a, label_smoothing=0.1)
++            self.cls_loss = nn.CrossEntropyLoss(
++                weight=self.cls_a, label_smoothing=0.1, reduction="none"
++            )
+             self.mlm_loss = nn.CrossEntropyLoss(ignore_index = 0)
+         else:
+             raise NotImplementedError()
+@@ -172,7 +200,10 @@ class TransformerEncoder(pl.LightningModule):
+         mlm_targs = batch["target_tokens"].long()
+         cls_targs = batch["target_cls"].long()
+         mlm_loss = self.mlm_loss(mlm_preds.permute(0, 2, 1), target=mlm_targs)
+-        cls_loss = self.cls_loss(cls_preds, target = cls_targs)
++        cls_loss = masked_sop_loss(
++            self.cls_loss(cls_preds, target=cls_targs),
++            batch.get("target_cls_mask"),
++        )
+ 
+         self.log("train/loss_mlm", mlm_loss.detach(), on_step=True, on_epoch=True)
+         self.log("train/loss_cls", cls_loss.detach(), on_step=True, on_epoch=True)
+@@ -212,7 +243,10 @@ class TransformerEncoder(pl.LightningModule):
+         mlm_targs = batch["target_tokens"].long()
+         cls_targs = batch["target_cls"].long()
+         mlm_loss = self.mlm_loss(mlm_preds.permute(0, 2, 1), target=mlm_targs)
+-        cls_loss = self.cls_loss(cls_preds, target = cls_targs)
++        cls_loss = masked_sop_loss(
++            self.cls_loss(cls_preds, target=cls_targs),
++            batch.get("target_cls_mask"),
++        )
+ 
+         self.log("val/loss_mlm", mlm_loss.detach(), on_step=True, on_epoch=True)
+         self.log("val/loss_cls", cls_loss.detach(), on_step=True, on_epoch=True)
+@@ -236,7 +270,10 @@ class TransformerEncoder(pl.LightningModule):
+         mlm_targs = batch["target_tokens"].long()
+         cls_targs = batch["target_cls"].long()
+         mlm_loss = self.mlm_loss(mlm_preds.permute(0, 2, 1), target=mlm_targs)
+-        cls_loss = self.cls_loss(cls_preds, target = cls_targs)
++        cls_loss = masked_sop_loss(
++            self.cls_loss(cls_preds, target=cls_targs),
++            batch.get("target_cls_mask"),
++        )
+ 
+         self.log("val/loss_mlm", mlm_loss.detach(), on_step=False, on_epoch=True)
+         self.log("val/loss_cls", cls_loss.detach(), on_step=False, on_epoch=True)

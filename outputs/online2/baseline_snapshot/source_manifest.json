@@ -1,0 +1,181 @@
+{
+  "created_at_utc": "2026-07-12T16:23:06.298609+00:00",
+  "repo_root": "/home/dasom/life2vec",
+  "note": "Working-tree online2 sources; NOT approved V1 reproducible original",
+  "file_count": 28,
+  "files": [
+    {
+      "path": "docs/online2_operator.md",
+      "sha256": "f511e679fc3490f9f8663f72adb537db98afe17d83c8884dc5fafffbade36286",
+      "size_bytes": 6741,
+      "mtime_utc": "2026-07-12T14:20:22.712115+00:00"
+    },
+    {
+      "path": "scripts/online2",
+      "sha256": "142b25374b0a99a50b95fa7b5250590bcfce0f1909957bb9824f9602a017d29c",
+      "size_bytes": 247,
+      "mtime_utc": "2026-07-12T09:22:06.335979+00:00"
+    },
+    {
+      "path": "scripts/online2_smoke_pretrain.py",
+      "sha256": "6806a6b5b31cf5d6ac43c10cb07a37eeec1b94019af262ef8aa1a3c13b5cab06",
+      "size_bytes": 6242,
+      "mtime_utc": "2026-07-12T10:32:22.238924+00:00"
+    },
+    {
+      "path": "src/data_new/augment.py",
+      "sha256": "1ba6efe6a0f0e4ef6635f7821ff1d66d32e69693a5207c041ed9f2d6d017eef9",
+      "size_bytes": 2858,
+      "mtime_utc": "2026-07-12T09:16:29.016521+00:00"
+    },
+    {
+      "path": "src/data_new/datamodule.py",
+      "sha256": "9a51dabab9a0c8f1c99bd47b00206e61ed4c41e7cd0da3266430f397885b5df1",
+      "size_bytes": 31023,
+      "mtime_utc": "2026-07-12T09:22:37.827032+00:00"
+    },
+    {
+      "path": "src/data_new/dataset.py",
+      "sha256": "27fc9c9f5a73b874b01b3eea051ffa9bf5ed5b8bb1a39c3cf8791a9870090c21",
+      "size_bytes": 5417,
+      "mtime_utc": "2026-07-12T13:49:33.169301+00:00"
+    },
+    {
+      "path": "src/data_new/populations/online2.py",
+      "sha256": "19b6eb9d81c307a5147dcaa5761ce0edf4ee54a0faab4da7d7140602dfe52455",
+      "size_bytes": 2776,
+      "mtime_utc": "2026-07-12T09:18:16.702643+00:00"
+    },
+    {
+      "path": "src/data_new/sources/online2.py",
+      "sha256": "4fcd3c969d6fcf7ec17923fd7c1638225a7e531331f7e344b35a5e37066bd253",
+      "size_bytes": 3917,
+      "mtime_utc": "2026-07-12T10:31:25.660415+00:00"
+    },
+    {
+      "path": "src/data_new/types.py",
+      "sha256": "24027c5d4b6bad685e6f3ba5cf0ff6cf0470b54aee59473d9820523a5f03c737",
+      "size_bytes": 3597,
+      "mtime_utc": "2026-07-12T09:16:20.888513+00:00"
+    },
+    {
+      "path": "src/data_new/vocabulary.py",
+      "sha256": "f72696de9666a9e117bbd87a2b51c22bc240f72b1779301e936ec40782b99190",
+      "size_bytes": 9645,
+      "mtime_utc": "2026-07-12T09:22:46.838047+00:00"
+    },
+    {
+      "path": "src/online2/__init__.py",
+      "sha256": "1ea2086cf8eaeda194cac955178f69b8ad0c0931f6eddd5b5e3dfdd8f34d71e2",
+      "size_bytes": 295,
+      "mtime_utc": "2026-07-12T09:19:46.849764+00:00"
+    },
+    {
+      "path": "src/online2/__main__.py",
+      "sha256": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+      "size_bytes": 48,
+      "mtime_utc": "2026-07-12T09:19:58.942782+00:00"
+    },
+    {
+      "path": "src/online2/builder.py",
+      "sha256": "669fededef06a69c5fbf2f9d39f7bed91e278f7b4c88082ae480d70c359220ab",
+      "size_bytes": 32215,
+      "mtime_utc": "2026-07-12T10:24:35.986262+00:00"
+    },
+    {
+      "path": "src/online2/canonical.py",
+      "sha256": "122a2fd177ec0df200a8c36e540111126b1499c3fdabc41e459eaea5065e3a88",
+      "size_bytes": 4592,
+      "mtime_utc": "2026-07-12T09:21:42.502940+00:00"
+    },
+    {
+      "path": "src/online2/catalog.py",
+      "sha256": "3e389f67e2d62f123bbf3e6bccaacac2c9794cb23d34eaf78e8a95d59a71359f",
+      "size_bytes": 2493,
+      "mtime_utc": "2026-07-12T09:16:48.561541+00:00"
+    },
+    {
+      "path": "src/online2/cli.py",
+      "sha256": "79038cbade1c55f03b609963e6950a641ddbecb09cccf49cc9fbaa770bd41d58",
+      "size_bytes": 4782,
+      "mtime_utc": "2026-07-12T10:52:07.049357+00:00"
+    },
+    {
+      "path": "src/online2/inventory.py",
+      "sha256": "e5d9bd77a51010ea5374e0427276e7973cf4819c85a39a1cf004aaf1b68fed1d",
+      "size_bytes": 6020,
+      "mtime_utc": "2026-07-12T09:22:29.501018+00:00"
+    },
+    {
+      "path": "src/online2/materializers.py",
+      "sha256": "b048f4223c127c85f723a014192819a6efea593869c59b671258f55b4d50488f",
+      "size_bytes": 32566,
+      "mtime_utc": "2026-07-12T09:53:15.902979+00:00"
+    },
+    {
+      "path": "src/online2/neo4j.py",
+      "sha256": "322e1a960207b1191b67786541688d59efc4331d959f3a0d72863f5ac9c4e12f",
+      "size_bytes": 26615,
+      "mtime_utc": "2026-07-12T10:52:00.465435+00:00"
+    },
+    {
+      "path": "src/online2/pool.py",
+      "sha256": "a547d3cf45ee1c86517079184148454100fdc3db47dde5e39dc6b0be69e25e8a",
+      "size_bytes": 2024,
+      "mtime_utc": "2026-07-12T09:16:38.612531+00:00"
+    },
+    {
+      "path": "src/online2/registry.py",
+      "sha256": "3d173a906ac20d31120d15ee82208584ad178564b4d280fbb5d0a44ed42a5d19",
+      "size_bytes": 5552,
+      "mtime_utc": "2026-07-12T10:24:35.983262+00:00"
+    },
+    {
+      "path": "src/online2/training_export.py",
+      "sha256": "622d6c177580ec971f3e5a124d65064ca44fcc4f446dd1e1ef1a0688a8d4ec90",
+      "size_bytes": 5798,
+      "mtime_utc": "2026-07-12T09:43:48.538690+00:00"
+    },
+    {
+      "path": "src/tasks/base.py",
+      "sha256": "375427ec8a524a334cfa1d9dac354b941a2b87404a2b8cb670214093d4341056",
+      "size_bytes": 8493,
+      "mtime_utc": "2026-07-12T09:16:44.576537+00:00"
+    },
+    {
+      "path": "src/tasks/mlm.py",
+      "sha256": "8fa038335d4ac7ef45a3ba59c81495d6b2b2bd88b09fd98a3364873fe4b88d1b",
+      "size_bytes": 12764,
+      "mtime_utc": "2026-07-12T10:31:58.791714+00:00"
+    },
+    {
+      "path": "src/transformer/external_embeddings.py",
+      "sha256": "c3f4deb14277b91ad4477819595d8d4ffec45a43002f955614f0ebb669b11de1",
+      "size_bytes": 3619,
+      "mtime_utc": "2026-07-12T09:18:51.497688+00:00"
+    },
+    {
+      "path": "src/transformer/models.py",
+      "sha256": "38bbf4dba7121c13a5471ea375506e7e964af1339fc544a2d81723237aeb539c",
+      "size_bytes": 15638,
+      "mtime_utc": "2026-07-12T09:19:03.956705+00:00"
+    },
+    {
+      "path": "tests/test_online2_integration_units.py",
+      "sha256": "bd60694897ff3218adc5960c16578225329280f335da48d96cc50cfea9704c87",
+      "size_bytes": 5559,
+      "mtime_utc": "2026-07-12T10:31:25.964418+00:00"
+    },
+    {
+      "path": "tests/test_online2_sop_and_mlm.py",
+      "sha256": "05c60f328f2bb098d1ee34b0f8ed0130b67317ed9c35b2c730aa1fe6e792cd80",
+      "size_bytes": 5193,
+      "mtime_utc": "2026-07-12T10:32:57.659236+00:00"
+    }
+  ],
+  "baseline_branch": "chore/online2-v2-baseline",
+  "baseline_commit_sha": "c56ba3fe3bc6a6e08808cad5b174dd8527d66ea4",
+  "baseline_tag": "online2-pre-v2-workingtree-baseline",
+  "baseline_meaning": "Working-tree snapshot immediately before V2 development. NOT the reproducible source of approved V1; approved V1 truth remains outputs/online2/build-v8-active80-r3 artifacts.",
+  "updated_at_utc": "2026-07-12T16:30:30.411360+00:00"
+}

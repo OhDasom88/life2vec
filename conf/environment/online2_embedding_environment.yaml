@@ -1,0 +1,63 @@
+# Offline embedding-build environment (NOT the Life2Vec train env).
+# Install and model download happen in Phase E0 only.
+name: online2-embedding-build
+purpose: frozen image/text encoder inference for versioned external embeddings
+lifecycle: offline_job_only
+
+host_constraints:
+  cuda_device_example: "NVIDIA GeForce RTX 3090 24GB"
+  life2vec_torch: "2.6.0+cu124"
+  note: >
+    Keep transformers/timm/sentence-transformers out of the Life2Vec conda env.
+    Life2Vec may only gain a minimal safetensors/numpy reader later.
+
+python:
+  version: "3.10"
+
+torch:
+  candidate: "2.6.0+cu124"
+  index_url: "https://download.pytorch.org/whl/cu124"
+  torchvision_candidate: "0.21.0+cu124"
+
+packages:
+  required_candidates:
+    - transformers>=4.51,<5
+    - safetensors>=0.4.5
+    - timm>=1.0.9
+    - pillow>=10
+    - numpy
+    - pandas
+    - pyarrow
+    - tqdm
+  optional_candidates:
+    - sentence-transformers>=3.0
+    - accelerate>=0.33
+
+text_encoder_candidates:
+  - id: Qwen/Qwen3-Embedding-0.6B
+    role: primary
+  - id: BAAI/bge-m3
+    role: fallback
+  - id: intfloat/multilingual-e5-base
+    role: fallback
+
+image_encoder_candidates:
+  - id: facebook/dinov2-large
+    role: primary
+  - id: facebook/dinov2-base
+    role: fallback
+  - id: google/siglip2-base-patch16-224
+    role: ablation_shared_space
+
+life2vec_env_reader_only:
+  allowed_additions:
+    - safetensors  # optional minimal reader
+  forbidden:
+    - transformers
+    - timm
+    - sentence-transformers
+    - huggingface encoder checkpoint load during training
+
+pinning_policy:
+  model_revision: git commit SHA of HF model repo
+  record_fields: [model_name, model_revision, model_checksum, processor_revision, pooling_method, embedding_dim]

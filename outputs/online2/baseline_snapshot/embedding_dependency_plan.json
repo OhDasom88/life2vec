@@ -1,0 +1,96 @@
+{
+  "created_at_utc": "2026-07-12T16:30:17.097646+00:00",
+  "phase": "B1-F_plan_only",
+  "embedding_env_name": "online2-embedding-build",
+  "life2vec_env_name": "life2vec",
+  "do_not_install_in_b1": true,
+  "life2vec_current": {
+    "torch": "2.6.0+cu124",
+    "transformers": "MISSING",
+    "safetensors": "MISSING",
+    "timm": "MISSING",
+    "pillow": "12.2.0",
+    "gpu": "NVIDIA GeForce RTX 3090 24GB"
+  },
+  "separation_principle": {
+    "embedding_env": [
+      "transformers",
+      "timm",
+      "safetensors",
+      "optional sentence-transformers",
+      "image/text encoders"
+    ],
+    "life2vec_env": [
+      "Life2Vec",
+      "MLM/SOP",
+      "external embedding reader",
+      "projection/norm/gate",
+      "optional safetensors reader only"
+    ]
+  },
+  "candidates": {
+    "text": [
+      {
+        "id": "Qwen/Qwen3-Embedding-0.6B",
+        "role": "primary",
+        "expected_dim": "TBD_at_E0",
+        "approx_disk_gb": 1.5
+      },
+      {
+        "id": "BAAI/bge-m3",
+        "role": "fallback",
+        "expected_dim": 1024,
+        "approx_disk_gb": 2.3
+      },
+      {
+        "id": "intfloat/multilingual-e5-base",
+        "role": "fallback",
+        "expected_dim": 768,
+        "approx_disk_gb": 1.1
+      }
+    ],
+    "image": [
+      {
+        "id": "facebook/dinov2-large",
+        "role": "primary",
+        "expected_dim": 1024,
+        "approx_disk_gb": 1.2
+      },
+      {
+        "id": "facebook/dinov2-base",
+        "role": "fallback",
+        "expected_dim": 768,
+        "approx_disk_gb": 0.35
+      },
+      {
+        "id": "google/siglip2-base-patch16-224",
+        "role": "ablation",
+        "expected_dim": "TBD_at_E0",
+        "approx_disk_gb": 1.0
+      }
+    ]
+  },
+  "compatibility_matrix": {
+    "torch_2_6_cu124": {
+      "status": "preferred_host_match"
+    },
+    "transformers_4_51_plus": {
+      "status": "candidate_for_qwen3_embedding",
+      "verify_at": "E0"
+    },
+    "timm": {
+      "required_for": [
+        "dinov2 via transformers or timm"
+      ],
+      "verify_at": "E0"
+    }
+  },
+  "benchmark_methods_deferred_to_E0": [
+    "repeat determinism",
+    "peak VRAM",
+    "throughput",
+    "collapse rate",
+    "pooling check"
+  ],
+  "config_path": "conf/environment/online2_embedding_environment.yaml"
+}

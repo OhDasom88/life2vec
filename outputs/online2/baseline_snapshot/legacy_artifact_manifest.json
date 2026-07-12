@@ -1,0 +1,103 @@
+{
+  "created_at_utc": "2026-07-12T16:23:09.034693+00:00",
+  "role": "approved_v1_artifact_baseline_readonly",
+  "build_id": "build_85c4aba3a72e0e321cfcf6af46eecd20a19a2c0a85fab2b70d0af677dd85840a",
+  "schema_version": "online2-v1",
+  "vocab_size": 994,
+  "training_export_manifest": {
+    "build_id": "build_85c4aba3a72e0e321cfcf6af46eecd20a19a2c0a85fab2b70d0af677dd85840a",
+    "row_count": 15525398,
+    "sequence_count": 967012,
+    "event_count": 222309,
+    "vocabulary_size": 994,
+    "training_events_sha256": "682c926b96c14cc11d2f81b521be11042e50e60e2eb53b67e2e3389cd0d10f63",
+    "token_registry_sha256": "ab0fb6d00b36cebb420b19801ebf51eb8c095dd4da9e49ab9ab49eedec034e25"
+  },
+  "files": [
+    {
+      "path": "outputs/online2/build-v8-active80-r3/build_manifest.json",
+      "sha256": "8cdee5586e6586565edc1f7b73603aca33d4e73e8e90a211663cf69c612b10f7",
+      "size_bytes": 1186
+    },
+    {
+      "path": "outputs/online2/build-v8-active80-r3/binning_registry.json",
+      "sha256": "b7002022abf7462086a68a2ab5dab52e24e33c669bedbe4a66a79584ffbdcf6d",
+      "size_bytes": 775559
+    },
+    {
+      "path": "outputs/online2/build-v8-active80-r3/tokenization_registry.json",
+      "sha256": "411270e490c8e970946d5a5d1d5e01d191572439a961d5ee0377818d764c20bd",
+      "size_bytes": 292
+    },
+    {
+      "path": "outputs/online2/build-v8-active80-r3/life2vec_token_registry.json",
+      "sha256": "ab0fb6d00b36cebb420b19801ebf51eb8c095dd4da9e49ab9ab49eedec034e25",
+      "size_bytes": 144121
+    },
+    {
+      "path": "outputs/online2/build-v8-active80-r3/training_export_manifest.json",
+      "sha256": "9c77810fd9d3235230816be5dc9e8d29c62b485baace3d91e956e978e6003d81",
+      "size_bytes": 386
+    },
+    {
+      "path": "outputs/online2/build-v8-active80-r3/validation_report.json",
+      "sha256": "f587c9e5e3818483a7d8366f36453ce0e6882e5c61e044d301ee2aad42fa9b5a",
+      "size_bytes": 38240
+    },
+    {
+      "path": "outputs/online2/build-v8-active80-r3/baseline_inventory.json",
+      "sha256": "3d1ad3745417d3950bd136814aa7a6f6772f0a0b2b350f9e63e189b463a245a2",
+      "size_bytes": 604480
+    },
+    {
+      "path": "outputs/online2/build-v8-active80-r3/training_events.parquet",
+      "sha256": "682c926b96c14cc11d2f81b521be11042e50e60e2eb53b67e2e3389cd0d10f63",
+      "size_bytes": 964804549
+    },
+    {
+      "path": "outputs/online2/build-v8-active80-r3/events.parquet",
+      "sha256": "b0a5e00c17695cf87b23b8fbe75e7f508ad2a37085148b0ab0669224fe4674f0",
+      "size_bytes": 17452652
+    },
+    {
+      "path": "outputs/online2/build-v8-active80-r3/event_tokens.parquet",
+      "sha256": "715adff6b98b5ca21b49ffc47ccdb3bf0d4aa56135b1c48d8082693ad782cec7",
+      "size_bytes": 114266492
+    },
+    {
+      "path": "outputs/online2/build-v8-active80-r3/cell_token_mappings.parquet",
+      "sha256": "10d4361681d989fe57e7549ea54dfcf7e51d47cbe1e79f284651e528cfb8e4b5",
+      "size_bytes": 150607990
+    },
+    {
+      "path": "outputs/online2/build-v8-active80-r3/sequences.parquet",
+      "sha256": "1ed782517e5782903b0c14e3c29c87eb1655914621177cc63d567de579019871",
+      "size_bytes": 178238651
+    },
+    {
+      "path": "outputs/online2/build-v8-active80-r3/same_time_groups.parquet",
+      "sha256": "d4c5e6b52bd9fc44d01f48f42ffb3f808e0debc6e385d5aa22b879a845b74f36",
+      "size_bytes": 198371
+    },
+    {
+      "path": "outputs/online2/build-v8-active80-r3/external_embeddings.parquet",
+      "sha256": "ea389fbebcdedb907e0a7d2f73c301ec61acf6e91b1809a47701b1c18f5ef326",
+      "size_bytes": 8338
+    },
+    {
+      "path": "outputs/online2/build-v8-active80-r3/atomic_values.parquet",
+      "sha256": "cf5830861d12202868c7bbaf0c9548658944925d40213a13eee2533c598d9994",
+      "size_bytes": 7856715
+    }
+  ],
+  "git_at_snapshot": {
+    "branch": "main",
+    "head": "5de965b53dc105adfbdc32b4fa733c786584abf0",
+    "note": "online2 sources mostly untracked"
+  },
+  "baseline_branch": "chore/online2-v2-baseline",
+  "baseline_commit_sha": "c56ba3fe3bc6a6e08808cad5b174dd8527d66ea4",
+  "baseline_tag": "online2-pre-v2-workingtree-baseline",
+  "baseline_meaning": "Working-tree snapshot immediately before V2 development. NOT the reproducible source of approved V1; approved V1 truth remains outputs/online2/build-v8-active80-r3 artifacts.",
+  "updated_at_utc": "2026-07-12T16:30:30.411555+00:00"
+}
