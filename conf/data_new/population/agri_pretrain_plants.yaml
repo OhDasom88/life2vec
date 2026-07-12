@@ -1,0 +1,7 @@
+defaults:
+  - /data_new/sources
+
+_target_: src.data_new.populations.agri_pretrain.AgriPretrainPlantPopulation
+
+name: agri_pretrain_plants
+growth_data: ${data_new.sources.agri_growth}

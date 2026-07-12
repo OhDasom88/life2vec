@@ -1,0 +1,16 @@
+defaults:
+  - /data_new/sources
+  - /data_new/population@population: agri_pretrain_union
+
+_target_: src.data_new.datamodule.Corpus
+
+name: agri_pretrain_vocab
+
+sources:
+  - ${data_new.sources.agri_growth}
+  - ${data_new.sources.agri_growth_greenhouse}
+  - ${data_new.sources.agri_environment_episode}
+  - ${data_new.sources.agri_environment_hourly_gh}
+
+reference_date: "2024-11-01"
+threshold: "2025-01-01"

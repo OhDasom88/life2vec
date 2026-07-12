@@ -42,3 +42,27 @@ agri_growth_finetune:
   _target_: src.data_new.sources.agri_growth_finetune.AgriGrowthFinetuneTokens
   name: agri_growth_finetune
   downsample: False
+
+agri_growth_greenhouse:
+  _target_: src.data_new.sources.agri_growth_greenhouse.AgriGrowthGreenhouseTokens
+  name: agri_growth_greenhouse
+  downsample: False
+
+agri_environment_episode:
+  _target_: src.data_new.sources.agri_environment.AgriEnvironmentTokens
+  name: agri_environment_episode
+  narrative: episode
+  person_scope: plant
+  downsample: False
+
+agri_environment_hourly_gh:
+  _target_: src.data_new.sources.agri_environment.AgriEnvironmentTokens
+  name: agri_environment_hourly_gh
+  narrative: hourly
+  person_scope: greenhouse
+  downsample: False
+
+hackathon_environment:
+  _target_: src.data_new.sources.hackathon_environment.HackathonEnvironmentTokens
+  name: hackathon_environment
+  downsample: False

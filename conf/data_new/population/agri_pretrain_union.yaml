@@ -1,0 +1,7 @@
+defaults:
+  - /data_new/population@plants: agri_pretrain_plants
+  - /data_new/population@greenhouses: agri_pretrain_greenhouses
+
+_target_: src.data_new.populations.agri_pretrain.AgriPretrainUnionPopulation
+
+name: agri_pretrain_union

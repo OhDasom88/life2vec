@@ -1,0 +1,14 @@
+defaults:
+  - /data_new/sources
+  - /data_new/population@population: agri_pretrain_greenhouses
+
+_target_: src.data_new.datamodule.Corpus
+
+name: agri_pretrain_greenhouse
+
+sources:
+  - ${data_new.sources.agri_environment_hourly_gh}
+  - ${data_new.sources.agri_growth_greenhouse}
+
+reference_date: "2024-11-01"
+threshold: "2025-01-01"

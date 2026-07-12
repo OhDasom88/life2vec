@@ -1,0 +1,14 @@
+defaults:
+  - /data_new/sources
+  - /data_new/population@population: agri_pretrain_plants
+
+_target_: src.data_new.datamodule.Corpus
+
+name: agri_pretrain_episode
+
+sources:
+  - ${data_new.sources.agri_environment_episode}
+  - ${data_new.sources.agri_growth}
+
+reference_date: "2024-11-01"
+threshold: "2025-01-01"

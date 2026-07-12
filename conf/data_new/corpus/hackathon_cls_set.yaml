@@ -1,0 +1,13 @@
+defaults:
+  - /data_new/sources
+  - /data_new/population@population: hackathon_cls_set
+
+_target_: src.data_new.datamodule.Corpus
+
+name: hackathon_cls_set
+
+sources:
+  - ${data_new.sources.hackathon_environment}
+
+reference_date: "2024-01-01"
+threshold: "2099-01-01"

@@ -1,0 +1,11 @@
+defaults:
+  - /data_new/corpus@corpus: hackathon_set
+
+_target_: src.data_new.vocabulary.CorpusVocabulary
+
+name: ${.corpus.name}
+min_token_count: 1
+year_range: [2024, 2025]
+background_tokens:
+  - GH_1
+  - LN_0
