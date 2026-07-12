@@ -16,10 +16,16 @@ build/
 # Data and artifacts
 data/interim/
 data/processed/
+data/rawdata/
+data/labelstudio/
 logs/
 outputs/
 checkpoints/
 wandb/
+datasets/
+dataset.bak/
+*.log
+output*.log
 
 # Hydra
 .multirun/
