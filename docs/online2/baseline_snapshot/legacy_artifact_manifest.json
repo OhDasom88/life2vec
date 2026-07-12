@@ -96,8 +96,9 @@
     "note": "online2 sources mostly untracked"
   },
   "baseline_branch": "chore/online2-v2-baseline",
-  "baseline_commit_sha": "c56ba3fe3bc6a6e08808cad5b174dd8527d66ea4",
+  "baseline_commit_sha": "d9c65590bdecfbc8d36118963bd8fada84d7bb15",
   "baseline_tag": "online2-pre-v2-workingtree-baseline",
   "baseline_meaning": "Working-tree snapshot immediately before V2 development. NOT the reproducible source of approved V1; approved V1 truth remains outputs/online2/build-v8-active80-r3 artifacts.",
-  "updated_at_utc": "2026-07-12T16:30:30.411822+00:00"
+  "updated_at_utc": "2026-07-12T16:30:41.518883+00:00",
+  "sha_record_note": "baseline_commit_sha identifies the snapshot content commit; a follow-up commit may only refresh this field."
 }
