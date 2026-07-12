@@ -19,11 +19,37 @@ from src.transformer.transformer import Transformer, MaskedLanguageModel, CLS_De
 log = logging.getLogger(__name__)
 HOME_PATH = str(Path.home())
 
+def masked_sop_loss(loss_values, mask=None):
+    """Average per-sample SOP losses over eligible rows only.
+
+    ``mask=None`` preserves compatibility with batches encoded before v8.
+    """
+    if mask is None:
+        return loss_values.mean()
+    mask = mask.to(device=loss_values.device, dtype=loss_values.dtype).reshape(-1)
+    values = loss_values.reshape(-1)
+    denominator = mask.sum()
+    if denominator.item() == 0:
+        return values.sum() * 0.0
+    return (values * mask).sum() / denominator
+
+
 class TransformerEncoder(pl.LightningModule):
     """Transformer with Masked Language Model"""
 
     def __init__(self, hparams):
         super(TransformerEncoder, self).__init__()
+        if "vocabulary" in hparams:
+            hparams = dict(hparams)
+            vocabulary = hparams.pop("vocabulary")
+            actual_size = vocabulary.size()
+            configured_size = hparams.get("vocab_size")
+            if configured_size is not None and int(configured_size) != actual_size:
+                raise ValueError(
+                    f"Configured vocab_size={configured_size} does not match "
+                    f"vocabulary size {actual_size}"
+                )
+            hparams["vocab_size"] = actual_size
         self.hparams.update(hparams)
         #self.idx2token = self.load_lookup(HOME_PATH + self.hparams.dict_path)
         self.last_global_step = 0
@@ -42,7 +68,9 @@ class TransformerEncoder(pl.LightningModule):
             self.mlm_decoder = MaskedLanguageModel(self.hparams, self.transformer.embedding, act="tanh")
             self.cls_decoder = CLS_Decoder(self.hparams)
             ## 2.2. LOSS
-            self.cls_loss = nn.CrossEntropyLoss(weight=self.cls_a, label_smoothing=0.1)
+            self.cls_loss = nn.CrossEntropyLoss(
+                weight=self.cls_a, label_smoothing=0.1, reduction="none"
+            )
             self.mlm_loss = nn.CrossEntropyLoss(ignore_index = 0)
         else:
             raise NotImplementedError()
@@ -172,7 +200,10 @@ class TransformerEncoder(pl.LightningModule):
         mlm_targs = batch["target_tokens"].long()
         cls_targs = batch["target_cls"].long()
         mlm_loss = self.mlm_loss(mlm_preds.permute(0, 2, 1), target=mlm_targs)
-        cls_loss = self.cls_loss(cls_preds, target = cls_targs)
+        cls_loss = masked_sop_loss(
+            self.cls_loss(cls_preds, target=cls_targs),
+            batch.get("target_cls_mask"),
+        )
 
         self.log("train/loss_mlm", mlm_loss.detach(), on_step=True, on_epoch=True)
         self.log("train/loss_cls", cls_loss.detach(), on_step=True, on_epoch=True)
@@ -212,7 +243,10 @@ class TransformerEncoder(pl.LightningModule):
         mlm_targs = batch["target_tokens"].long()
         cls_targs = batch["target_cls"].long()
         mlm_loss = self.mlm_loss(mlm_preds.permute(0, 2, 1), target=mlm_targs)
-        cls_loss = self.cls_loss(cls_preds, target = cls_targs)
+        cls_loss = masked_sop_loss(
+            self.cls_loss(cls_preds, target=cls_targs),
+            batch.get("target_cls_mask"),
+        )
 
         self.log("val/loss_mlm", mlm_loss.detach(), on_step=True, on_epoch=True)
         self.log("val/loss_cls", cls_loss.detach(), on_step=True, on_epoch=True)
@@ -236,7 +270,10 @@ class TransformerEncoder(pl.LightningModule):
         mlm_targs = batch["target_tokens"].long()
         cls_targs = batch["target_cls"].long()
         mlm_loss = self.mlm_loss(mlm_preds.permute(0, 2, 1), target=mlm_targs)
-        cls_loss = self.cls_loss(cls_preds, target = cls_targs)
+        cls_loss = masked_sop_loss(
+            self.cls_loss(cls_preds, target=cls_targs),
+            batch.get("target_cls_mask"),
+        )
 
         self.log("val/loss_mlm", mlm_loss.detach(), on_step=False, on_epoch=True)
         self.log("val/loss_cls", cls_loss.detach(), on_step=False, on_epoch=True)

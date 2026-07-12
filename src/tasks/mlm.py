@@ -1,4 +1,5 @@
 import logging
+from copy import deepcopy
 from dataclasses import dataclass
 from functools import cached_property
 from itertools import chain
@@ -7,7 +8,6 @@ from xml.dom.minidom import Document
 
 import numpy as np
 import torch
-from random import shuffle
 
 from src.data_new.types import Background, PersonDocument, EncodedDocument
 from src.tasks.base import Task
@@ -32,8 +32,21 @@ class MLM(Task):
     # MLM Specific params
     mask_ratio: float = 0.30
     smart_masking: bool = False
+    mask_special_tokens: bool = False
+    mask_background_tokens: bool = False
+    non_maskable_tokens: Tuple[str, ...] = ("IMAGE_EMBED_SLOT", "TEXT_EMBED_SLOT")
+    sop_reverse_probability: float = 0.05
+    sop_shuffle_probability: float = 0.05
+    evaluation_seed: int = 2023
 
-    def encode_document(self, document: PersonDocument) -> "MLMEncodedDocument":
+    def encode_preprocessed_document(
+        self, document: PersonDocument, is_train: bool
+    ) -> "MLMEncodedDocument":
+        return self.encode_document(document, is_train=is_train)
+
+    def encode_document(
+        self, document: PersonDocument, is_train: bool = True
+    ) -> "MLMEncodedDocument":
 
         prefix_sentence = (
             ["[CLS]"] + Background.get_sentence(document.background) + ["[SEP]"]
@@ -41,7 +54,9 @@ class MLM(Task):
 
         ############################################
         ### CLS TASK
-        document, targ_cls = self.cls_task(document)
+        document, targ_cls, target_cls_mask = self.cls_task(
+            document, is_train=is_train
+        )
         ############################################
 
         sentences = [prefix_sentence] + [s + ["[SEP]"] for s in document.sentences]
@@ -71,7 +86,7 @@ class MLM(Task):
 
         length = len(token_ids)
 
-        input_ids = np.zeros((4, self.max_length))
+        input_ids = np.zeros((4, self.max_length), dtype=np.float32)
         input_ids[0, :length] = masked_sentences
         input_ids[1, :length] = abspos_expanded
         input_ids[2, :length] = age_expanded
@@ -83,7 +98,7 @@ class MLM(Task):
         # TODO: Consider renaming, to document/sentences instead of sequence...
         # would require refactoring of the modelling also though
 
-        original_sequence = np.zeros(self.max_length)
+        original_sequence = np.zeros(self.max_length, dtype=np.int64)
         original_sequence[:length] = token_ids
 
         sequence_id = np.array(document.person_id)
@@ -95,6 +110,7 @@ class MLM(Task):
             target_tokens=masked_tokens,
             target_pos=masked_indx,
             target_cls=targ_cls,
+            target_cls_mask=target_cls_mask,
             original_sequence=original_sequence,
         )
 
@@ -119,18 +135,100 @@ class MLM(Task):
         )
         return cast(List[Tuple[int, int]], token_groups)
 
-    def cls_task(self, document: PersonDocument):
-        p = np.random.rand(1)
-        if p <0.05:
-            document.sentences.reverse()
-            targ_cls = 1
-        elif p>0.95:
-            shuffle(document.sentences)
-            targ_cls = 2
-        else:
-            targ_cls = 0
+    @staticmethod
+    def _group_blocks(document: PersonDocument) -> List[List[int]]:
+        """Return event-index blocks; legacy documents treat each sentence as a group."""
+        group_ids = document.same_time_group_ids
+        if group_ids is None:
+            return [[i] for i in range(len(document.sentences))]
+        blocks: List[List[int]] = []
+        positions = {}
+        for index, group_id in enumerate(group_ids):
+            # Keep a group together even if malformed input made it non-contiguous.
+            if group_id not in positions:
+                positions[group_id] = len(blocks)
+                blocks.append([])
+            blocks[positions[group_id]].append(index)
+        return blocks
 
-        return document, targ_cls
+    def _sop_is_eligible(
+        self, document: PersonDocument, distinct_group_count: int
+    ) -> bool:
+        if document.same_time_group_ids is None:
+            # Preserve the old SOP behavior for legacy documents.
+            return True
+        semantics_ok = document.order_semantics in {
+            "STRICT_CHRONOLOGICAL",
+            "SPARSE_CHRONOLOGICAL",
+            "CHRONOLOGICAL_WITH_TIES",
+        }
+        declared = (
+            bool(document.op_eligible)
+            if document.op_eligible is not None
+            else semantics_ok
+        )
+        return declared and semantics_ok and distinct_group_count >= 2
+
+    def cls_task(
+        self,
+        document: PersonDocument,
+        is_train: bool = True,
+        force_label: int | None = None,
+    ):
+        """Apply a 3-class SOP permutation to whole SameTimeGroup blocks."""
+        result = deepcopy(document)
+        result.validate_event_alignment()
+        blocks = self._group_blocks(result)
+        eligible = self._sop_is_eligible(result, len(blocks))
+        if not eligible:
+            return result, np.int64(0), np.float32(0.0)
+
+        if is_train:
+            rng = np.random
+        else:
+            # Stable per-person seed; unlike hash(), this is process-independent.
+            person_bytes = str(result.person_id).encode("utf-8")
+            person_seed = int.from_bytes(person_bytes[:8].ljust(8, b"\0"), "little")
+            rng = np.random.RandomState(self.evaluation_seed ^ person_seed)
+
+        if force_label is None:
+            draw = float(rng.random())
+            if draw < self.sop_reverse_probability:
+                label = 1
+            elif (
+                draw < self.sop_reverse_probability + self.sop_shuffle_probability
+                and len(blocks) >= 3
+            ):
+                label = 2
+            else:
+                label = 0
+        else:
+            if force_label not in (0, 1, 2):
+                raise ValueError("SOP label must be 0, 1, or 2")
+            label = force_label
+
+        block_order = list(range(len(blocks)))
+        if label == 1:
+            block_order.reverse()
+        elif label == 2:
+            if len(blocks) < 3:
+                # With two groups, the only non-arranged order is REVERSED.
+                label = 1
+                block_order.reverse()
+            else:
+                identity = tuple(block_order)
+                reversed_order = tuple(reversed(block_order))
+                for _ in range(32):
+                    rng.shuffle(block_order)
+                    if tuple(block_order) not in (identity, reversed_order):
+                        break
+                else:
+                    block_order = block_order[1:2] + block_order[:1] + block_order[2:]
+
+        event_order = [index for block in block_order for index in blocks[block]]
+        result.select_events(event_order)
+        result.shuffled = label != 0
+        return result, np.int64(label), np.float32(1.0)
 
     def mlm_mask(
         self, token_ids: np.ndarray
@@ -147,48 +245,77 @@ class MLM(Task):
         # limit is length of an actual sequence
         n_tokens = len(token_ids)
 
-        num_tokens_to_mask = np.floor(n_tokens * self.mask_ratio).astype(np.int32)
-        # firt 10% of tokens won't be changed
-        pos_unchange = np.floor(num_tokens_to_mask * 0.1).astype(np.int32)
-        # last 10% of tokens would be random ; the rest will be changed
+        requested = int(np.floor(n_tokens * self.mask_ratio))
+
+        excluded_ids = {sep_id, unk_id, token2index.get("[PAD]", 0)}
+        if not self.mask_special_tokens:
+            excluded_ids.update(
+                token2index[token]
+                for token in vocabulary.general_tokens
+                if token in token2index
+            )
+            try:
+                general = vocabulary.vocab()
+                excluded_ids.update(
+                    general.loc[general.CATEGORY == "GENERAL", "ID"].astype(int).tolist()
+                )
+            except (AttributeError, KeyError):
+                # Minimal/legacy vocabulary implementations may only expose lists.
+                pass
+        if not self.mask_background_tokens:
+            excluded_ids.update(
+                token2index[token]
+                for token in vocabulary.background_tokens
+                if token in token2index
+            )
+        excluded_ids.update(
+            token2index[token]
+            for token in self.non_maskable_tokens
+            if token in token2index
+        )
+        legal_mask = ~np.isin(token_ids[1:], list(excluded_ids))
+        legal_indx = np.arange(start=1, stop=n_tokens)[legal_mask]
+        max_masked_num = int(np.floor(self.mask_ratio * self.max_length))
+        num_tokens_to_mask = min(requested, len(legal_indx), max_masked_num)
+        # 80% [MASK], 10% unchanged, 10% random.
+        pos_unchange = int(np.floor(num_tokens_to_mask * 0.1))
         pos_random = num_tokens_to_mask - pos_unchange
 
-        # we do not mask SEP and UNK
-        legal_mask = (token_ids[1:] != sep_id) & (token_ids[1:] != unk_id)
-        legal_indx = np.arange(start=1, stop=n_tokens)[legal_mask]
-
-        indx_to_mask = np.random.choice(
-            a=legal_indx, size=num_tokens_to_mask, replace=False
-        )
-
-        max_masked_num = np.floor(self.mask_ratio * self.max_length).astype(np.int32)
+        indx_to_mask = (
+            np.random.choice(a=legal_indx, size=num_tokens_to_mask, replace=False)
+            if num_tokens_to_mask
+            else np.asarray([], dtype=np.int64)
+        ).astype(np.int64)
 
         # positions of the masked tokens
-        y_indx = np.full(shape=max_masked_num, fill_value=int(self.max_length - 1))
+        y_indx = np.full(
+            shape=max_masked_num,
+            fill_value=int(self.max_length - 1),
+            dtype=np.int64,
+        )
         y_indx[: len(indx_to_mask)] = indx_to_mask.copy()
 
         # remember the actual tokens on positions
-        y_token = np.zeros(shape=max_masked_num)
+        y_token = np.zeros(shape=max_masked_num, dtype=np.int64)
         y_token[: len(indx_to_mask)] = token_ids[indx_to_mask].copy()
 
         # masked token_ids #rather change the sampling domain for accurate masking
         # ratio?
         token_ids[indx_to_mask[pos_unchange:pos_random]] = mask_id
 
-        vocab_size = len(token2index)
-        n_general_tokens = len(vocabulary.general_tokens)
+        replacement_ids = np.array(
+            sorted(set(token2index.values()) - excluded_ids), dtype=np.int64
+        )
 
         if self.smart_masking:
 
             smart_edge = int(pos_random + int(pos_unchange * 0.3))
 
             # Random 7% of all random cases
-            token_ids[indx_to_mask[smart_edge:]] = np.random.randint(
-                # low we do not mask any special tokens
-                low=n_general_tokens,
-                high=vocab_size,
-                size=(1, len(indx_to_mask[smart_edge:])),
-            )
+            if len(replacement_ids):
+                token_ids[indx_to_mask[smart_edge:]] = np.random.choice(
+                    replacement_ids, size=len(indx_to_mask[smart_edge:])
+                )
 
             # Smart Random 3% of all the cases
             smart_values = token_ids[indx_to_mask[pos_random:smart_edge]]
@@ -199,12 +326,10 @@ class MLM(Task):
             token_ids[indx_to_mask[pos_random:smart_edge]] = smart_values
 
         else:
-            token_ids[indx_to_mask[pos_random:]] = torch.randint(
-                # low we do not mask any special tokens
-                low=n_general_tokens,
-                high=vocab_size,
-                size=(1, len(indx_to_mask[pos_random:])),
-            )
+            if len(replacement_ids) and len(indx_to_mask[pos_random:]):
+                token_ids[indx_to_mask[pos_random:]] = np.random.choice(
+                    replacement_ids, size=len(indx_to_mask[pos_random:])
+                )
         return token_ids, y_indx, y_token
 
     @staticmethod
@@ -224,4 +349,5 @@ class MLMEncodedDocument(EncodedDocument[MLM]):
     target_tokens: np.ndarray
     target_pos: np.ndarray
     target_cls: np.ndarray
+    target_cls_mask: np.ndarray
     original_sequence: np.ndarray
