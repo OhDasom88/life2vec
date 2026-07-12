@@ -1,0 +1,20 @@
+_target_: src.tasks.grouped_mlm.GroupedMLM
+name: online2_v2_grouped_mlm
+max_length: 1024
+no_sep: false
+p_sequence_timecut: 0.0
+p_sequence_resample: 0.0
+p_sequence_abspos_noise: 0.0
+p_sequence_hide_background: 0.0
+p_sentence_drop_tokens: 0.0
+shuffle_within_sentences: false
+mask_ratio: 0.30
+smart_masking: false
+mask_special_tokens: false
+mask_background_tokens: false
+mask_feature_identity: false
+non_maskable_tokens: ["[IMAGE_SLOT]", "[TEXT_SLOT]", "IMAGE_EMBED_SLOT", "TEXT_EMBED_SLOT"]
+vocab_v2_path: ${oc.env:ONLINE2_V2_VOCAB_PATH}
+sop_reverse_probability: 0.05
+sop_shuffle_probability: 0.05
+evaluation_seed: ${seed}
