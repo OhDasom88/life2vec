@@ -1,0 +1,82 @@
+{
+  "created_at_utc": "2026-07-12T16:35:53.500633+00:00",
+  "reuse_distributions": [
+    {
+      "unit": "event_id",
+      "n_unique": 222309,
+      "min": 1.0,
+      "mean": 69.83701964382908,
+      "median": 65.0,
+      "p90": 111.0,
+      "p95": 125.0,
+      "p99": 142.0,
+      "max": 169.0
+    },
+    {
+      "unit": "same_time_group_id",
+      "n_unique": 4872,
+      "min": 111.0,
+      "mean": 3186.6580459770116,
+      "median": 3103.0,
+      "p90": 5396.200000000004,
+      "p95": 6741.9,
+      "p99": 8390.96,
+      "max": 9175.0
+    },
+    {
+      "unit": "farm_date_window_sequences",
+      "n_unique": 825,
+      "min": 340.0,
+      "mean": 1658.090909090909,
+      "median": 1688.0,
+      "p90": 2073.2,
+      "p95": 2241.3999999999996,
+      "p99": 2460.84,
+      "max": 2547.0
+    }
+  ],
+  "exact_duplicate_hash_groups": 229802,
+  "exact_duplicate_sequences": 494162,
+  "near_duplicate_sample_pairs_ge_0_80": 4,
+  "near_duplicate_bucket_totals": {
+    "ge_0_95": 1,
+    "ge_0_80": 4,
+    "ge_0_50": 8,
+    "pairs": 9000
+  },
+  "near_duplicate_method": "sample <=30 narratives, <=25 sequences each, event-set Jaccard; seed=2023",
+  "narrative_inflation_summary": {
+    "median": 0.26263737924454733,
+    "p90": 1.0,
+    "max": 1.0
+  },
+  "split_overlap": [
+    {
+      "metric": "events_in_multiple_splits",
+      "value": 20.0
+    },
+    {
+      "metric": "multi_farm_sequences",
+      "value": 20.0
+    },
+    {
+      "metric": "sequence_count",
+      "value": 967012.0
+    },
+    {
+      "metric": "unique_events",
+      "value": 222309.0
+    },
+    {
+      "metric": "sequence_per_unique_event",
+      "value": 4.349855381473534
+    }
+  ],
+  "sampling_policy_candidates_impact_notes": {
+    "reuse_aware_weight": "Down-weights high-reuse events; lowers effective N, may raise unique-context diversity.",
+    "source_window_cap": "Caps sequences per farm-date window; largest impact on dense hourly narratives.",
+    "narrative_cap": "Limits sequences per narrative_id; reduces narrative monopoly.",
+    "near_duplicate_filter": "Drops Jaccard>=0.95 pairs within narrative; small exact-dup cleanup first.",
+    "epoch_level_rematerialization": "Resample contexts each epoch; no artifact rewrite, train-time only."
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "seed": 2023,
+  "abs_token": "CIRCULATION_FAN|ABS_B00",
+  "global_token": "CIRCULATION_FAN|GLOBAL_B00",
+  "farm_token": "CIRCULATION_FAN|FARM_REL_B00",
+  "masked_sibling_positions": [
+    3
+  ],
+  "visible_sibling_positions": [
+    1,
+    2
+  ],
+  "note": "Legacy independent MLM can leave sibling representations unmasked."
+}

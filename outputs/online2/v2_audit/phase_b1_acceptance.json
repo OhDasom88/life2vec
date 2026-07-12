@@ -1,0 +1,36 @@
+{
+  "phase": "B1",
+  "created_at_utc": "2026-07-12T16:37:25.418156+00:00",
+  "baseline_branch": "chore/online2-v2-baseline",
+  "baseline_commit_sha": "d9c65590bdecfbc8d36118963bd8fada84d7bb15",
+  "baseline_tag": "online2-pre-v2-workingtree-baseline",
+  "criteria": {
+    "1_baseline_commit_or_snapshot": "PASS",
+    "2_baseline_sha_recorded": "PASS",
+    "3_feature_type_unit_table": "PASS",
+    "4_unit_confidence_threshold_ready": "PASS",
+    "5_constant_classified": "PASS",
+    "6_legacy_mlm_fixture": "PASS",
+    "7_random_replacement_families": "PASS",
+    "8_event_reuse_distribution": "PASS",
+    "9_exact_near_duplicate_stats": "PASS",
+    "10_split_overlap_audit": "PASS",
+    "11_image_inventory_74": "PASS",
+    "12_interpretation_policy_audit": "PASS",
+    "13_problem_set_hidden_interp_used_0": "PASS",
+    "14_sensor_multimodal_routing": "PASS",
+    "15_embedding_env_plan": "PASS",
+    "16_neo4j_v1_unchanged": "PASS",
+    "17_deterministic_rerun_tests": "PASS"
+  },
+  "verdict": "PASS",
+  "v2_1_decisions_pending": [
+    "FARM_REL channel policy for pretraining (off vs causal vs train-fixed)",
+    "actuator/flow state thresholds after codebook/unit confirmation",
+    "whether FARM/ZONE remain input context or metadata-only",
+    "grouped masking: mask feature identity with value group or keep",
+    "STATIC metadata move for GLOBAL_CONSTANT ALWAYS_OFF features",
+    "reuse-aware sampling vs narrative/window caps for inflation",
+    "image_role HISTORY/QUERY assignment evidence source"
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "created_at_utc": "2026-07-12T16:35:05.337231+00:00",
+  "vocab_size": 994,
+  "excluded_count": 66,
+  "replacement_candidate_count": 928,
+  "includes_narrative": 80,
+  "includes_category": 6,
+  "includes_dataset": 1,
+  "background_excluded": [
+    "FARM|F130230",
+    "FARM|F135380",
+    "FARM|F152840",
+    "FARM|F155481",
+    "FARM|F188026",
+    "FARM|F188310",
+    "FARM|F194265",
+    "FARM|F209570",
+    "FARM|F241573",
+    "FARM|F257178",
+    "FARM|F279269",
+    "FARM|F295998",
+    "FARM|F302129",
+    "FARM|F332196",
+    "FARM|F333620",
+    "FARM|F346854",
+    "FARM|F354848",
+    "FARM|F356651",
+    "FARM|F385790",
+    "FARM|F393975"
+  ],
+  "slots_excluded": [
+    "IMAGE_EMBED_SLOT",
+    "TEXT_EMBED_SLOT"
+  ],
+  "mask_ratio_config": 0.3,
+  "bert_style_split": {
+    "mask": 0.8,
+    "keep": 0.1,
+    "random": 0.1
+  },
+  "sibling_independent_masking": true
+}

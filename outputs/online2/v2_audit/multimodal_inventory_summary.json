@@ -1,0 +1,16 @@
+{
+  "created_at_utc": "2026-07-12T16:36:14.827956+00:00",
+  "disk_images": 74,
+  "image_events": 74,
+  "interpretation_events": 35,
+  "external_embedding_rows": 109,
+  "embedding_ready": 0,
+  "embedding_pending": 109,
+  "route_counts": {
+    "sensor_only": 967012
+  },
+  "problem_set_interpretation_allowed": 35,
+  "problem_set_allowed_pretraining_count": 0,
+  "score90_allowed_for_pretraining": 35,
+  "notes": "No vectors ready => all sequences sensor_only is expected."
+}

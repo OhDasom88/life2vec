@@ -1,0 +1,68 @@
+{
+  "created_at_utc": "2026-07-12T16:36:14.916498+00:00",
+  "build_id": "build_85c4aba3a72e0e321cfcf6af46eecd20a19a2c0a85fab2b70d0af677dd85840a",
+  "feature_rows": 44,
+  "threshold_ready_features": [
+    "co2_ppm",
+    "crown_diameter_mm",
+    "ec_sensor",
+    "flower_truss_order",
+    "inside_humidity_pct",
+    "inside_temp_c",
+    "leaf_count",
+    "leaf_length_cm",
+    "leaf_width_cm",
+    "opened_flower_count",
+    "outside_humidity_pct",
+    "outside_temp_c",
+    "petiole_length_cm",
+    "plant_height_cm",
+    "substrate_ec_ds_m",
+    "substrate_temp_c",
+    "substrate_water_content_pct",
+    "unopened_flower_count",
+    "wind_direction_deg",
+    "wind_speed_m_s"
+  ],
+  "unresolved_or_low_unit": [
+    "circulation_fan",
+    "co2_supply",
+    "fcu_fan",
+    "fcu_pump",
+    "line_flow_rate",
+    "nutrient_solution_system",
+    "outside_solar_radiation",
+    "rain_detected",
+    "roof_vent_left",
+    "roof_vent_right",
+    "shade_screen",
+    "thermal_curtain",
+    "total_flow_rate",
+    "tube_rail"
+  ],
+  "constant_type_counts": {
+    "GLOBAL_CONSTANT": 57,
+    "FARM_CONSTANT": 36
+  },
+  "mlm_replacement_candidates": 928,
+  "reuse": {
+    "exact_duplicate_sequences": 494162,
+    "near_dup_pairs_ge_0_80_sample": 4
+  },
+  "multimodal": {
+    "created_at_utc": "2026-07-12T16:36:14.827956+00:00",
+    "disk_images": 74,
+    "image_events": 74,
+    "interpretation_events": 35,
+    "external_embedding_rows": 109,
+    "embedding_ready": 0,
+    "embedding_pending": 109,
+    "route_counts": {
+      "sensor_only": 967012
+    },
+    "problem_set_interpretation_allowed": 35,
+    "problem_set_allowed_pretraining_count": 0,
+    "score90_allowed_for_pretraining": 35,
+    "notes": "No vectors ready => all sequences sensor_only is expected."
+  }
+}
