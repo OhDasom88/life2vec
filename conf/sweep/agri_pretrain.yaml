@@ -1,0 +1,35 @@
+# W&B grid sweep for Agri multi-corpus pretrain (MLM + SOP/CLS).
+#
+# Usage:
+#   source setup.local.sh
+#   wandb sweep conf/sweep/agri_pretrain.yaml
+#   wandb agent dasom-oh/Berry2Vec/<sweep_id>
+
+project: Berry2Vec
+entity: dasom-oh
+program: src/sweep_pretrain.py
+command:
+  - ${env}
+  - python
+  - -m
+  - src.sweep_pretrain
+method: grid
+metric:
+  name: val/pretrain_score
+  goal: maximize
+
+parameters:
+  learning_rate:
+    values: [0.001, 0.004, 0.01, 0.04]
+
+  mlm_weight:
+    values: [0.6, 0.7, 0.8, 0.9]
+
+  dropout:
+    values: [0.05, 0.1, 0.15, 0.2]
+
+  weight_decay:
+    values: [0.001, 0.01, 0.05]
+
+  batch_size:
+    values: [2, 4, 8]

@@ -1,0 +1,16 @@
+defaults:
+  - /data_new/vocabulary@vocabulary: agri_pretrain_set
+  - /task@task: agri_mlm
+  - /data_new/corpus@corpus_growth: agri_pretrain_growth
+  - /data_new/corpus@corpus_episode: agri_pretrain_episode
+  - /data_new/corpus@corpus_greenhouse: agri_pretrain_greenhouse
+
+_target_: src.data_new.datamodule.MultiCorpusL2VDataModule
+
+name: agri_pretrain_multicorpus
+
+batch_size: 4
+num_workers: 0
+
+subset: false
+subset_id: 0

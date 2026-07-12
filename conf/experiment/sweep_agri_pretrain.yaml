@@ -1,0 +1,17 @@
+# @package _global_
+
+defaults:
+  - pretrain_agri_multicorpus
+
+version: 1.0
+
+trainer:
+  max_epochs: 50
+  check_val_every_n_epoch: 1
+  callbacks:
+    - ${callbacks.checkpoint_pretrain_sweep}
+    - ${callbacks.early_stopping_pretrain_sweep}
+    - ${callbacks.pretrain_wandb_review}
+    - ${callbacks.lr_monitor}
+    - ${callbacks.silence_warnings}
+    - ${callbacks.agri_save_weights}
