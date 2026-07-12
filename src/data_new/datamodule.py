@@ -28,6 +28,21 @@ from .vocabulary import Vocabulary
 log = logging.getLogger(__name__)
 
 
+def timedelta_to_position(delta, time_unit: str):
+    """Convert pandas/dask timedeltas without discarding sub-day precision."""
+    unit_seconds = {
+        "second": 1,
+        "minute": 60,
+        "hour": 3600,
+        "day": 86400,
+    }
+    if time_unit not in unit_seconds:
+        raise ValueError(
+            f"Unsupported time_unit={time_unit!r}; expected one of {sorted(unit_seconds)}"
+        )
+    return (delta.dt.total_seconds() // unit_seconds[time_unit]).astype(int)
+
+
 def compute_age(date: pd.Series, birthday: pd.Series) -> pd.Series:
     age = date.dt.year - birthday.dt.year
     age -= (date + MonthEnd(1)).dt.day_of_year < birthday.dt.day_of_year  # type: ignore
@@ -66,6 +81,7 @@ class Corpus:
 
     reference_date: str = "2008-01-01" 
     threshold: str = "2016-01-01"
+    time_unit: str = "day"
 
     def __post_init__(self) -> None:
 
@@ -105,9 +121,13 @@ class Corpus:
         population: pd.DataFrame = self.population.population()
         data_split = getattr(self.population.data_split(), split)
         sentences_parts = [self.sentences(s) for s in self.sources]
+        sort_columns = ["START_DATE"]
+        for column in ("time_group_rank", "event_position", "event_id"):
+            if all(column in part.columns for part in sentences_parts):
+                sort_columns.append(column)
         combined_sentences = concat_sorted(
             [sp.loc[lambda x: x.index.isin(data_split)] for sp in sentences_parts],
-            columns=["START_DATE"],
+            columns=sort_columns,
         ).join(population)
 
         # Fix age from sources without age using birthday
@@ -121,11 +141,10 @@ class Corpus:
             combined_sentences.START_DATE >= self._threshold
         )
 
-        # Date as days from reference date <- maybe move into task
-
-        combined_sentences["START_DATE"] = (
-            combined_sentences.START_DATE - self._reference_date
-        ).dt.days.astype(int)
+        delta = combined_sentences.START_DATE - self._reference_date
+        combined_sentences["START_DATE"] = timedelta_to_position(
+            delta, self.time_unit
+        )
 
         ### DASK SPECIFIC
         combined_sentences = combined_sentences.reset_index().set_index("PERSON_ID", sorted=True, npartitions="auto")
@@ -158,6 +177,31 @@ class Corpus:
         cols = ["START_DATE", "SENTENCE"]
         if "AGE" in tokenized.columns:
             cols.append("AGE")
+        metadata_columns = (
+            "SEGMENT",
+            "segment_id",
+            "EVENT_ID",
+            "event_id",
+            "SAME_TIME_GROUP_ID",
+            "same_time_group_id",
+            "EVENT_KIND",
+            "event_kind",
+            "MODALITY_REF",
+            "modality_ref",
+            "EMBEDDING_REF",
+            "embedding_ref",
+            "ORDER_SEMANTICS",
+            "order_semantics",
+            "OP_ELIGIBLE",
+            "op_eligible",
+            "SEQUENCE_ID",
+            "sequence_id",
+            "EVENT_POSITION",
+            "event_position",
+            "TIME_GROUP_RANK",
+            "time_group_rank",
+        )
+        cols.extend(column for column in metadata_columns if column in tokenized.columns)
 
         # It is a bit akwkard that we join, then split right after.
         # However it is easier to deal with strings, I think
@@ -245,7 +289,7 @@ class L2VDataModule(pl.LightningDataModule):
 
     def __post_init__(self) -> None:
         super().__init__()
-        assert self.name != ""
+        assert self.corpus.name != ""
         self.task.register(self)
 
     @property
@@ -282,9 +326,10 @@ class L2VDataModule(pl.LightningDataModule):
             if arguments == self._arguments():
                 return
             else:
-                log.warning("Arguments do not correspond to the recorded ones")
-                return
-                raise ValidationError
+                raise ValidationError(
+                    f"Stale dataset cache at {self.dataset_root}: "
+                    "recorded arguments differ from current corpus/vocabulary/task"
+                )
         except (EOFError, FileNotFoundError):
             pass
 
@@ -489,8 +534,10 @@ class MultiCorpusL2VDataModule(pl.LightningDataModule):
                 arguments = pickle.load(f)
             if arguments == self._arguments():
                 return
-            log.warning("Multi-corpus dataset arguments changed; re-run prepare_data")
-            return
+            raise ValidationError(
+                f"Stale multi-corpus dataset cache at {self.dataset_root}: "
+                "recorded arguments differ from current configuration"
+            )
         except (EOFError, FileNotFoundError):
             pass
 

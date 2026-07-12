@@ -123,7 +123,19 @@ class DocumentDataset(HDF5Dataset[PersonDocument, EncodedDocument[TaskT]]):
 
     def serialize(self, x: PersonDocument) -> str:
         """Dumps the person document to json data"""
-        return json.dumps(asdict(x), separators=(",", ":"))
+
+        def _json_default(obj: Any) -> Any:
+            if isinstance(obj, np.bool_):
+                return bool(obj)
+            if isinstance(obj, np.integer):
+                return int(obj)
+            if isinstance(obj, np.floating):
+                return float(obj)
+            raise TypeError(
+                f"Object of type {obj.__class__.__name__} is not JSON serializable"
+            )
+
+        return json.dumps(asdict(x), separators=(",", ":"), default=_json_default)
 
 
 class ShardedDocumentDataset(ConcatDataset, Generic[TaskT]):

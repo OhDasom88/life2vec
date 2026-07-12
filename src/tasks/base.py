@@ -1,4 +1,5 @@
 import random
+from copy import deepcopy
 from dataclasses import asdict, dataclass
 from itertools import accumulate
 from typing import TYPE_CHECKING, Callable, Dict, List, TypeVar
@@ -97,13 +98,17 @@ class Task:
         def preprocessor(x: PersonDocument) -> "EncodedDocument[_TaskT]":
             x = self.augment_document(x, is_train=is_train)
             x = self.clip_document(x)
-            return self.encode_document(x)
+            return self.encode_preprocessed_document(x, is_train=is_train)
 
         return preprocessor
 
     def augment_document(
         self, document: PersonDocument, is_train: bool
     ) -> PersonDocument:
+        # Dataset records can be reused by validation/test transforms.  Never mutate
+        # the cached PersonDocument (or its nested sentence lists).
+        document = deepcopy(document)
+        document.validate_event_alignment()
 
         if self.shuffle_within_sentences:
             # TODO: Maybe we should only do this for training?
@@ -139,9 +144,11 @@ class Task:
         # events that share the same abspos (not tied to data source).
         from itertools import cycle, islice
 
-        pattern = self.segment_pattern or [2, 3, 1]  # background prefix uses 1
-        document.segment = list(islice(cycle(pattern), len(document.sentences)))
+        if document.segment is None:
+            pattern = self.segment_pattern or [2, 3, 1]  # background prefix uses 1
+            document.segment = list(islice(cycle(pattern), len(document.sentences)))
 
+        document.validate_event_alignment()
         return document
 
     def clip_document(self, document: PersonDocument) -> PersonDocument:
@@ -158,12 +165,16 @@ class Task:
                 break
 
         if clip_idx is not None:
-            document.sentences = document.sentences[-clip_idx:]
-            document.abspos = document.abspos[-clip_idx:]
-            document.age = document.age[-clip_idx:]
-            document.segment = document.segment[-clip_idx:]
+            start = len(document.sentences) - clip_idx
+            document.select_events(range(start, len(document.sentences)))
 
         return document
+
+    def encode_preprocessed_document(
+        self: _TaskT, document: PersonDocument, is_train: bool
+    ) -> "EncodedDocument[_TaskT]":
+        """Split-aware encoding hook; legacy tasks keep their existing contract."""
+        return self.encode_document(document)
 
     def encode_document(
         self: _TaskT, document: PersonDocument
@@ -194,11 +205,35 @@ class Task:
             birth_year=birthday.year,
         )
 
+        def optional_list(*columns: str):
+            for column in columns:
+                if column in person_sentences.columns:
+                    return person_sentences[column].tolist()
+            return None
+
+        def optional_scalar(*columns: str):
+            for column in columns:
+                if column in person_sentences.columns:
+                    values = person_sentences[column].dropna()
+                    return values.iloc[0] if len(values) else None
+            return None
+
         return PersonDocument(
             person_id=person_id,
             sentences=sentences,
             abspos=abspos,
             age=age,
             timecut_pos=timecut_pos,
+            segment=optional_list("SEGMENT", "segment_id"),
             background=background,
+            event_ids=optional_list("EVENT_ID", "event_id"),
+            same_time_group_ids=optional_list(
+                "SAME_TIME_GROUP_ID", "same_time_group_id"
+            ),
+            event_kinds=optional_list("EVENT_KIND", "event_kind"),
+            modality_refs=optional_list(
+                "MODALITY_REF", "modality_ref", "EMBEDDING_REF", "embedding_ref"
+            ),
+            order_semantics=optional_scalar("ORDER_SEMANTICS", "order_semantics"),
+            op_eligible=optional_scalar("OP_ELIGIBLE", "op_eligible"),
         )

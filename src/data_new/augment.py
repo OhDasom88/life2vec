@@ -16,10 +16,7 @@ def align_document(document: PersonDocument) -> PersonDocument:
     """Aligns the document with timecut_pos"""
 
     cut = document.timecut_pos
-    document.sentences = document.sentences[:cut]
-    document.abspos = document.abspos[:cut]
-    document.age = document.age[:cut]
-    return document
+    return document.select_events(range(min(cut, len(document.sentences))))
 
 def make_timecut(
     document: PersonDocument,
@@ -48,11 +45,7 @@ def make_timecut(
         else:
             break
 
-    document.sentences = document.sentences[:timecut_pos]
-    document.abspos = document.abspos[:timecut_pos]
-    document.age = document.age[:timecut_pos]
-
-    return document
+    return document.select_events(range(timecut_pos))
 
 
 def add_noise2time(document: PersonDocument) -> PersonDocument:
@@ -77,17 +70,12 @@ def resample_document(document: PersonDocument) -> PersonDocument:
         np.random.choice(np.arange(0, num_records), size=num_to_remove, replace=False)
     )
 
-    document.sentences = [
-        i for idx, i in enumerate(document.sentences) if idx not in idx_to_remove
-    ]
-    document.abspos = [
-        i for idx, i in enumerate(document.abspos) if idx not in idx_to_remove
-    ]
-    document.age = [i for idx, i in enumerate(document.age) if idx not in idx_to_remove]
+    keep = [idx for idx in range(num_records) if idx not in idx_to_remove]
+    document.select_events(keep)
 
     # Added for v8_1_43
     # Each document should start with [0,1]
-    if document.abspos[0] != 1:
+    if document.abspos and document.abspos[0] != 1:
         offset = document.abspos[0] - 1
         document.abspos = [np.maximum(0, i - offset) for i in document.abspos]
 
@@ -101,10 +89,4 @@ def shuffle_sentences(document: PersonDocument) -> PersonDocument:
     order = list(range(0, len(document.abspos)))
     random.shuffle(order)
     order = order
-    document.sentences = [document.sentences[i] for i in order]
-    if document.segment is not None:
-        document.segment = [document.segment[i] for i in order]
-    document.abspos = [document.abspos[i] for i in order]
-    document.age = [document.age[i] for i in order]
-
-    return document
+    return document.select_events(order)
