@@ -30,6 +30,55 @@ class GroupedMLM(MLM):
         self._vocab_v2: Optional[VocabV2] = None
         self._masker: Optional[GroupedMLMMasker] = None
 
+    def get_document(self, person_sentences) -> PersonDocument:
+        document = super().get_document(person_sentences)
+        info = document.task_info if isinstance(document.task_info, dict) else {}
+        for field in (self.measurement_group_field, self.token_role_field):
+            if field in person_sentences.columns:
+                values = person_sentences[field].dropna()
+                if len(values):
+                    info[field] = values.iloc[0]
+        document.task_info = info or None
+        return document
+
+    def clip_document(self, document: PersonDocument) -> PersonDocument:
+        """Truncate long V2 sequence sentences instead of dropping all events."""
+        from src.data_new.types import Background
+
+        sep_size = 0 if self.no_sep else 1
+        prefix_length = len(Background.get_sentence(document.background)) + 1 + sep_size
+        max_sequence_length = self.max_length - prefix_length
+        if max_sequence_length <= 1:
+            return document
+
+        # V2 export is typically one serialized sentence per PERSON_ID.
+        if len(document.sentences) == 1 and len(document.sentences[0]) > max_sequence_length:
+            keep = max_sequence_length - sep_size
+            keep = max(keep, 1)
+            document.sentences = [document.sentences[0][:keep]]
+            if isinstance(document.task_info, dict):
+                for field in (self.measurement_group_field, self.token_role_field):
+                    raw = document.task_info.get(field)
+                    if isinstance(raw, str):
+                        try:
+                            values = json.loads(raw)
+                        except json.JSONDecodeError:
+                            continue
+                        document.task_info[field] = json.dumps(values[:keep])
+                    elif isinstance(raw, list):
+                        document.task_info[field] = raw[:keep]
+            if document.abspos:
+                document.abspos = document.abspos[:1]
+            if document.age:
+                document.age = document.age[:1]
+            if document.segment:
+                document.segment = document.segment[:1]
+            if document.event_ids:
+                document.event_ids = document.event_ids[:1]
+            return document
+
+        return super().clip_document(document)
+
     def _ensure_masker(self) -> GroupedMLMMasker:
         if self._masker is None:
             if not self.vocab_v2_path:

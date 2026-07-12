@@ -228,12 +228,35 @@ def tokenize_events(
         keep_ids = set(events["event_id"].head(max_events))
         events = events[events["event_id"].isin(keep_ids)]
 
-    # Build event key index
-    key_cols = ["farm", "zone", "ts", "view"]
-    cell_groups = {key: grp for key, grp in cells.groupby(key_cols, sort=False)}
+    # Compact cell index: avoid materializing 200k+ DataFrame group objects.
+    cells = cells.sort_values(
+        ["farm", "zone", "ts", "view", "column_name", "cell_id"], kind="mergesort"
+    )
+    cell_records = list(
+        cells[
+            [
+                "farm",
+                "zone",
+                "ts",
+                "view",
+                "column_name",
+                "cell_id",
+                "farm_id",
+                "raw_display",
+                "is_null",
+                "atomic_value_id",
+            ]
+        ].itertuples(index=False, name=None)
+    )
+    cell_groups: dict[tuple[str, str, str, str], list[tuple]] = defaultdict(list)
+    for rec in cell_records:
+        cell_groups[(rec[0], rec[1], rec[2], rec[3])].append(rec)
 
     rows = []
-    for ev in events.itertuples(index=False):
+    total = len(events)
+    for idx, ev in enumerate(events.itertuples(index=False), start=1):
+        if idx == 1 or idx % 5000 == 0 or idx == total:
+            print(f"tokenize_events {idx}/{total}", flush=True)
         key = (ev.farm, ev.zone, ev.ts, ev.view)
         grp = cell_groups.get(key)
         tokens: list[str] = []
@@ -248,17 +271,17 @@ def tokenize_events(
             group_ids = ["NONE"] * len(tokens)
             roles = ["slot", "meta", "meta"]
         elif grp is not None:
-            # deterministic column order
-            for cell in grp.sort_values(["column_name", "cell_id"], kind="mergesort").itertuples(index=False):
-                if cell.column_name in skip_cols:
+            for cell in grp:
+                column_name = cell[4]
+                if column_name in skip_cols:
                     continue
-                raw = "" if bool(cell.is_null) else str(cell.raw_display)
+                raw = "" if bool(cell[8]) else str(cell[7])
                 measured = tokenizer.tokenize_value(
-                    str(cell.column_name),
+                    str(column_name),
                     raw,
-                    farm_id=str(cell.farm_id),
-                    cell_id=str(cell.cell_id),
-                    atomic_value_id=str(getattr(cell, "atomic_value_id", "") or ""),
+                    farm_id=str(cell[6]),
+                    cell_id=str(cell[5]),
+                    atomic_value_id=str(cell[9] or ""),
                 )
                 tokens.append("[MEAS_SEP]")
                 group_ids.append(measured.measurement_group_id)
@@ -267,7 +290,9 @@ def tokenize_events(
                     tokens.append(tok)
                     group_ids.append(measured.measurement_group_id)
                     roles.append(role)
-            tokens = ["[EVENT_SEP]", f"VIEW|{str(ev.view).split('_')[-1].upper() if '_' in str(ev.view) else str(ev.view).upper()}", "EVENT_KIND|OBSERVATION"] + tokens
+            view_name = str(ev.view)
+            view_tok = view_name.split("_")[-1].upper() if "_" in view_name else view_name.upper()
+            tokens = ["[EVENT_SEP]", f"VIEW|{view_tok}", "EVENT_KIND|OBSERVATION"] + tokens
             group_ids = ["NONE", "NONE", "NONE"] + group_ids
             roles = ["sep", "meta", "meta"] + roles
         else:
@@ -275,7 +300,6 @@ def tokenize_events(
             group_ids = ["NONE"] * 3
             roles = ["sep", "meta", "quality"]
 
-        # map unknown tokens to UNK for serialization ids, but keep strings for audit
         token_ids = [vocab.get(t) for t in tokens]
         rows.append(
             {
@@ -299,52 +323,91 @@ def tokenize_events(
 
 
 def materialize_sequences(out: Path, legacy_build: Path, events_v2: pd.DataFrame) -> dict[str, Any]:
-    segments = pd.read_parquet(legacy_build / "sequence_segments.parquet")
+    """Stream sequence materialization to avoid holding ~1M full sentences in RAM."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    segments = pd.read_parquet(
+        legacy_build / "sequence_segments.parquet",
+        columns=["sequence_id", "event_id", "position"],
+    )
     sequences = pd.read_parquet(
         legacy_build / "sequences.parquet",
-        columns=[
-            "sequence_id",
-            "narrative_id",
-            "same_time_group_ids",
-            "contains_image",
-            "contains_interpretation",
-            "farm_count",
-        ],
+        columns=["sequence_id", "narrative_id", "contains_image"],
     )
-    events_v2 = events_v2.set_index("event_id", drop=False)
-    segments = segments.merge(
-        sequences[["sequence_id", "narrative_id", "contains_image", "contains_interpretation"]],
-        on="sequence_id",
-        how="left",
-    )
+    seq_meta = sequences.set_index("sequence_id")
     segments = segments.sort_values(["sequence_id", "position"], kind="mergesort")
 
-    # Precompute event sentence lookup
-    sent_map = events_v2["SENTENCE"].to_dict()
-    farm_map = events_v2["farm_id"].to_dict()
-    stg_map = events_v2["same_time_group_id"].to_dict()
-    role_map = events_v2["token_roles"].to_dict()
-    mg_map = events_v2["measurement_group_ids"].to_dict()
+    sent_map = events_v2.set_index("event_id")["SENTENCE"].astype(str).to_dict()
+    farm_map = events_v2.set_index("event_id")["farm_id"].astype(str).to_dict()
+    stg_map = events_v2.set_index("event_id")["same_time_group_id"].astype(str).to_dict()
+    role_map = events_v2.set_index("event_id")["token_roles"].astype(str).to_dict()
+    mg_map = events_v2.set_index("event_id")["measurement_group_ids"].astype(str).to_dict()
     ts_map = {
         eid: ts
-        for eid, ts in zip(events_v2["event_id"], pd.to_datetime(events_v2["observation_timestamp"], utc=True))
+        for eid, ts in zip(
+            events_v2["event_id"],
+            pd.to_datetime(events_v2["observation_timestamp"], utc=True),
+        )
     }
 
-    records = []
+    max_store_tokens = 2048
+    chunk_size = 5000
+    parts_dir = out / "_seq_parts"
+    if parts_dir.exists():
+        for old in parts_dir.glob("*.parquet"):
+            old.unlink()
+    parts_dir.mkdir(parents=True, exist_ok=True)
+
+    # Online dedup: keep first (serialization_signature, narrative_id)
+    seen_exact: set[tuple[str, str]] = set()
+    event_set_counts: dict[str, int] = defaultdict(int)
+    class_counts = {
+        "TRUE_EXACT_DUPLICATE": 0,
+        "SAME_CONTEXT_DIFFERENT_NARRATIVE": 0,
+        "UNIQUE": 0,
+    }
+    before = 0
+    kept = 0
+    chunk: list[dict[str, Any]] = []
+    part_idx = 0
+    writer: Optional[pq.ParquetWriter] = None
+    final_path = out / "sequences_v2.parquet"
+
+    def flush_chunk() -> None:
+        nonlocal chunk, part_idx, writer
+        if not chunk:
+            return
+        frame = pd.DataFrame(chunk)
+        table = pa.Table.from_pandas(frame, preserve_index=False)
+        if writer is None:
+            writer = pq.ParquetWriter(final_path, table.schema, compression="zstd")
+        writer.write_table(table)
+        part_idx += 1
+        chunk = []
+
+    total = int(segments["sequence_id"].nunique())
+    idx = 0
     for sequence_id, group in segments.groupby("sequence_id", sort=False):
+        idx += 1
+        if idx == 1 or idx % 20000 == 0 or idx == total:
+            print(f"materialize_sequences {idx}/{total} kept={kept}", flush=True)
         event_ids = group["event_id"].tolist()
         if any(eid not in sent_map for eid in event_ids):
             continue
+        before += 1
+        meta = seq_meta.loc[sequence_id]
+        narrative_id = str(meta["narrative_id"])
         farms = [farm_map[eid] for eid in event_ids]
-        stgs = []
-        parts = []
-        flat_groups = []
-        flat_roles = []
+        stgs: list[str] = []
+        parts: list[str] = []
+        flat_groups: list[str] = []
+        flat_roles: list[str] = []
         prev_ts = None
         start_ts = ts_map[event_ids[0]]
         for eid in event_ids:
             ts = ts_map[eid]
-            prefix = []
+            prefix: list[str] = []
             if prev_ts is not None:
                 hours = (ts - prev_ts).total_seconds() / 3600.0
                 prefix.append(delta_t_bucket(hours))
@@ -358,28 +421,43 @@ def materialize_sequences(out: Path, legacy_build: Path, events_v2: pd.DataFrame
             roles = json.loads(role_map[eid])
             parts.extend(prefix + body + ["[SEQ_SEP]"])
             flat_groups.extend(["NONE"] * len(prefix) + gids + ["NONE"])
-            flat_roles.extend(["temporal"] * (len(prefix) - 1) + ["sep"] + roles + ["sep"])
+            flat_roles.extend(
+                ["temporal"] * (len(prefix) - 1) + ["sep"] + roles + ["sep"]
+            )
             stgs.append(stg_map[eid])
-        farm_local, zone_local = local_spatial_maps(farms, [])
+        farm_local, _ = local_spatial_maps(farms, [])
         spatial = list(dict.fromkeys(farm_local[f] for f in farms))
-        serialization = " ".join(spatial + parts)
+        full_tokens = spatial + parts
+        serialization = " ".join(full_tokens)
         ordered_sig = hashlib.sha256("|".join(event_ids).encode()).hexdigest()
         event_set_sig = hashlib.sha256("|".join(sorted(event_ids)).encode()).hexdigest()
         sig = hashlib.sha256(serialization.encode()).hexdigest()
         window_sig = hashlib.sha256(
             f"{min(farms)}|{start_ts.date()}|{ts_map[event_ids[-1]].date()}".encode()
         ).hexdigest()
-        records.append(
+
+        exact_key = (sig, narrative_id)
+        is_exact_dup = exact_key in seen_exact
+        if is_exact_dup:
+            class_counts["TRUE_EXACT_DUPLICATE"] += 1
+            continue
+        # First occurrence of exact key — may still be SAME_CONTEXT later; classify after pass
+        seen_exact.add(exact_key)
+        event_set_counts[event_set_sig] += 1
+        stored_tokens = full_tokens[:max_store_tokens]
+        aligned_groups = (["NONE"] * len(spatial) + flat_groups)[:max_store_tokens]
+        aligned_roles = (["meta"] * len(spatial) + flat_roles)[:max_store_tokens]
+        chunk.append(
             {
                 "sequence_id": sequence_id,
-                "narrative_id": group["narrative_id"].iloc[0],
+                "narrative_id": narrative_id,
                 "PERSON_ID": int(hashlib.sha256(str(sequence_id).encode()).hexdigest()[:16], 16)
                 & ((1 << 63) - 1),
-                "SENTENCE": serialization,
+                "SENTENCE": " ".join(stored_tokens),
                 "event_ids": json.dumps(event_ids),
                 "same_time_group_ids": json.dumps(list(dict.fromkeys(stgs))),
-                "measurement_group_ids": json.dumps(flat_groups),
-                "token_roles": json.dumps(flat_roles),
+                "measurement_group_ids": json.dumps(aligned_groups),
+                "token_roles": json.dumps(aligned_roles),
                 "farm_ids": json.dumps(sorted(set(map(str, farms)))),
                 "ordered_event_signature": ordered_sig,
                 "event_set_signature": event_set_sig,
@@ -387,38 +465,66 @@ def materialize_sequences(out: Path, legacy_build: Path, events_v2: pd.DataFrame
                 "source_window_signature": window_sig,
                 "canonical_context_id": event_set_sig,
                 "split_group_id": window_sig,
-                "contains_image": bool(group["contains_image"].iloc[0]),
+                "contains_image": bool(meta["contains_image"]),
                 "tokenization_version": "v2",
                 "training_mode": "transductive_public_pretraining",
+                "token_count_full": len(full_tokens),
+                "token_count_stored": len(stored_tokens),
+                "duplicate_class": "PENDING",
             }
         )
+        kept += 1
+        if len(chunk) >= chunk_size:
+            flush_chunk()
 
-    seq_df = pd.DataFrame(records)
-    before = len(seq_df)
-    seq_df["duplicate_class"] = np.where(
-        seq_df.duplicated(["serialization_signature", "narrative_id"], keep=False),
-        "TRUE_EXACT_DUPLICATE",
-        np.where(
-            seq_df.duplicated(["event_set_signature"], keep=False),
-            "SAME_CONTEXT_DIFFERENT_NARRATIVE",
-            "UNIQUE",
-        ),
-    )
-    dedup = seq_df.sort_values(["sequence_id"]).drop_duplicates(
-        ["serialization_signature", "narrative_id"], keep="first"
+    flush_chunk()
+    if writer is not None:
+        writer.close()
+
+    # Assign duplicate classes + sampling weights on kept rows (no full pre_dedup payload)
+    if not final_path.exists():
+        write_json(
+            out / "duplicate_report_v2.json",
+            {"before": before, "after": 0, "removed_true_exact": before, "class_counts_pre": class_counts},
+        )
+        return {"before": before, "after": 0}
+
+    dedup = pd.read_parquet(final_path)
+    context_freq = dedup.groupby("event_set_signature").size()
+    dedup = dedup.copy()
+    dedup["duplicate_class"] = np.where(
+        dedup["event_set_signature"].map(context_freq) > 1,
+        "SAME_CONTEXT_DIFFERENT_NARRATIVE",
+        "UNIQUE",
     )
     view_counts = dedup.groupby("canonical_context_id").size().rename("context_view_count")
     dedup = dedup.join(view_counts, on="canonical_context_id")
     dedup["sampling_weight"] = 1.0 / np.sqrt(dedup["context_view_count"].clip(lower=1))
-    dedup.to_parquet(out / "sequences_v2.parquet", index=False)
-    seq_df.to_parquet(out / "sequences_v2_pre_dedup.parquet", index=False)
+    dedup.to_parquet(final_path, index=False)
+
+    # Lightweight pre-dedup index (signatures only) for audit
+    pre_index = dedup[
+        [
+            "sequence_id",
+            "narrative_id",
+            "serialization_signature",
+            "event_set_signature",
+            "duplicate_class",
+        ]
+    ].copy()
+    pre_index.to_parquet(out / "sequences_v2_pre_dedup.parquet", index=False)
+    class_counts["SAME_CONTEXT_DIFFERENT_NARRATIVE"] = int(
+        (dedup["duplicate_class"] == "SAME_CONTEXT_DIFFERENT_NARRATIVE").sum()
+    )
+    class_counts["UNIQUE"] = int((dedup["duplicate_class"] == "UNIQUE").sum())
     write_json(
         out / "duplicate_report_v2.json",
         {
             "before": before,
             "after": int(len(dedup)),
             "removed_true_exact": int(before - len(dedup)),
-            "class_counts_pre": seq_df["duplicate_class"].value_counts().to_dict(),
+            "class_counts_pre": class_counts,
+            "note": "pre_dedup parquet stores kept index only; exact-dup rows discarded online",
         },
     )
     return {"before": before, "after": int(len(dedup))}
@@ -615,22 +721,34 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--max-events", type=int, default=0, help="0=all")
     parser.add_argument("--skip-sequences", action="store_true")
+    parser.add_argument("--skip-registries", action="store_true")
+    parser.add_argument("--skip-tokenize", action="store_true")
     args = parser.parse_args()
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
 
-    print("== registries ==")
-    reg = build_registries(out, args.legacy_build, args.audit)
-    write_json(out / "registry_build_report.json", reg)
-    print(reg)
+    if args.skip_registries and (out / "registry_build_report.json").exists():
+        reg = json.loads((out / "registry_build_report.json").read_text())
+        print("== registries (cached) ==")
+        print(reg)
+    else:
+        print("== registries ==")
+        reg = build_registries(out, args.legacy_build, args.audit)
+        write_json(out / "registry_build_report.json", reg)
+        print(reg)
 
     print("== grouped masking validation ==")
     print(validate_grouped_masking(out))
 
-    print("== tokenize events ==")
     max_events = args.max_events or None
-    events = tokenize_events(out, args.legacy_build, max_events=max_events)
-    print({"events": len(events)})
+    if args.skip_tokenize and (out / "events_tokenized_v2.parquet").exists():
+        print("== tokenize events (cached) ==")
+        events = pd.read_parquet(out / "events_tokenized_v2.parquet")
+        print({"events": len(events)})
+    else:
+        print("== tokenize events ==")
+        events = tokenize_events(out, args.legacy_build, max_events=max_events)
+        print({"events": len(events)})
 
     if not args.skip_sequences:
         print("== materialize sequences ==")

@@ -1,0 +1,10 @@
+defaults:
+  - /data_new/corpus@corpus: online2_v2
+  - /data_new/vocabulary@vocabulary: online2_v2
+  - /task@task: online2_v2_grouped_mlm
+
+_target_: src.data_new.datamodule.L2VDataModule
+batch_size: ${oc.env:ONLINE2_V2_BATCH_SIZE,2}
+num_workers: 0
+persistent_workers: false
+pin_memory: false

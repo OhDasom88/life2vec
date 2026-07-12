@@ -4,10 +4,10 @@ defaults:
   - /trainer: pretrain
   - /callbacks
 
-version: 2.0
+version: 2.0-transductive
 implementation: online2_v2
-comments: "Online2 V2 transductive grouped-MLM smoke"
-name: online2_v2_pretraining_smoke
+comments: "Online2 V2 transductive public pretraining"
+name: online2_v2_pretraining
 model_name: l2v
 seed: 2023
 stage: pre_training
@@ -19,13 +19,13 @@ model:
   hparams:
     batch_size: ${datamodule.batch_size}
     max_length: ${datamodule.task.max_length}
-    hidden_size: 128
-    hidden_ff: 512
+    hidden_size: 256
+    hidden_ff: 1024
     hidden_act: swish
-    n_encoders: 2
-    n_heads: 4
-    n_local: 3
-    local_window_size: 16
+    n_encoders: 4
+    n_heads: 8
+    n_local: 4
+    local_window_size: 32
     norm_type: rezero
     att_dropout: 0.1
     fw_dropout: 0.1
@@ -40,8 +40,8 @@ model:
     experiment_version: ${version}
     attention_type: performer
     multihead_dc: false
-    num_random_features: 64
-    learning_rate: 1.e-3
+    num_random_features: 128
+    learning_rate: 5.e-4
     weight_decay: 0.01
     beta1: 0.9
     beta2: 0.999
@@ -55,7 +55,11 @@ model:
 trainer:
   accelerator: auto
   devices: 1
+  precision: 16-mixed
   min_epochs: 1
-  max_epochs: 1
-  limit_train_batches: 20
-  limit_val_batches: 5
+  max_epochs: 3
+  val_check_interval: 0.25
+  accumulate_grad_batches: ${oc.env:ONLINE2_V2_GRAD_ACCUM,1}
+  gradient_clip_val: 1.0
+  enable_checkpointing: true
+  default_root_dir: ${oc.env:ONLINE2_V2_RUN_DIR,outputs/online2/v2_runs}

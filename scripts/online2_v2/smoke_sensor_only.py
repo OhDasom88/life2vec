@@ -21,7 +21,8 @@ BUILD = Path(os.environ.get("ONLINE2_V2_BUILD", ROOT / "outputs/online2/v2_build
 
 def main() -> None:
     vocab = VocabV2.load(BUILD / "vocab_v2.json")
-    export = pd.read_parquet(BUILD / "training_events_v2.parquet")
+    smoke = BUILD / "training_events_v2_smoke.parquet"
+    export = pd.read_parquet(smoke if smoke.exists() else BUILD / "training_events_v2.parquet")
     assert len(export) > 0
     row = export.iloc[0]
     tokens = str(row["SENTENCE"]).split()

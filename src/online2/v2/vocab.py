@@ -17,6 +17,7 @@ SPECIAL = [
     "[UNK]",
     "[MASK]",
     "[CLS]",
+    "[SEP]",
     "[SEQ_SEP]",
     "[GROUP_SEP]",
     "[EVENT_SEP]",
