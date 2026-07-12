@@ -1,0 +1,10 @@
+defaults:
+  - /data_new/sources
+
+_target_: src.data_new.populations.agri_fruiting.AgriFruitingOverfitPopulation
+
+name: agri_fruiting_overfit
+growth_data: ${data_new.sources.agri_growth_finetune}
+min_events: 5
+seed: 2023
+train_val_test: [0.7, 0.15, 0.15]

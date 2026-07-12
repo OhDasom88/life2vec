@@ -7,7 +7,7 @@ defaults:
 
 version: 1.0
 implementation: agri
-comments: "Finetune for last-observation fruiting count regression"
+comments: "Fruiting bucket classification with weighted sampling and asymmetric loss"
 name: fruiting
 model_name: l2v
 
@@ -21,7 +21,7 @@ model:
   _convert_: all
   hparams:
     seed: ${seed}
-    vocab_size: 86
+    vocab_size: 357
     batch_size: ${datamodule.batch_size}
     max_length: ${datamodule.task.max_length}
     hidden_size: 128
@@ -57,11 +57,12 @@ model:
     epsilon: 1.e-8
     freeze_embeddings: true
     freeze_positions: false
-    num_classes: 1
-    num_targets: 1
-    loss_type: mae
-    weighted_loss: false
-    pooled: false
+    num_targets: 6
+    loss_type: asymmetric
+    asym_alpha: 1.0
+    asym_beta: 1.5
+    pooled: true
+    redraw_projections: true
     num_pooled_sep: ${datamodule.task.num_pooled_sep}
     pretrained_model_path: ${pretrained_model_path}
     stage: ${stage}

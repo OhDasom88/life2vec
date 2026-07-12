@@ -11,7 +11,7 @@ PRETRAIN_CKPT = (
 FINETUNE_CKPT = (
     PROJECT_ROOT / "checkpoints/agri/fruiting/l2v/1.0/1.0-epoch=06.ckpt"
 )
-VOCAB_PATH = PROJECT_ROOT / "data/processed/vocab/agri_growth_set/result.tsv"
+VOCAB_PATH = PROJECT_ROOT / "data/processed/vocab/agri_pretrain_set/result.tsv"
 POPULATION_PATH = (
     PROJECT_ROOT / "data/processed/populations/agri_fruiting_set/population/result.pkl"
 )

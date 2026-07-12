@@ -1,20 +1,22 @@
 # @package _global_
-# Base config for W&B hyperparameter sweeps on Agri fruiting finetune.
+# Base config for W&B grid sweeps on Agri fruiting finetune (overfit sanity).
+# All 40 plant sequences are used for train/val/test (memorization check).
+# Pretrained encoder weights come from W&B pretrain sweep ugf1f2ld.
 
 defaults:
-  - /datamodule: agri_fruiting_set
+  - /datamodule: agri_fruiting_overfit_set
   - /trainer: eos
   - /callbacks
 
 version: sweep
 implementation: agri
-comments: "W&B sweep: fruiting finetune hyperparameter search"
+comments: "W&B grid sweep: overfit sanity (40 samples, train=val=test) with ugf1f2ld pretrain"
 name: fruiting
 model_name: l2v
 
 seed: 2023
 stage: finetuning
-pretrained_model_path: /weights/agri/mlm/pre_training/1_0.pth
+pretrained_model_path: /weights/agri/mlm/pre_training/sweep_s5fcufv0.pth
 ckpt_path: null
 
 model:
@@ -22,7 +24,7 @@ model:
   _convert_: all
   hparams:
     seed: ${seed}
-    vocab_size: 86
+    vocab_size: 357
     batch_size: ${datamodule.batch_size}
     max_length: ${datamodule.task.max_length}
     hidden_size: 128
@@ -58,11 +60,13 @@ model:
     epsilon: 1.e-8
     freeze_embeddings: true
     freeze_positions: false
-    num_classes: 1
-    num_targets: 1
-    loss_type: mae
-    weighted_loss: false
-    pooled: false
+    num_targets: 6
+    loss_type: asymmetric
+    asym_alpha: 1.0
+    asym_beta: 1.5
+    auto_class_weights: true
+    pooled: true
+    redraw_projections: true
     num_pooled_sep: ${datamodule.task.num_pooled_sep}
     pretrained_model_path: ${pretrained_model_path}
     stage: ${stage}
@@ -74,8 +78,8 @@ trainer:
   accelerator: gpu
   devices: [0]
   num_sanity_val_steps: 0
-  min_epochs: 100
-  max_epochs: 200
+  min_epochs: 20
+  max_epochs: 300
   accumulate_grad_batches: 2
   limit_train_batches: 1.0
   limit_val_batches: 1.0

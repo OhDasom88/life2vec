@@ -20,8 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import torch
-from captum.attr import InputXGradient
+import torch.nn.functional as F
 from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 from omegaconf import DictConfig
@@ -34,6 +33,12 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from analysis.scripts.paths import FINETUNE_CKPT, VOCAB_PATH
 from src.data_new.datamodule import collate_encoded_documents
+from src.transformer.agri_fruiting_model import (
+    FRUITING_BUCKET_REPRESENTATIVES,
+    FRUITING_NUM_CLASSES,
+    fruiting_bucket_to_count,
+    fruiting_count_to_bucket,
+)
 
 
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "berry2vec_fruiting_predictions"
@@ -42,6 +47,7 @@ FONT_PATH = Path(__file__).resolve().parent / "fonts" / "NotoSansCJKkr-Regular.o
 SPLIT_COLORS = {"train": "#4C72B0", "val": "#DD8452", "test": "#55A868"}
 SPLIT_LABELS = {"train": "학습", "val": "검증", "test": "테스트"}
 SALIENCY_SKIP_TOKENS = {"[CLS]", "[SEP]", "[PAD]"}
+BUCKET_LABELS = ("≤3", "4", "5", "6", "7", "≥8")
 
 
 def configure_korean_matplotlib() -> str:
@@ -129,6 +135,26 @@ def load_vocab() -> pd.DataFrame:
     return pd.read_csv(VOCAB_PATH, sep="\t").set_index("ID")
 
 
+def load_compatible_state_dict(model, checkpoint: Path) -> List[str]:
+    ckpt = torch.load(checkpoint, map_location="cpu")
+    checkpoint_state = ckpt["state_dict"]
+    model_state = model.state_dict()
+    compatible_state: Dict[str, torch.Tensor] = {}
+    skipped_keys: List[str] = []
+
+    for key, value in checkpoint_state.items():
+        if key not in model_state:
+            skipped_keys.append(key)
+            continue
+        if model_state[key].shape != value.shape:
+            skipped_keys.append(key)
+            continue
+        compatible_state[key] = value
+
+    model.load_state_dict(compatible_state, strict=False)
+    return skipped_keys
+
+
 def load_model_and_datamodule(
     experiment: str,
     checkpoint: Path,
@@ -139,8 +165,15 @@ def load_model_and_datamodule(
     dm.setup()
 
     model = instantiate(cfg.model, _convert_="all")
-    ckpt = torch.load(checkpoint, map_location="cpu")
-    model.load_state_dict(ckpt["state_dict"], strict=False)
+    skipped_keys = load_compatible_state_dict(model, checkpoint)
+    if skipped_keys:
+        decoder_skips = [key for key in skipped_keys if key.startswith("decoder.")]
+        if decoder_skips:
+            print(
+                "[경고] 체크포인트와 분류 모델 구조가 일치하지 않아 "
+                "decoder 가중치는 새로 초기화됩니다. "
+                "분류 모델로 재학습한 체크포인트를 사용하세요."
+            )
     model.eval()
     model.to(device)
     return model, dm, cfg
@@ -213,7 +246,12 @@ def top_tokens_by_saliency(
     return " | ".join(rendered)
 
 
+def bucket_label(bucket: int) -> str:
+    return BUCKET_LABELS[int(bucket)]
+
+
 def compute_confidence(abs_errors: np.ndarray, calibration_mae: float) -> np.ndarray:
+    """Legacy helper for regression-style CSV replots."""
     scale = max(calibration_mae, 1e-6)
     return np.exp(-abs_errors / scale)
 
@@ -227,26 +265,48 @@ def _summarize_token_saliency(attr: torch.Tensor, mask: torch.Tensor) -> np.ndar
     return attr.detach().cpu().numpy()
 
 
+def _extract_logits(model, outputs: torch.Tensor) -> torch.Tensor:
+    if outputs.dim() == 3:
+        return outputs[:, 0, :]
+    return outputs
+
+
+def _logits_to_probs(model, logits: torch.Tensor) -> torch.Tensor:
+    if hasattr(model, "sigsoftmax"):
+        return model.sigsoftmax(logits)
+    return F.softmax(logits, dim=-1)
+
+
 def build_saliency_fn(model):
     def forward_for_attr(embeddings, meta):
         padding_mask = meta["padding_mask"].long()
         hidden = model.transformer.forward_finetuning_with_embeddings(
             embeddings, padding_mask
         )
-        output = model.decoder(hidden)
-        if output.ndim == 3:
-            output = output[:, 0, 0]
-        return output.unsqueeze(-1)
+        if getattr(model.hparams, "pooled", False):
+            output = model.decoder(hidden, mask=padding_mask)
+        else:
+            output = model.decoder(hidden)
+        logits = _extract_logits(model, output)
+        return _logits_to_probs(model, logits)
 
     return InputXGradient(forward_for_attr)
 
 
 @torch.no_grad()
-def predict_batch(model, batch: Dict[str, torch.Tensor]) -> np.ndarray:
+def predict_batch(model, batch: Dict[str, torch.Tensor]) -> Dict[str, np.ndarray]:
     outputs = model(batch)
-    if outputs.ndim == 3:
-        return outputs[:, 0, 0].detach().cpu().numpy()
-    return outputs.reshape(outputs.shape[0], -1)[:, 0].detach().cpu().numpy()
+    logits = _extract_logits(model, outputs)
+    scores = _logits_to_probs(model, logits)
+    pred_buckets = torch.argmax(scores, dim=-1)
+    confidence = torch.max(scores, dim=-1).values
+    pred_counts = fruiting_bucket_to_count(pred_buckets)
+    return {
+        "pred_buckets": pred_buckets.cpu().numpy(),
+        "pred_counts": pred_counts.cpu().numpy(),
+        "confidence": confidence.cpu().numpy(),
+        "probs": scores.cpu().numpy(),
+    }
 
 
 def run_split(
@@ -270,8 +330,11 @@ def run_split(
             key: value.to(device) if torch.is_tensor(value) else value
             for key, value in batch.items()
         }
-        predictions = predict_batch(model, batch)
+        pred_result = predict_batch(model, batch)
         targets = batch["target"].detach().cpu().numpy().reshape(-1)
+        target_buckets = fruiting_count_to_bucket(
+            torch.tensor(targets, dtype=torch.float32)
+        ).numpy()
         sequence_ids = batch["sequence_id"].detach().cpu().numpy().reshape(-1)
 
         embeddings, _ = model.transformer.get_sequence_embedding(
@@ -281,7 +344,7 @@ def run_split(
         padding_mask = batch["padding_mask"].long()
         saliency_tensor = attr_fn.attribute(
             embeddings,
-            target=0,
+            target=torch.tensor(pred_result["pred_buckets"], device=device),
             additional_forward_args={"padding_mask": padding_mask},
         )
 
@@ -302,21 +365,36 @@ def run_split(
             token_saliency = _summarize_token_saliency(saliency_tensor[idx], mask)
 
             target = float(targets[idx])
-            prediction = float(predictions[idx])
+            pred_bucket = int(pred_result["pred_buckets"][idx])
+            target_bucket = int(target_buckets[idx])
+            prediction = float(pred_result["pred_counts"][idx])
+            confidence = float(pred_result["confidence"][idx])
             abs_error = abs(target - prediction)
+            bucket_correct = pred_bucket == target_bucket
+            class_probs = {
+                bucket_label(class_idx): float(pred_result["probs"][idx, class_idx])
+                for class_idx in range(FRUITING_NUM_CLASSES)
+            }
 
             sample_rows.append(
                 {
                     "split": split,
                     "sequence_id": int(sequence_ids[idx]),
                     "target": target,
+                    "target_bucket": target_bucket,
+                    "target_bucket_label": bucket_label(target_bucket),
+                    "pred_bucket": pred_bucket,
+                    "pred_bucket_label": bucket_label(pred_bucket),
                     "prediction": prediction,
+                    "confidence": confidence,
+                    "bucket_correct": bucket_correct,
                     "abs_error": abs_error,
                     "sequence_length": int(mask.sum()),
                     "input_summary": summarize_tokens(tokens),
                     "top_tokens": top_tokens_by_saliency(
                         tokens, token_saliency.tolist(), top_token_k
                     ),
+                    "class_probs": json.dumps(class_probs, ensure_ascii=False),
                 }
             )
             saliency_rows.append(
@@ -324,7 +402,10 @@ def run_split(
                     "split": split,
                     "sequence_id": int(sequence_ids[idx]),
                     "target": target,
+                    "target_bucket": target_bucket,
+                    "pred_bucket": pred_bucket,
                     "prediction": prediction,
+                    "confidence": confidence,
                     "tokens": [
                         {
                             **token,
@@ -347,7 +428,12 @@ def compute_split_metrics(df: pd.DataFrame) -> Dict[str, float]:
     ss_res = float(np.sum((targets - preds) ** 2))
     ss_tot = float(np.sum((targets - np.mean(targets)) ** 2))
     r2 = float(1.0 - ss_res / ss_tot) if ss_tot > 0 else float("nan")
-    return {"mae": mae, "rmse": rmse, "r2": r2, "n_samples": int(len(df))}
+    metrics = {"mae": mae, "rmse": rmse, "r2": r2, "n_samples": int(len(df))}
+    if "bucket_correct" in df.columns:
+        metrics["accuracy"] = float(df["bucket_correct"].mean())
+    if "confidence" in df.columns:
+        metrics["mean_confidence"] = float(df["confidence"].mean())
+    return metrics
 
 
 def save_jsonl(path: Path, rows: Iterable[Dict[str, Any]]) -> None:
@@ -405,7 +491,16 @@ def plot_pred_vs_true(
     ax.set_xlabel("실제 착과수")
     ax.set_ylabel("예측 착과수")
     overall_mae = float(results_df["abs_error"].mean())
-    ax.set_title(f"berry2vec 예측 vs 실제 (전체 MAE={overall_mae:.3f})")
+    overall_acc = (
+        float(results_df["bucket_correct"].mean())
+        if "bucket_correct" in results_df.columns
+        else float("nan")
+    )
+    title = f"berry2vec 예측 vs 실제 (MAE={overall_mae:.3f}"
+    if not math.isnan(overall_acc):
+        title += f", 버킷정확도={overall_acc:.3f}"
+    title += ")"
+    ax.set_title(title)
     ax.legend(title="데이터 분할")
     ax.grid(alpha=0.2)
 
@@ -421,15 +516,20 @@ def plot_metrics_by_split(
 ) -> Path:
     metrics_df = pd.DataFrame(split_metrics).T.reset_index().rename(columns={"index": "split"})
     metrics_df["split_label"] = metrics_df["split"].map(lambda s: SPLIT_LABELS.get(s, s))
-    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
-    for ax, metric, title in zip(
-        axes,
-        ["mae", "rmse", "r2"],
-        ["MAE", "RMSE", "R²"],
-    ):
+    metric_cols = [col for col in ["mae", "rmse", "accuracy", "r2"] if col in metrics_df.columns]
+    metric_titles = {
+        "mae": "MAE",
+        "rmse": "RMSE",
+        "accuracy": "버킷 정확도",
+        "r2": "R²",
+    }
+    fig, axes = plt.subplots(1, len(metric_cols), figsize=(4 * len(metric_cols), 4))
+    if len(metric_cols) == 1:
+        axes = [axes]
+    for ax, metric in zip(axes, metric_cols):
         colors = [SPLIT_COLORS.get(split, "#666666") for split in metrics_df["split"]]
         ax.bar(metrics_df["split_label"], metrics_df[metric], color=colors)
-        ax.set_title(title)
+        ax.set_title(metric_titles.get(metric, metric))
         ax.set_xlabel("데이터 분할")
         ax.grid(axis="y", alpha=0.2)
     fig.suptitle("데이터 분할별 예측 성능")
@@ -541,7 +641,8 @@ def plot_saliency_examples(
         ax.set_title(
             f"{SPLIT_LABELS.get(row['split'], row['split'])} "
             f"id={int(row['sequence_id'])} "
-            f"실제={row['target']:.1f} 예측={row['prediction']:.1f}",
+            f"실제={row['target']:.0f}({row.get('target_bucket_label', '')}) "
+            f"예측={row['prediction']:.0f}({row.get('pred_bucket_label', '')})",
             fontsize=9,
         )
 
@@ -562,12 +663,26 @@ def plot_prediction_table(
     top_k: int = 12,
 ) -> Path:
     preview = results_df.sort_values(["split", "sequence_id"]).head(top_k).copy()
-    preview["prediction"] = preview["prediction"].map(lambda x: f"{x:.2f}")
+    preview["prediction"] = preview["prediction"].map(lambda x: f"{x:.0f}")
     preview["confidence"] = preview["confidence"].map(lambda x: f"{x:.3f}")
     preview["abs_error"] = preview["abs_error"].map(lambda x: f"{x:.3f}")
+    if "bucket_correct" in preview.columns:
+        preview["bucket_correct"] = preview["bucket_correct"].map(
+            lambda x: "O" if x else "X"
+        )
 
     table_df = preview[
-        ["split", "sequence_id", "target", "prediction", "confidence", "abs_error"]
+        [
+            "split",
+            "sequence_id",
+            "target",
+            "target_bucket_label",
+            "prediction",
+            "pred_bucket_label",
+            "confidence",
+            "bucket_correct",
+            "abs_error",
+        ]
     ].copy()
     table_df["split"] = table_df["split"].map(lambda s: SPLIT_LABELS.get(s, s))
     table_df = table_df.rename(
@@ -575,8 +690,11 @@ def plot_prediction_table(
             "split": "분할",
             "sequence_id": "개체ID",
             "target": "실제값",
+            "target_bucket_label": "실제버킷",
             "prediction": "예측값",
+            "pred_bucket_label": "예측버킷",
             "confidence": "신뢰도",
+            "bucket_correct": "버킷정답",
             "abs_error": "절대오차",
         }
     )
@@ -635,12 +753,16 @@ def print_preview(df: pd.DataFrame, top_k: int) -> None:
         "split",
         "sequence_id",
         "target",
+        "target_bucket_label",
         "prediction",
+        "pred_bucket_label",
         "confidence",
+        "bucket_correct",
         "abs_error",
         "sequence_length",
         "top_tokens",
     ]
+    preview_cols = [col for col in preview_cols if col in df.columns]
     print(df[preview_cols].head(top_k).to_string(index=False))
 
 
@@ -707,15 +829,6 @@ def main() -> None:
             save_jsonl(args.output_dir / f"saliency_{split}.jsonl", saliency_rows)
 
         results_df = pd.DataFrame(all_samples)
-        if "val" in args.splits:
-            calibration_mae = split_metrics["val"]["mae"]
-        else:
-            calibration_mae = float(results_df["abs_error"].mean())
-
-        results_df["confidence"] = compute_confidence(
-            results_df["abs_error"].to_numpy(),
-            calibration_mae=calibration_mae,
-        )
 
         for split in args.splits:
             mask = results_df["split"] == split
@@ -729,8 +842,11 @@ def main() -> None:
             "checkpoint": str(args.checkpoint),
             "experiment": args.experiment,
             "device": args.device,
-            "confidence_calibration_mae": calibration_mae,
-            "confidence_formula": "exp(-abs_error / val_mae)",
+            "model_type": "classification",
+            "num_classes": FRUITING_NUM_CLASSES,
+            "bucket_labels": list(BUCKET_LABELS),
+            "bucket_representatives": list(FRUITING_BUCKET_REPRESENTATIVES),
+            "confidence_formula": "max(sigsoftmax probability of predicted bucket)",
             "splits": split_metrics,
         }
         (args.output_dir / "metrics_summary.json").write_text(
@@ -755,12 +871,15 @@ def main() -> None:
 
     print("\n[berry2vec 예측 요약]")
     for split, metrics in split_metrics.items():
-        print(
+        summary = (
             f"- {split}: n={metrics['n_samples']}, "
             f"MAE={metrics['mae']:.4f}, RMSE={metrics['rmse']:.4f}, R2={metrics['r2']:.4f}"
         )
-    if not args.plot_only:
-        print(f"- confidence calibration (val MAE): {calibration_mae:.4f}")
+        if "accuracy" in metrics:
+            summary += f", 버킷정확도={metrics['accuracy']:.4f}"
+        if "mean_confidence" in metrics:
+            summary += f", 평균신뢰도={metrics['mean_confidence']:.4f}"
+        print(summary)
 
     print("\n[예측 결과 샘플]")
     print_preview(results_df, args.show_top_k)

@@ -1,5 +1,5 @@
 defaults:
-  - /data_new/corpus@corpus: agri_fruiting_set
+  - /data_new/corpus@corpus: agri_fruiting_overfit
   - /data_new/vocabulary@vocabulary: agri_pretrain_set
   - /task@task: agri_fruiting
 
@@ -7,6 +7,7 @@ _target_: src.data_new.datamodule.AgriFruitingDataModule
 
 batch_size: 8
 num_workers: 0
+weighted_sampling: false
 
 subset: false
 subset_id: 0

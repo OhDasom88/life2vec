@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from ..decorators import save_pickle
 from ..serialize import DATA_ROOT
+from .base import DataSplit
 from .from_agri_growth import FromAgriGrowth
 
 
@@ -38,3 +39,14 @@ class AgriFruitingPopulation(FromAgriGrowth):
         )
         assert isinstance(result, pd.DataFrame)
         return result
+
+
+@dataclass
+class AgriFruitingOverfitPopulation(AgriFruitingPopulation):
+    """Same cohort as AgriFruitingPopulation, but train/val/test all use every sample."""
+
+    name: str = "agri_fruiting_overfit"
+
+    def data_split(self) -> DataSplit:
+        ids = self.population().index.to_numpy()
+        return DataSplit(train=ids, val=ids, test=ids)

@@ -1,31 +1,51 @@
-# W&B sweep definition for Agri fruiting finetune.
+# W&B grid sweep: Agri fruiting finetune — overfit sanity (40 samples, train=val=test).
+# All parameters use explicit discrete values (no ranges).
 #
-# Usage (from repo root, after `source setup.sh`):
-#   wandb sweep conf/sweep/agri_fruiting.yaml
-#   wandb agent <entity>/<project>/<sweep_id>
+# Usage:
+#   source setup.sh
+#   bash scripts/run_fruiting_sweep.sh
+#   bash scripts/run_fruiting_sweep_agent.sh <sweep_id> [count]
 
+project: Berry2Vec
+entity: dasom-oh
 program: src/sweep_train.py
 command:
   - ${env}
   - python
   - -m
   - src.sweep_train
-method: bayes
+method: grid
 metric:
   name: val/mae_count
   goal: minimize
 
 parameters:
+  pretrained_run_id:
+    values:
+      - s5fcufv0
+      - jufqbahm
+      - r6tkd9h9
+      - zh7950l0
+      - e8uuafs1
+      - etl0dtk8
+      - 0llpyrus
+      - x4d5fgde
+      - i28zrj4b
+      - c9deyiob
+      - hp1zc09r
+      - hglytgxl
+
   pooled:
     values: [false, true]
 
   loss_type:
-    values: [mae, entropy]
+    values: [asymmetric, entropy]
+
+  asym_beta:
+    values: [1.0, 1.5, 2.0]
 
   learning_rate:
-    distribution: log_uniform_values
-    min: 1.0e-5
-    max: 1.0e-3
+    values: [0.00001, 0.0001, 0.0005, 0.001]
 
   dropout:
     values: [0.05, 0.1, 0.2]
@@ -36,14 +56,11 @@ parameters:
   freeze_embeddings:
     values: [true, false]
 
+  freeze_positions:
+    values: [true, false]
+
   batch_size:
     values: [4, 8]
 
   accumulate_grad_batches:
     values: [1, 2, 4]
-
-early_terminate:
-  type: hyperband
-  min_iter: 100
-  eta: 2
-  s: 3

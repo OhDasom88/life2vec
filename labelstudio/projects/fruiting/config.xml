@@ -1,0 +1,35 @@
+<View>
+  <Header value="착과수 버킷 검수 — $sequence_id"/>
+  <Text name="meta" value="Split: $split · True count: $true_count · Pred count: $pred_count · Confidence: $confidence"/>
+  <Choices name="true_bucket" toName="meta" choice="single" showInline="true">
+    <Choice value="0 (≤3)"/>
+    <Choice value="1 (4)"/>
+    <Choice value="2 (5)"/>
+    <Choice value="3 (6)"/>
+    <Choice value="4 (7)"/>
+    <Choice value="5 (≥8)"/>
+  </Choices>
+  <Choices name="pred_bucket" toName="meta" choice="single" showInline="true">
+    <Choice value="0 (≤3)"/>
+    <Choice value="1 (4)"/>
+    <Choice value="2 (5)"/>
+    <Choice value="3 (6)"/>
+    <Choice value="4 (7)"/>
+    <Choice value="5 (≥8)"/>
+  </Choices>
+  <Choices name="review_ok" toName="meta" choice="single" showInline="true">
+    <Choice value="yes"/>
+    <Choice value="no"/>
+  </Choices>
+  <Choices name="corrected_bucket" toName="meta" choice="single" showInline="true">
+    <Choice value="0 (≤3)"/>
+    <Choice value="1 (4)"/>
+    <Choice value="2 (5)"/>
+    <Choice value="3 (6)"/>
+    <Choice value="4 (7)"/>
+    <Choice value="5 (≥8)"/>
+    <Choice value="N/A"/>
+  </Choices>
+  <TextArea name="notes" toName="meta" placeholder="검수 메모"/>
+  <Text name="tokens" value="$token_preview"/>
+</View>

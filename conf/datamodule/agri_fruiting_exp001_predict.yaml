@@ -1,0 +1,14 @@
+# EXP-001 예측용: overfit cohort + 학습 당시 vocabulary (agri_growth_set, 86 tokens)
+defaults:
+  - /data_new/corpus@corpus: agri_fruiting_overfit
+  - /data_new/vocabulary@vocabulary: agri_growth_set
+  - /task@task: agri_fruiting
+
+_target_: src.data_new.datamodule.AgriFruitingDataModule
+
+batch_size: 8
+num_workers: 0
+weighted_sampling: false
+
+subset: false
+subset_id: 0

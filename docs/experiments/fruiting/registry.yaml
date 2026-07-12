@@ -1,0 +1,97 @@
+# Machine-readable experiment registry
+project: Berry2Vec
+task: fruiting
+
+notion:
+  hub_page: https://app.notion.com/p/39175b02ea8181b89a81fd7422f447d3
+  database: https://app.notion.com/p/dab8a00f3dad4488bfe5607c6c5365c0
+  hub_page_id: 39175b02-ea81-81b8-9a81-fd7422f447d3
+  database_id: dab8a00f-3dad-4488-bfe5-607c6c5365c0
+
+github:
+  repo: https://github.com/OhDasom88/life2vec
+  default_branch: main
+  issues_enabled: false
+  labels: [experiment, fruiting, EXP-001]
+  branch_pattern: "exp/EXP-NNN-<slug>"
+  commit_pattern: "exp(fruiting): EXP-NNN ..."
+
+wandb:
+  entity: dasom-oh
+  project: Berry2Vec
+  tags: [fruiting, agri]
+
+label_studio:
+  base_url: http://localhost:8080
+  project_pattern: "berry2vec-fruiting-EXP-NNN"
+  config: labelstudio/projects/fruiting/config.xml
+  imports_dir: data/labelstudio/imports
+  exports_dir: data/labelstudio/exports
+
+experiments:
+  - id: EXP-001
+    notion_id: FRT-001
+    title: "1차 확인 — Overfit sanity (plain CE)"
+    status: done
+    stage: overfit
+    date: "2026-07-02"
+    hydra: finetune_agri_fruiting_overfit
+    metrics:
+      val_bucket_acc: 0.625
+      val_mae_count: 0.625
+    checkpoint: checkpoints/agri/fruiting/l2v/overfit/overfit-epoch=19.ckpt
+    github:
+      commit: eee0b4ebe9cd4bc2488a5a820ba08d3d3652e517
+      commit_url: https://github.com/OhDasom88/life2vec/commit/eee0b4ebe9cd4bc2488a5a820ba08d3d3652e517
+      branch: null
+      pr: null
+      note: "분류 모델 코드 미커밋 (working tree)"
+    label_studio:
+      project: berry2vec-fruiting-EXP-001
+      import: data/labelstudio/imports/EXP-001_predictions.json
+      export: null
+      status: import_ready
+    wandb:
+      mode: offline
+      run_dir: logs/agri/wandb/offline-run-20260702_151024-up7kbrf0
+      run_id: up7kbrf0
+    local_doc: docs/experiments/fruiting/EXP-001_overfit_sanity_62p5.md
+    notion: https://app.notion.com/p/39175b02ea8181549035c45e4ccbcf14
+
+  - id: EXP-002
+    notion_id: FRT-002
+    title: "Overfit — weighted sampling + asymmetric loss"
+    status: failed
+    stage: overfit
+    date: "2026-07-02"
+    hydra: finetune_agri_fruiting_overfit
+    metrics:
+      val_bucket_acc: 0.10
+      val_mae_count: 2.40
+    checkpoint: checkpoints/agri/fruiting/l2v/overfit/overfit-epoch=07.ckpt
+    github:
+      commit: eee0b4ebe9cd4bc2488a5a820ba08d3d3652e517
+      commit_url: https://github.com/OhDasom88/life2vec/commit/eee0b4ebe9cd4bc2488a5a820ba08d3d3652e517
+    label_studio:
+      project: null
+      status: not_applicable
+    wandb:
+      mode: offline
+      run_dir: logs/agri/wandb/offline-run-20260702_144838-yzfwn8cp
+      run_id: yzfwn8cp
+    local_doc: docs/experiments/fruiting/EXP-002_weighted_asymmetric_overfit.md
+    notes: "이중 불균형 보정으로 극단 버킷 쏠림"
+    notion: https://app.notion.com/p/39175b02ea8181c7918bfab190405802
+
+  - id: EXP-003
+    notion_id: FRT-003
+    title: "본학습 — train/val split + weighted + asymmetric"
+    status: planned
+    stage: finetune
+    hydra: finetune_agri_fruiting
+    github:
+      branch: exp/EXP-003-finetune
+    label_studio:
+      status: planned
+    notion: https://app.notion.com/p/39175b02ea81816b8837d7b92fea223f
+    local_doc: null

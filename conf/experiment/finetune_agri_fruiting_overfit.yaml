@@ -1,0 +1,32 @@
+# @package _global_
+# Overfit sanity check: full cohort train/val, no rebalancing, plain CE.
+
+defaults:
+  - finetune_agri_fruiting
+  - override /datamodule: agri_fruiting_overfit_set
+
+version: overfit
+comments: "Overfit sanity check — full cohort, no weighted sampling, plain CE"
+
+model:
+  hparams:
+    freeze_embeddings: false
+    learning_rate: 1.0e-3
+    loss_type: entropy
+    auto_class_weights: false
+    att_dropout: 0.0
+    fw_dropout: 0.0
+    dc_dropout: 0.0
+    emb_dropout: 0.0
+    redraw_projections: false
+
+trainer:
+  min_epochs: 20
+  max_epochs: 300
+  accumulate_grad_batches: 1
+  num_sanity_val_steps: 0
+  log_every_n_steps: 5
+  callbacks:
+    - ${callbacks.checkpoint_fruiting}
+    - ${callbacks.lr_monitor}
+    - ${callbacks.silence_warnings}
