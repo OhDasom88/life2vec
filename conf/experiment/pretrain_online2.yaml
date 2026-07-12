@@ -1,0 +1,59 @@
+# @package _global_
+defaults:
+  - /datamodule: online2
+  - /trainer: pretrain
+  - /callbacks
+
+version: 8.0
+implementation: online2
+comments: "Online2 registry-frozen hourly MLM + SameTimeGroup SOP"
+name: online2_pretraining
+model_name: l2v
+seed: 2023
+stage: pre_training
+ckpt_path: null
+
+model:
+  _target_: src.transformer.models.TransformerEncoder
+  _convert_: all
+  hparams:
+    batch_size: ${datamodule.batch_size}
+    max_length: ${datamodule.task.max_length}
+    hidden_size: 128
+    hidden_ff: 512
+    hidden_act: swish
+    n_encoders: 2
+    n_heads: 4
+    n_local: 3
+    local_window_size: 16
+    norm_type: rezero
+    att_dropout: 0.1
+    fw_dropout: 0.1
+    dc_dropout: 0.1
+    emb_dropout: 0.1
+    parametrize_emb: false
+    norm_input_emb: false
+    norm_output_emb: true
+    weight_tying: wt
+    training_task: ${datamodule.task.name}
+    experiment_name: ${name}_${model_name}
+    experiment_version: ${version}
+    attention_type: performer
+    multihead_dc: false
+    num_random_features: 64
+    learning_rate: 1.e-3
+    weight_decay: 0.01
+    beta1: 0.9
+    beta2: 0.999
+    cls_num_targs: 3
+    epsilon: 1.e-6
+    stage: ${stage}
+    implementation: ${implementation}
+    version: ${version}
+    vocab_size: 994
+
+trainer:
+  accelerator: auto
+  devices: 1
+  min_epochs: 1
+  max_epochs: 50

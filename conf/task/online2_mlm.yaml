@@ -1,0 +1,18 @@
+_target_: src.tasks.mlm.MLM
+name: online2_mlm_v8
+max_length: 2560
+no_sep: false
+p_sequence_timecut: 0.0
+p_sequence_resample: 0.0
+p_sequence_abspos_noise: 0.0
+p_sequence_hide_background: 0.0
+p_sentence_drop_tokens: 0.0
+shuffle_within_sentences: true
+mask_ratio: 0.30
+smart_masking: false
+mask_special_tokens: false
+mask_background_tokens: false
+non_maskable_tokens: [IMAGE_EMBED_SLOT, TEXT_EMBED_SLOT]
+sop_reverse_probability: 0.05
+sop_shuffle_probability: 0.05
+evaluation_seed: ${seed}

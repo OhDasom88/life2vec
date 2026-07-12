@@ -1,0 +1,12 @@
+_target_: src.data_new.vocabulary.RegistryVocabulary
+name: online2_${oc.env:ONLINE2_REGISTRY_VERSION}
+registry_path: ${oc.env:ONLINE2_TOKEN_REGISTRY_PATH}
+registry_version: ${oc.env:ONLINE2_REGISTRY_VERSION}
+expected_checksum: ${oc.env:ONLINE2_REGISTRY_SHA256,""}
+general_tokens:
+  - "[PAD]"
+  - "[CLS]"
+  - "[SEP]"
+  - "[MASK]"
+  - "[UNK]"
+background_tokens: []

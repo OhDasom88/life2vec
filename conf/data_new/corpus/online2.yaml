@@ -1,0 +1,11 @@
+defaults:
+  - /data_new/sources
+  - /data_new/population@population: online2
+
+_target_: src.data_new.datamodule.Corpus
+name: online2_${oc.env:ONLINE2_BUILD_ID}
+sources:
+  - ${data_new.sources.online2}
+reference_date: ${oc.env:ONLINE2_REFERENCE_DATE}
+threshold: ${oc.env:ONLINE2_THRESHOLD}
+time_unit: hour

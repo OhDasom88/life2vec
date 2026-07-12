@@ -1,0 +1,9 @@
+defaults:
+  - /data_new/sources
+
+_target_: src.data_new.populations.online2.Online2Population
+name: online2
+source: ${data_new.sources.online2}
+seed: ${seed}
+train_val_test: [0.8, 0.1, 0.1]
+split_group_column: farm_id
