@@ -581,6 +581,39 @@ class CoVWeightingLoss(nn.Module):
 
 
 
+class AsymmetricMulticlassCrossEntropyLoss(nn.Module):
+    """Weighted multiclass CE with ordinal under/over prediction penalties."""
+
+    def __init__(
+        self,
+        class_weights: Optional[Tensor] = None,
+        under_penalty: float = 1.5,
+        over_penalty: float = 1.0,
+    ):
+        super().__init__()
+        if class_weights is not None:
+            self.register_buffer("class_weights", class_weights)
+        else:
+            self.class_weights = None
+        self.under_penalty = under_penalty
+        self.over_penalty = over_penalty
+
+    def forward(self, logits: Tensor, target: Tensor) -> Tensor:
+        target = target.long().view(-1)
+        ce = F.cross_entropy(
+            logits,
+            target,
+            weight=self.class_weights,
+            reduction="none",
+        )
+        pred = logits.argmax(dim=-1)
+        diff = pred - target
+        penalty = torch.ones_like(ce)
+        penalty = torch.where(diff < 0, penalty * self.under_penalty, penalty)
+        penalty = torch.where(diff > 0, penalty * self.over_penalty, penalty)
+        return (ce * penalty).mean()
+
+
 class AsymmetricCrossEntropyLoss(nn.Module):
     """CrossEntropy Loss for Positive-Unlabeled Learning
     Args:

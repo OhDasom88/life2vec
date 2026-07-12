@@ -4,6 +4,20 @@
 # so the every callbacks are always configured and supplied 
 # to the Trainer using variable interpolation.
 
+checkpoint_pretrain_sweep:
+  _target_: pytorch_lightning.callbacks.ModelCheckpoint
+  dirpath: ${local_path}/checkpoints/${implementation}/${name}/${version}
+  verbose: true
+  filename: ${version}-{epoch:02d}
+  save_last: true
+  monitor: val/pretrain_score
+  mode: max
+  save_weights_only: false
+  save_top_k: 3
+
+agri_save_weights:
+  _target_: src.callbacks.AgriSaveWeights
+
 checkpoint:
   _target_: pytorch_lightning.callbacks.ModelCheckpoint
   dirpath: ${local_path}/checkpoints/${implementation}/${name}/${version}
@@ -43,9 +57,24 @@ early_stopping_pretrain:
   strict: true
   min_delta: 0.001
 
+early_stopping_pretrain_sweep:
+  _target_: pytorch_lightning.callbacks.EarlyStopping
+  monitor: val/pretrain_score
+  mode: max
+  patience: 20
+  strict: true
+  min_delta: 0.001
+
+pretrain_wandb_review:
+  _target_: src.callbacks.PretrainWandbReview
+  num_val_batches: 3
+  samples_per_batch: 2
+  log_every_n_epochs: 1
+  watch_log_freq: 50
+
 early_stopping_fruiting:
   _target_: pytorch_lightning.callbacks.EarlyStopping
-  monitor: "val/mae"
+  monitor: "val/mae_count"
   mode: "min"
   patience: 15
   strict: true
@@ -57,7 +86,7 @@ checkpoint_fruiting:
   verbose: true
   filename: ${version}-{epoch:02d}
   save_last: true
-  monitor: "val/mae"
+  monitor: "val/mae_count"
   mode: "min"
   save_weights_only: false
   save_top_k: 3
@@ -80,6 +109,25 @@ early_stopping_fruiting_sweep:
   patience: 25
   strict: true
   min_delta: 0.02
+
+checkpoint_hackathon_cls_sweep:
+  _target_: pytorch_lightning.callbacks.ModelCheckpoint
+  dirpath: ${local_path}/checkpoints/${implementation}/${name}/${model_name}/${version}
+  verbose: true
+  filename: ${version}-{epoch:02d}
+  save_last: true
+  monitor: "val/f1_corrected"
+  mode: "max"
+  save_weights_only: false
+  save_top_k: 3
+
+early_stopping_hackathon_cls_sweep:
+  _target_: pytorch_lightning.callbacks.EarlyStopping
+  monitor: "val/f1_corrected"
+  mode: "max"
+  patience: 5
+  strict: true
+  min_delta: 0.001
 
 early_stopping_psy:
   _target_: pytorch_lightning.callbacks.EarlyStopping

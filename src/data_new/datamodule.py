@@ -13,7 +13,7 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 from pandas.tseries.offsets import MonthEnd
-from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
+from torch.utils.data import ConcatDataset, DataLoader, Dataset, WeightedRandomSampler
 
 from ..tasks.base import Task, collate_encoded_documents
 from .sampler import FixedSampler
@@ -429,6 +429,168 @@ class L2VDataModule(pl.LightningDataModule):
         return self.get_dataloader(self.test, shuffle=False)
 
 
+@dataclass
+class MultiCorpusL2VDataModule(pl.LightningDataModule):
+    """Merge multiple corpora into one MLM dataset (ConcatDataset per split)."""
+
+    corpus_growth: Corpus
+    corpus_episode: Corpus
+    corpus_greenhouse: Corpus
+    vocabulary: Vocabulary
+    task: Task
+    name: str
+
+    batch_size: int = 4
+    num_workers: int = 2
+    persistent_workers: bool = False
+    pin_memory: bool = False
+    subset: bool = False
+    subset_id: int = 0
+
+    def __post_init__(self) -> None:
+        super().__init__()
+        assert self.name != ""
+        self.task.register(self)
+
+    @property
+    def corpora(self) -> List[Corpus]:
+        return [self.corpus_growth, self.corpus_episode, self.corpus_greenhouse]
+
+    @property
+    def corpus(self) -> Corpus:
+        """Backward compatibility (first corpus)."""
+        return self.corpus_growth
+
+    @property
+    def dataset_root(self) -> Path:
+        return DATA_ROOT / "processed" / "datasets" / self.name / self.task.name
+
+    def get_vocab_size(self) -> int:
+        return self.vocabulary.size()
+
+    def _arguments(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "corpus_growth": _jsonify(self.corpus_growth),
+            "corpus_episode": _jsonify(self.corpus_episode),
+            "corpus_greenhouse": _jsonify(self.corpus_greenhouse),
+            "vocabulary": _jsonify(self.vocabulary),
+            "task": _jsonify(self.task),
+        }
+
+    def prepare(self) -> None:
+        self.prepare_data()
+        self.setup()
+
+    def prepare_data(self) -> None:
+        arg_path = self.dataset_root / "_arguments"
+        try:
+            with open(arg_path, "rb") as f:
+                arguments = pickle.load(f)
+            if arguments == self._arguments():
+                return
+            log.warning("Multi-corpus dataset arguments changed; re-run prepare_data")
+            return
+        except (EOFError, FileNotFoundError):
+            pass
+
+        log.info("Preparing %d corpora...", len(self.corpora))
+        for corpus in self.corpora:
+            corpus.prepare()
+
+        log.info("Preparing shared vocabulary...")
+        self.vocabulary.prepare()
+        log.info("\tVocabulary size: %s", self.vocabulary.size())
+
+        self.dataset_root.mkdir(exist_ok=True, parents=True)
+        jobs = []
+        for split in ("train", "val", "test"):
+            for corpus in self.corpora:
+                jobs.append(self._prepare_corpus_split(corpus, split))
+        dask.compute(*jobs)
+
+        with open(arg_path, "wb") as f:
+            pickle.dump(self._arguments(), f)
+
+    def _prepare_corpus_split(self, corpus: Corpus, split: str) -> dd.Series:
+        data = corpus.combined_sentences(split)
+        n_partitions = data.npartitions
+        out_root = self.dataset_root / corpus.name / split
+
+        def process_partition(
+            partition: pd.DataFrame, partition_info: Optional[Dict[str, int]] = None
+        ) -> bool:
+            assert partition_info is not None
+            from math import log10
+
+            file_name = (
+                str(partition_info["number"]).zfill(int(log10(n_partitions)) + 1)
+                + ".hdf5"
+            )
+            path = out_root / file_name
+            records = (
+                partition.groupby(level="PERSON_ID")
+                .apply(self.task.get_document)
+                .to_list()
+            )
+            DocumentDataset(file=path).save_data(records)
+            return True
+
+        result = data.map_partitions(process_partition, meta=(None, bool))
+        assert isinstance(result, dd.Series)
+        return result
+
+    def get_dataset(self, split: str, train_preprocessor: bool = True) -> Dataset:
+        if train_preprocessor:
+            preprocessor = self.task.get_preprocessor(is_train=split == "train")
+        else:
+            preprocessor = self.task.get_preprocessor(is_train=False)
+
+        datasets: List[Dataset] = []
+        for corpus in self.corpora:
+            directory = self.dataset_root / corpus.name / split
+            if not directory.exists():
+                raise FileNotFoundError(
+                    f"Missing prepared documents at {directory}. Run prepare_data."
+                )
+            datasets.append(
+                ShardedDocumentDataset(directory=directory, transform=preprocessor)
+            )
+        return ConcatDataset(datasets)
+
+    def setup(self, stage: Optional[str] = None) -> None:
+        if stage == "fit" or stage is None:
+            self.train = self.get_dataset("train")
+            self.val = self.get_dataset("val")
+        if stage == "test" or stage is None:
+            self.test = self.get_dataset("test")
+
+    def get_dataloader(self, dataset: Dataset, shuffle: bool = True) -> DataLoader:
+        return DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=shuffle,
+            collate_fn=collate_encoded_documents,
+            generator=torch.Generator(),
+            pin_memory=self.pin_memory,
+            persistent_workers=self.persistent_workers,
+        )
+
+    def train_dataloader(self) -> DataLoader:
+        if self.subset:
+            assert self.subset_id < 3
+            idx = [i for i in range(len(self.train)) if i % 3 == self.subset_id]
+            self.train = torch.utils.data.Subset(self.train, idx)
+        return self.get_dataloader(self.train, shuffle=True)
+
+    def val_dataloader(self) -> DataLoader:
+        return self.get_dataloader(self.val, shuffle=False)
+
+    def test_dataloader(self) -> DataLoader:
+        return self.get_dataloader(self.test, shuffle=False)
+
+
 class CLSDataModule(L2VDataModule):
 
     def get_train_weights(self) -> torch.Tensor:
@@ -528,6 +690,50 @@ class CLSDataModule(L2VDataModule):
         """Returns the test dataloader"""
         indices = self.get_ordered_indexes(split = "test")
         return self.get_fixed_dataloader(self.test, indices)
+
+
+@dataclass
+class AgriFruitingDataModule(CLSDataModule):
+    """Weighted sampling by fruiting bucket; val/test use standard loaders."""
+
+    weighted_sampling: bool = True
+
+    def get_train_weights(self) -> torch.Tensor:
+        from src.transformer.agri_fruiting_model import (
+            compute_fruiting_bucket_weights,
+            fruiting_count_to_bucket,
+        )
+
+        ids = self.corpus.population.data_split().train
+        population = self.corpus.population.population()
+        targets = population.loc[ids]["TARGET"].values.astype(np.float32)
+        buckets = fruiting_count_to_bucket(torch.tensor(targets)).numpy()
+        unique = np.unique(buckets)
+        class_weights = {
+            int(bucket): 1.0 / np.sum(buckets == bucket) for bucket in unique
+        }
+        sample_weights = np.array([class_weights[int(b)] for b in buckets], dtype=np.float32)
+        sample_weights = sample_weights / sample_weights.sum()
+        return torch.tensor(sample_weights, dtype=torch.float32)
+
+    def get_bucket_class_weights(self) -> torch.Tensor:
+        from src.transformer.agri_fruiting_model import compute_fruiting_bucket_weights
+
+        ids = self.corpus.population.data_split().train
+        population = self.corpus.population.population()
+        targets = population.loc[ids]["TARGET"].values.astype(np.float32)
+        return compute_fruiting_bucket_weights(targets)
+
+    def train_dataloader(self) -> DataLoader:
+        if not self.weighted_sampling:
+            return self.get_dataloader(self.train, shuffle=True)
+        return super().train_dataloader()
+
+    def val_dataloader(self) -> DataLoader:
+        return self.get_dataloader(self.val, shuffle=False)
+
+    def test_dataloader(self) -> DataLoader:
+        return self.get_dataloader(self.test, shuffle=False)
 
 
 class PSYDataModule(CLSDataModule):

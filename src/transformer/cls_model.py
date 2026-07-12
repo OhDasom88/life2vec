@@ -59,16 +59,26 @@ class Transformer_CLS(pl.LightningModule):
         return self.hparams.num_targets
 
     def init_encoder(self):
+        from src.wandb_pretrain import load_transformer_weights
+
         self.transformer = Transformer(self.hparams)
-        log.info("Embedding sample before load: %.2f" %self.transformer.embedding.token.weight[1, 0].detach())
+        emb_before = float(self.transformer.embedding.token.weight[1, 0].detach())
+        log.info("Embedding sample before load: %.4f", emb_before)
+        self._pretrain_transfer_summary = None
         if "none" in self.hparams.pretrained_model_path:
             log.info("No pretrained model")
         else:
-            log.info("Pretrained Model Path:\n\t%s" %(HOME_PATH + self.hparams.pretrained_model_path))
-            self.transformer.load_state_dict(
-                torch.load(HOME_PATH + self.hparams.pretrained_model_path, map_location=self.device), strict=False
+            weight_path = Path(HOME_PATH) / self.hparams.pretrained_model_path.lstrip("/")
+            log.info("Pretrained Model Path:\n\t%s", weight_path)
+            self._pretrain_transfer_summary = load_transformer_weights(
+                self.transformer,
+                weight_path,
+                map_location=self.device,
             )
-        log.info("Embedding sample after load: %.2f" %self.transformer.embedding.token.weight[1, 0].detach())
+        emb_after = float(self.transformer.embedding.token.weight[1, 0].detach())
+        log.info("Embedding sample after load: %.4f", emb_after)
+        if self._pretrain_transfer_summary is not None:
+            self._pretrain_transfer_summary["embedding_delta"] = abs(emb_after - emb_before)
 
     def init_decoder(self):
         if self.hparams.pooled: 

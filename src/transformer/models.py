@@ -288,20 +288,37 @@ class TransformerEncoder(pl.LightningModule):
             eps=self.hparams.epsilon,
         )
 
+        total_steps = self._onecycle_total_steps()
+        log.info("OneCycleLR total_steps=%d", total_steps)
+
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": torch.optim.lr_scheduler.OneCycleLR(
-                    optimizer, max_lr=self.hparams.learning_rate, 
-                    epochs=30, steps_per_epoch=375,
-                    three_phase=False, pct_start=0.05, max_momentum=self.hparams.beta1,
-                    div_factor=30
-                ),  
+                    optimizer,
+                    max_lr=self.hparams.learning_rate,
+                    total_steps=total_steps,
+                    three_phase=False,
+                    pct_start=0.05,
+                    max_momentum=self.hparams.beta1,
+                    div_factor=30,
+                ),
                 "interval": "step",
                 "frequency": 1,
                 "name": "learning_rate",
             },
         }
+
+    def _onecycle_total_steps(self) -> int:
+        if self.trainer is not None:
+            steps = self.trainer.estimated_stepping_batches
+            if steps is not None and int(steps) > 0:
+                return int(steps)
+
+        batch_size = max(int(self.hparams.get("batch_size", 8)), 1)
+        max_epochs = int(getattr(self.trainer, "max_epochs", 50) or 50)
+        steps_per_epoch = max(1, int(self.hparams.get("steps_per_epoch", 375)))
+        return steps_per_epoch * max_epochs
 
     def log_metrics(
         self,
@@ -404,6 +421,14 @@ class TransformerEncoder(pl.LightningModule):
                 self.val_cls_f1(cls_preds, cls_targs),
                 on_step=on_step,
                 on_epoch=on_epoch,
+            )
+            mlm_f1 = self.val_f1(mlm_preds, mlm_targs)
+            cls_f1 = self.val_cls_f1(cls_preds, cls_targs)
+            self.log(
+                "val/pretrain_score",
+                mlm_f1 + cls_f1,
+                on_step=False,
+                on_epoch=True,
             )
 
     @staticmethod

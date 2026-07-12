@@ -44,6 +44,14 @@ def main(cfg):
     seed_everything(cfg.seed)
     
     data = instantiate(cfg.datamodule, _convert_="all")
+    if hasattr(data, "get_vocab_size"):
+        OmegaConf.update(
+            cfg, "model.hparams.vocab_size", int(data.get_vocab_size()), merge=True
+        )
+    elif hasattr(data, "vocabulary"):
+        OmegaConf.update(
+            cfg, "model.hparams.vocab_size", int(data.vocabulary.size()), merge=True
+        )
     ##MODEL
     model = instantiate(cfg.model, _convert_="all")
 

@@ -61,7 +61,7 @@ class Vocabulary:
 
     def size(self) -> int:
         """Returns the number of tokens"""
-        return len(self.token2index)
+        return len(self.vocab())
 
     def prepare(self) -> None:
         """Prepareres the vocabulary by calling :meth:`vocab`"""

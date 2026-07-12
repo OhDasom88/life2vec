@@ -7,6 +7,7 @@ import seaborn as sns
 import torch
 import pytorch_lightning as pl
 import torch.nn.functional as F
+import wandb
 from torch.utils.data import RandomSampler, WeightedRandomSampler
 from coral_pytorch.dataset import corn_label_from_logits
 
@@ -158,6 +159,7 @@ class SaveWeights(pl.Callback):
         torch.save(pl_module.transformer.state_dict(), path + _id + ".pth")
         log.info("Transformer weights saved:\n\t %s" %path)
         return super().on_fit_end(trainer, pl_module)
+
     def on_test_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
         _id = "%s" %str(pl_module.hparams.version).replace(".","_")
         path = HOME_PATH + "/odrev/projekter/PY000017_D/weights/%s/%s/%s/" %(pl_module.hparams.implementation, 
@@ -170,6 +172,24 @@ class SaveWeights(pl.Callback):
         torch.save(pl_module.transformer.state_dict(), path + _id + ".pth")
         log.info("Transformer weights saved:\n\t %s" %path)
         return super().on_test_start(trainer, pl_module)
+
+
+class AgriSaveWeights(pl.Callback):
+    """Save pretrain transformer weights under ~/weights/<implementation>/mlm/."""
+
+    def on_fit_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+        version_id = str(pl_module.hparams.version).replace(".", "_")
+        task = getattr(pl_module.hparams, "training_task", "mlm")
+        impl = str(pl_module.hparams.implementation)
+        path = Path(HOME_PATH) / "weights" / impl / task / "pre_training"
+        path.mkdir(parents=True, exist_ok=True)
+        out = path / f"{version_id}.pth"
+        torch.save(pl_module.transformer.state_dict(), out)
+        log.info("Agri transformer weights saved: %s", out)
+
+    def on_test_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+        self.on_fit_end(trainer, pl_module)
+
 
 class RedrawRandomProjections(pl.Callback):
     """Performer Specific Callback to redraw Random Orthogonal projections."""
@@ -450,6 +470,234 @@ class EmbeddingCollector(pl.Callback):
         log.info("Token Embedding matrix is saved")
         return super().on_validation_end(trainer, pl_module)
     
+class PretrainWandbReview(pl.Callback):
+    """Log gradients/params (via wandb.watch) and MLM+SOP prediction reviews to W&B."""
+
+    CLS_LABELS = {0: "ordered", 1: "reversed", 2: "shuffled"}
+
+    def __init__(
+        self,
+        num_val_batches: int = 3,
+        samples_per_batch: int = 2,
+        log_every_n_epochs: int = 1,
+        watch_log_freq: int = 100,
+    ) -> None:
+        super().__init__()
+        self.num_val_batches = num_val_batches
+        self.samples_per_batch = samples_per_batch
+        self.log_every_n_epochs = log_every_n_epochs
+        self.watch_log_freq = watch_log_freq
+        self._watching = False
+        self._mlm_rows: list[list] = []
+        self._sop_rows: list[list] = []
+        self._seq_rows: list[list] = []
+
+    def on_fit_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+        if wandb.run is None or self._watching:
+            return
+        wandb.watch(
+            pl_module,
+            log="all",
+            log_freq=self.watch_log_freq,
+            log_graph=False,
+        )
+        self._watching = True
+
+    def on_validation_epoch_start(
+        self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"
+    ) -> None:
+        self._mlm_rows = []
+        self._sop_rows = []
+        self._seq_rows = []
+
+    def on_validation_batch_end(
+        self,
+        trainer: "pl.Trainer",
+        pl_module: "pl.LightningModule",
+        outputs,
+        batch: Any,
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ) -> None:
+        if wandb.run is None:
+            return
+        if trainer.current_epoch % self.log_every_n_epochs != 0:
+            return
+        if batch_idx >= self.num_val_batches:
+            return
+        if not hasattr(trainer.datamodule, "vocabulary"):
+            return
+
+        index2token = trainer.datamodule.vocabulary.index2token
+        with torch.no_grad():
+            mlm_preds, cls_preds = pl_module(batch)
+        cls_pred_labels = torch.argmax(cls_preds, dim=-1)
+
+        for sample_i in range(
+            min(self.samples_per_batch, batch["input_ids"].shape[0])
+        ):
+            self._collect_mlm_rows(
+                batch,
+                mlm_preds,
+                sample_i,
+                index2token,
+                self._mlm_rows,
+                trainer.current_epoch,
+                batch_idx,
+            )
+            self._collect_sop_rows(
+                batch,
+                cls_preds,
+                cls_pred_labels,
+                sample_i,
+                self._sop_rows,
+                trainer.current_epoch,
+                batch_idx,
+            )
+            self._collect_sequence_row(
+                batch, sample_i, index2token, self._seq_rows, batch_idx
+            )
+
+    def on_validation_epoch_end(
+        self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"
+    ) -> None:
+        if wandb.run is None:
+            return
+        if trainer.current_epoch % self.log_every_n_epochs != 0:
+            return
+
+        if self._mlm_rows:
+            wandb.log(
+                {
+                    "review/mlm_predictions": wandb.Table(
+                        columns=[
+                            "epoch",
+                            "batch",
+                            "sequence_id",
+                            "position",
+                            "true_token",
+                            "pred_token",
+                            "correct",
+                            "context",
+                        ],
+                        data=self._mlm_rows,
+                    )
+                },
+            )
+        if self._sop_rows:
+            wandb.log(
+                {
+                    "review/sop_predictions": wandb.Table(
+                        columns=[
+                            "epoch",
+                            "batch",
+                            "sequence_id",
+                            "true_sop",
+                            "pred_sop",
+                            "correct",
+                            "prob_ordered",
+                            "prob_reversed",
+                            "prob_shuffled",
+                        ],
+                        data=self._sop_rows,
+                    )
+                },
+            )
+        if self._seq_rows:
+            wandb.log(
+                {
+                    "review/input_sequences": wandb.Table(
+                        columns=[
+                            "batch",
+                            "sequence_id",
+                            "length",
+                            "token_preview",
+                            "abspos_preview",
+                        ],
+                        data=self._seq_rows,
+                    )
+                },
+            )
+
+
+    def _collect_mlm_rows(
+        self, batch, mlm_preds, sample_i, index2token, rows, epoch, batch_idx
+    ) -> None:
+        target_pos = batch["target_pos"][sample_i].long().cpu().numpy()
+        target_tokens = batch["target_tokens"][sample_i].long().cpu().numpy()
+        original = batch["original_sequence"][sample_i].long().cpu().numpy()
+        pred_ids = torch.argmax(mlm_preds[sample_i], dim=-1).cpu().numpy()
+        seq_id = int(batch["sequence_id"][sample_i].item())
+
+        try:
+            end = int(np.where(original == 0)[0][0])
+        except IndexError:
+            end = len(original)
+
+        for pos, true_id in zip(target_pos, target_tokens):
+            if true_id == 0:
+                continue
+            pos = int(pos)
+            if pos >= end or pos >= len(pred_ids):
+                continue
+            pred_id = int(pred_ids[pos])
+            true_id = int(true_id)
+            ctx_start = max(0, pos - 3)
+            ctx = " ".join(
+                index2token.get(int(original[i]), "?")
+                for i in range(ctx_start, min(end, pos + 2))
+            )
+            rows.append(
+                [
+                    epoch,
+                    batch_idx,
+                    seq_id,
+                    pos,
+                    index2token.get(true_id, f"ID_{true_id}"),
+                    index2token.get(pred_id, f"ID_{pred_id}"),
+                    pred_id == true_id,
+                    ctx,
+                ]
+            )
+
+    def _collect_sop_rows(
+        self, batch, cls_preds, cls_pred_labels, sample_i, rows, epoch, batch_idx
+    ) -> None:
+        seq_id = int(batch["sequence_id"][sample_i].item())
+        true_lbl = int(batch["target_cls"][sample_i].item())
+        pred_lbl = int(cls_pred_labels[sample_i].item())
+        probs = F.softmax(cls_preds[sample_i], dim=-1).cpu().tolist()
+        rows.append(
+            [
+                epoch,
+                batch_idx,
+                seq_id,
+                self.CLS_LABELS.get(true_lbl, str(true_lbl)),
+                self.CLS_LABELS.get(pred_lbl, str(pred_lbl)),
+                pred_lbl == true_lbl,
+                round(probs[0], 4),
+                round(probs[1], 4),
+                round(probs[2], 4),
+            ]
+        )
+
+    def _collect_sequence_row(
+        self, batch, sample_i, index2token, rows, batch_idx
+    ) -> None:
+        original = batch["original_sequence"][sample_i].long().cpu().numpy()
+        abspos = batch["input_ids"][sample_i, 1].long().cpu().numpy()
+        seq_id = int(batch["sequence_id"][sample_i].item())
+        try:
+            end = int(np.where(original == 0)[0][0])
+        except IndexError:
+            end = len(original)
+        preview = " | ".join(
+            index2token.get(int(original[i]), "?") for i in range(min(end, 40))
+        )
+        abspos_preview = ",".join(str(int(abspos[i])) for i in range(min(end, 40)))
+        rows.append([batch_idx, seq_id, end, preview, abspos_preview])
+
+
 class TextCollector(pl.Callback):
     """Collect the sequence data (original and predicted) during the MLM Task"""
     def __init__(self, num_samples_per_epoch: int = 3) -> None:

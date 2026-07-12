@@ -195,10 +195,10 @@ class CLS_Decoder(nn.Module):
 
 class CLS_Decoder_FT2(nn.Module):
     """Classification for CLS Predictions"""
-    def __init__(self, hparams):
+    def __init__(self, hparams, num_outputs: int | None = None):
         super(CLS_Decoder_FT2, self).__init__()
         hidden_size = hparams.hidden_size
-        num_targs = 2
+        num_targs = num_outputs if num_outputs is not None else 2
         p = hparams.dc_dropout
 
         self.ff1 = nn.Linear(hidden_size,hidden_size)
