@@ -1,0 +1,17 @@
+# @package _global_
+
+defaults:
+  - finetune_hackathon
+
+version: sweep
+
+trainer:
+  max_epochs: 150
+  callbacks:
+    - ${callbacks.checkpoint_hackathon_cls_sweep}
+    - ${callbacks.early_stopping_hackathon_cls_sweep}
+    - ${callbacks.lr_monitor}
+    - ${callbacks.silence_warnings}
+    - ${callbacks.reseed_dataloader}
+    - ${callbacks.track_ids}
+    - ${callbacks.calculate_risk}

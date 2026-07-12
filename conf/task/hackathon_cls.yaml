@@ -1,0 +1,16 @@
+_target_: src.tasks.cls.CLS
+
+name: cls
+max_length: 640
+no_sep: false
+
+pooled: false
+num_pooled_sep: 0
+
+p_sequence_timecut: 0.0
+p_sequence_resample: 0.2
+p_sequence_abspos_noise: 0.05
+p_sequence_hide_background: 0.0
+p_sentence_drop_tokens: 0.0
+
+shuffle_within_sentences: true

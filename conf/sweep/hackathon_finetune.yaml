@@ -1,0 +1,53 @@
+# W&B grid sweep: Hackathon binary CLS finetune.
+# Refresh pretrained_run_id list after pretrain sweep:
+#   python scripts/generate_hackathon_sweep_yaml.py --write --top-k 8
+#
+# Usage:
+#   source setup.sh
+#   wandb sweep conf/sweep/hackathon_finetune.yaml
+#   wandb agent dasom-oh/Berry2Vec/<sweep_id>
+
+project: Berry2Vec
+entity: dasom-oh
+program: src/sweep_train_hackathon.py
+command:
+  - ${env}
+  - python
+  - -m
+  - src.sweep_train_hackathon
+method: grid
+metric:
+  name: val/f1_corrected
+  goal: maximize
+
+parameters:
+  pretrained_run_id:
+    values:
+      - e6do76xs
+
+  pooled:
+    values: [false]
+
+  loss_type:
+    values: [asymmetric]
+
+  pos_weight:
+    values: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+
+  learning_rate:
+    values: [0.0001, 0.0005, 0.001]
+
+  dropout:
+    values: [0.05, 0.1, 0.15]
+
+  weight_decay:
+    values: [0.001, 0.01]
+
+  freeze_embeddings:
+    values: [true, false]
+
+  batch_size:
+    values: [800]
+
+  accumulate_grad_batches:
+    values: [1]

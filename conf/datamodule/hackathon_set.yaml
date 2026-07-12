@@ -1,0 +1,12 @@
+defaults:
+  - /data_new/corpus@corpus: hackathon_set
+  - /data_new/vocabulary@vocabulary: hackathon_set
+  - /task@task: hackathon_mlm
+
+_target_: src.data_new.datamodule.L2VDataModule
+
+batch_size: 16
+num_workers: 0
+
+subset: false
+subset_id: 0

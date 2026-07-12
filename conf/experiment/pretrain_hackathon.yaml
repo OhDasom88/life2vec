@@ -1,0 +1,70 @@
+# @package _global_
+
+defaults:
+  - /datamodule: hackathon_set
+  - /trainer: pretrain
+  - /callbacks
+
+version: 1.0
+implementation: hackathon
+comments: "Hackathon greenhouse environment MLM pretrain"
+name: pre_training
+model_name: l2v
+
+seed: 2023
+stage: pre_training
+ckpt_path: null
+
+model:
+  _target_: src.transformer.models.TransformerEncoder
+  _convert_: all
+  hparams:
+    vocab_size: 500
+    batch_size: ${datamodule.batch_size}
+    max_length: ${datamodule.task.max_length}
+    hidden_size: 128
+    hidden_ff: 512
+    hidden_act: swish
+    n_encoders: 2
+    n_heads: 4
+    n_local: 3
+    local_window_size: 16
+    norm_type: rezero
+    att_dropout: 0.1
+    fw_dropout: 0.1
+    dc_dropout: 0.1
+    emb_dropout: 0.1
+    parametrize_emb: false
+    norm_input_emb: false
+    norm_output_emb: true
+    weight_tying: wt
+    training_task: ${datamodule.task.name}
+    experiment_name: ${name}_${model_name}
+    experiment_version: ${version}
+    attention_type: performer
+    multihead_dc: false
+    num_random_features: 64
+    learning_rate: 1.e-3
+    weight_decay: 0.01
+    beta1: 0.9
+    beta2: 0.999
+    cls_num_targs: 3
+    epsilon: 1.e-6
+    stage: ${stage}
+    implementation: ${implementation}
+    version: ${version}
+
+trainer:
+  accelerator: gpu
+  devices: [0]
+  min_epochs: 1
+  max_epochs: 50
+  accumulate_grad_batches: 1
+  limit_train_batches: 1.0
+  limit_val_batches: 1.0
+  check_val_every_n_epoch: 1
+  callbacks:
+    - ${callbacks.checkpoint_pretrain_sweep}
+    - ${callbacks.lr_monitor}
+    - ${callbacks.silence_warnings}
+    - ${callbacks.agri_save_weights}
