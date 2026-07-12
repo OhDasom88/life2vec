@@ -1,5 +1,8 @@
 from dataclasses import dataclass, field
 from functools import cached_property
+import hashlib
+import json
+from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Tuple, Union, cast
 
 import dask
@@ -66,6 +69,89 @@ class Vocabulary:
     def prepare(self) -> None:
         """Prepareres the vocabulary by calling :meth:`vocab`"""
         self.vocab()
+
+
+@dataclass
+class RegistryVocabulary(Vocabulary):
+    """Stable vocabulary backed by a frozen, versioned online2 token registry."""
+
+    registry_path: str
+    name: str = "online2"
+    registry_version: str = ""
+    expected_checksum: str = ""
+    general_tokens: List[str] = field(
+        default_factory=lambda: ["[PAD]", "[CLS]", "[SEP]", "[MASK]", "[UNK]"]
+    )
+    background_tokens: List[str] = field(default_factory=list)
+
+    def checksum(self) -> str:
+        return hashlib.sha256(Path(self.registry_path).read_bytes()).hexdigest()
+
+    @cached_property
+    def _vocab(self) -> pd.DataFrame:
+        path = Path(self.registry_path)
+        if not path.exists():
+            raise FileNotFoundError(path)
+        if self.expected_checksum and self.checksum() != self.expected_checksum:
+            raise ValueError("Token registry checksum does not match configuration")
+        if path.suffix.lower() == ".parquet":
+            frame = pd.read_parquet(path)
+        elif path.suffix.lower() in {".json", ".jsonl"}:
+            if path.suffix.lower() == ".jsonl":
+                frame = pd.read_json(path, lines=True)
+            else:
+                payload = json.loads(path.read_text())
+                frame = pd.DataFrame(payload.get("tokens", payload))
+        else:
+            frame = pd.read_csv(path)
+
+        frame = frame.rename(
+            columns={
+                "token_id": "ID",
+                "id": "ID",
+                "token": "TOKEN",
+                "category": "CATEGORY",
+            }
+        )
+        required = {"ID", "TOKEN", "CATEGORY"}
+        if not required.issubset(frame.columns):
+            raise ValueError(
+                f"Token registry must contain {sorted(required)} columns"
+            )
+        if self.registry_version:
+            if "registry_version" not in frame:
+                raise ValueError("Token registry has no registry_version column")
+            versions = set(frame["registry_version"].dropna().astype(str).unique())
+            if versions != {self.registry_version}:
+                raise ValueError(
+                    f"Registry version mismatch: expected {self.registry_version!r}, "
+                    f"found {sorted(versions)}"
+                )
+
+        result = frame.loc[:, ["ID", "TOKEN", "CATEGORY"]].copy()
+        result["ID"] = result["ID"].astype(int)
+        result["TOKEN"] = result["TOKEN"].astype(str)
+        result["CATEGORY"] = result["CATEGORY"].astype(str)
+        result = result.sort_values("ID", kind="mergesort").reset_index(drop=True)
+        if result["ID"].duplicated().any() or result["TOKEN"].duplicated().any():
+            raise ValueError("Token registry IDs and token strings must be unique")
+        expected_ids = list(range(len(result)))
+        if result["ID"].tolist() != expected_ids:
+            raise ValueError("Token registry IDs must be contiguous and start at zero")
+        tokens = set(result["TOKEN"])
+        missing_special = [token for token in self.general_tokens if token not in tokens]
+        if missing_special:
+            raise ValueError(f"Token registry lacks special tokens: {missing_special}")
+        if result.loc[result["TOKEN"] == "[PAD]", "ID"].item() != 0:
+            raise ValueError("[PAD] must have stable token ID 0")
+        if not self.background_tokens:
+            self.background_tokens = result.loc[
+                result["CATEGORY"] == "BACKGROUND", "TOKEN"
+            ].tolist()
+        return result
+
+    def vocab(self) -> pd.DataFrame:
+        return self._vocab.copy()
 
 
 @dataclass
