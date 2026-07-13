@@ -97,9 +97,24 @@ scripts/online2 neo4j validate \
 ## life2vec smoke
 
 ```bash
-# smoke subset은 full export에서 샘플링한 뒤
+# 1-batch CUDA smoke (Hydra 없이)
 ONLINE2_SMOKE_DIR=outputs/online2/smoke_train \
   python scripts/online2_smoke_pretrain.py
+```
+
+Hydra end-to-end sanity (smoke subset 200 sequences):
+
+```bash
+export ONLINE2_PARQUET_PATH=outputs/online2/smoke_train/training_events.parquet
+export ONLINE2_BUILD_ID=build_85c4aba3a72e0e321cfcf6af46eecd20a19a2c0a85fab2b70d0af677dd85840a
+export ONLINE2_REGISTRY_VERSION=1
+export ONLINE2_TOKEN_REGISTRY_PATH=outputs/online2/smoke_train/life2vec_token_registry.json
+export ONLINE2_REFERENCE_DATE=2024-01-01
+export ONLINE2_THRESHOLD=2099-01-01
+
+python -m src.prepare_data +datamodule=online2 'target=${datamodule}' \
+  single_threaded=true +seed=2023
+python -m src.train experiment=pretrain_online2_smoke
 ```
 
 전체 사전학습 예:
@@ -111,6 +126,8 @@ export ONLINE2_REGISTRY_VERSION=1
 export ONLINE2_TOKEN_REGISTRY_PATH=outputs/online2/build-v8-active80-r3/life2vec_token_registry.json
 export ONLINE2_REFERENCE_DATE=2024-01-01
 export ONLINE2_THRESHOLD=2099-01-01
+python -m src.prepare_data +datamodule=online2 'target=${datamodule}' \
+  single_threaded=true +seed=2023
 python -m src.train experiment=pretrain_online2
 ```
 

@@ -155,6 +155,12 @@ def _modality(path: Path) -> str:
 
 
 def _timestamp(raw: str) -> tuple[str, str]:
+    """Parse online2 CSV timestamps into UTC Zulu strings.
+
+    Policy (confirmed): timezone-naive CSV strings are Asia/Seoul (KST) wall
+    clocks. Aware values keep their offset. See
+    ``outputs/online2/v2_finetune/TIMEZONE_POLICY_KST.md``.
+    """
     if not raw:
         return "", "unknown"
     value = datetime.fromisoformat(raw)
