@@ -189,7 +189,7 @@ class MLM(Task):
             # Stable per-person seed; unlike hash(), this is process-independent.
             person_bytes = str(result.person_id).encode("utf-8")
             person_seed = int.from_bytes(person_bytes[:8].ljust(8, b"\0"), "little")
-            rng = np.random.RandomState(self.evaluation_seed ^ person_seed)
+            rng = np.random.RandomState((self.evaluation_seed ^ person_seed) & 0xFFFFFFFF)
 
         if force_label is None:
             draw = float(rng.random())
