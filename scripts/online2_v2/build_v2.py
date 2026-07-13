@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from src.online2.v2.binning import fit_binning_v2
+from src.online2.v2.binning import BinningPolicy, fit_binning_v2
 from src.online2.v2.feature_schema import build_feature_schema_from_audit
 from src.online2.v2.masking import GroupedMLMMasker
 from src.online2.v2.provenance import training_mode_meta
@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BUILD = ROOT / "outputs/online2/build-v8-active80-r3"
 DEFAULT_AUDIT = ROOT / "outputs/online2/v2_audit/feature_semantics_and_units.csv"
 DEFAULT_OUT = ROOT / "outputs/online2/v2_build"
+DEFAULT_BINNING_POLICY = DEFAULT_OUT / "binning_policy_v2.yaml"
 DATA = ROOT / "datasets/agrichallenge/online2"
 
 
@@ -125,6 +126,10 @@ def build_registries(out: Path, legacy_build: Path, audit: Path) -> dict[str, An
     for path in sorted((legacy_build).glob("*.json")):
         source_hashes[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
 
+    policy_path = out / "binning_policy_v2.yaml"
+    if not policy_path.exists():
+        policy_path = DEFAULT_BINNING_POLICY
+    policy = BinningPolicy.load(policy_path if policy_path.exists() else None)
     binning = fit_binning_v2(
         schema,
         rows,
@@ -132,8 +137,25 @@ def build_registries(out: Path, legacy_build: Path, audit: Path) -> dict[str, An
         example_count=example_n,
         problem_count=problem_n,
         code_commit_hash=git_commit(),
+        policy=policy,
     )
     binning.save(out / "binning_registry_v2_transductive.json")
+    # Compact machine-readable policy snapshot (hash + counts).
+    write_json(
+        out / "binning_policy_v2.json",
+        {
+            "edge_policy": binning.meta.get("edge_policy"),
+            "abs_policy": binning.meta.get("abs_policy"),
+            "global_rel_policy": binning.meta.get("global_rel_policy"),
+            "farm_rel_policy": binning.meta.get("farm_rel_policy"),
+            "zero_mass_threshold": binning.meta.get("zero_mass_threshold"),
+            "policy_version": binning.meta.get("policy_version"),
+            "registry_hash": binning.meta.get("registry_hash"),
+            "feature_count": len(binning.meta.get("feature_summaries") or {}),
+            "farm_rule_count": binning.meta.get("farm_rule_count"),
+            "policy_yaml": str(policy_path) if policy_path.exists() else None,
+        },
+    )
     vocab = build_vocab_v2(schema, binning, code_commit_hash=git_commit())
     vocab.save(out / "vocab_v2.json")
     save_token_usage_policy(out / "token_usage_policy_v2.json")
@@ -481,7 +503,7 @@ def materialize_sequences(out: Path, legacy_build: Path, events_v2: pd.DataFrame
     if writer is not None:
         writer.close()
 
-    # Assign duplicate classes + sampling weights on kept rows (no full pre_dedup payload)
+    # Assign duplicate classes + sampling weights without loading SENTENCE columns fully.
     if not final_path.exists():
         write_json(
             out / "duplicate_report_v2.json",
@@ -489,51 +511,84 @@ def materialize_sequences(out: Path, legacy_build: Path, events_v2: pd.DataFrame
         )
         return {"before": before, "after": 0}
 
-    dedup = pd.read_parquet(final_path)
-    context_freq = dedup.groupby("event_set_signature").size()
-    dedup = dedup.copy()
-    dedup["duplicate_class"] = np.where(
-        dedup["event_set_signature"].map(context_freq) > 1,
+    light_cols = [
+        "sequence_id",
+        "narrative_id",
+        "serialization_signature",
+        "event_set_signature",
+        "canonical_context_id",
+    ]
+    index = pd.read_parquet(final_path, columns=light_cols)
+    context_freq = index.groupby("event_set_signature").size()
+    view_counts = index.groupby("canonical_context_id").size()
+    dup_class = np.where(
+        index["event_set_signature"].map(context_freq) > 1,
         "SAME_CONTEXT_DIFFERENT_NARRATIVE",
         "UNIQUE",
     )
-    view_counts = dedup.groupby("canonical_context_id").size().rename("context_view_count")
-    dedup = dedup.join(view_counts, on="canonical_context_id")
-    dedup["sampling_weight"] = 1.0 / np.sqrt(dedup["context_view_count"].clip(lower=1))
-    dedup.to_parquet(final_path, index=False)
+    context_view_count = index["canonical_context_id"].map(view_counts).astype(int)
+    sampling_weight = 1.0 / np.sqrt(context_view_count.clip(lower=1).astype(float))
+    annotate = pd.DataFrame(
+        {
+            "sequence_id": index["sequence_id"].to_numpy(),
+            "duplicate_class": dup_class,
+            "context_view_count": context_view_count.to_numpy(),
+            "sampling_weight": sampling_weight.to_numpy(),
+        }
+    ).set_index("sequence_id")
 
-    # Lightweight pre-dedup index (signatures only) for audit
-    pre_index = dedup[
-        [
-            "sequence_id",
-            "narrative_id",
-            "serialization_signature",
-            "event_set_signature",
-            "duplicate_class",
-        ]
+    pre_index = index[
+        ["sequence_id", "narrative_id", "serialization_signature", "event_set_signature"]
     ].copy()
+    pre_index["duplicate_class"] = dup_class
     pre_index.to_parquet(out / "sequences_v2_pre_dedup.parquet", index=False)
-    class_counts["SAME_CONTEXT_DIFFERENT_NARRATIVE"] = int(
-        (dedup["duplicate_class"] == "SAME_CONTEXT_DIFFERENT_NARRATIVE").sum()
-    )
-    class_counts["UNIQUE"] = int((dedup["duplicate_class"] == "UNIQUE").sum())
+
+    # Row-group rewrite to attach annotation columns (keeps peak RAM ~1 group).
+    pf = pq.ParquetFile(final_path)
+    tmp_path = out / "sequences_v2.annotated.tmp.parquet"
+    ann_writer: Optional[pq.ParquetWriter] = None
+    for rg in range(pf.metadata.num_row_groups):
+        frame = pf.read_row_group(rg).to_pandas()
+        drop_cols = [c for c in ("duplicate_class", "context_view_count", "sampling_weight") if c in frame.columns]
+        if drop_cols:
+            frame = frame.drop(columns=drop_cols)
+        joined = frame.join(annotate, on="sequence_id", how="left")
+        table = pa.Table.from_pandas(joined, preserve_index=False)
+        if ann_writer is None:
+            ann_writer = pq.ParquetWriter(tmp_path, table.schema, compression="zstd")
+        ann_writer.write_table(table)
+        del frame, joined, table
+    if ann_writer is not None:
+        ann_writer.close()
+        tmp_path.replace(final_path)
+
+    class_counts["SAME_CONTEXT_DIFFERENT_NARRATIVE"] = int((dup_class == "SAME_CONTEXT_DIFFERENT_NARRATIVE").sum())
+    class_counts["UNIQUE"] = int((dup_class == "UNIQUE").sum())
+    after_n = int(len(index))
+    del index, annotate, context_freq, view_counts
     write_json(
         out / "duplicate_report_v2.json",
         {
             "before": before,
-            "after": int(len(dedup)),
-            "removed_true_exact": int(before - len(dedup)),
+            "after": after_n,
+            "removed_true_exact": int(before - after_n),
             "class_counts_pre": class_counts,
-            "note": "pre_dedup parquet stores kept index only; exact-dup rows discarded online",
+            "note": "pre_dedup parquet stores kept index only; exact-dup rows discarded online; annotate via row-groups",
         },
     )
-    return {"before": before, "after": int(len(dedup))}
+    return {"before": before, "after": after_n}
 
 
 def shadow_split(out: Path) -> dict[str, Any]:
-    seq = pd.read_parquet(out / "sequences_v2.parquet")
-    # Connected components for multi-farm via shared events already collapsed into split_group_id=window
-    # Use split_group_id hash for farm-held-out style buckets without cross overlap.
+    """Assign shadow_split using light columns + row-group rewrite (memory safe)."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    final_path = out / "sequences_v2.parquet"
+    light = pd.read_parquet(
+        final_path,
+        columns=["sequence_id", "split_group_id", "event_ids"],
+    )
     seed = 2023
     ratios = np.asarray([0.8, 0.1, 0.1])
     thr = np.cumsum(ratios)
@@ -547,34 +602,46 @@ def shadow_split(out: Path) -> dict[str, Any]:
             return "val"
         return "test"
 
-    seq = seq.copy()
-    seq["shadow_split"] = seq["split_group_id"].map(bucket)
-    # Ensure no event_id overlap across splits
-    exploded = seq[["shadow_split", "event_ids", "sequence_id"]].copy()
+    light = light.copy()
+    light["shadow_split"] = light["split_group_id"].map(bucket)
+    exploded = light[["shadow_split", "event_ids", "sequence_id", "split_group_id"]].copy()
     exploded["event_id"] = exploded["event_ids"].map(json.loads)
     exploded = exploded.explode("event_id")
     overlap = (
         exploded.groupby("event_id")["shadow_split"].nunique().reset_index(name="n_splits")
     )
     bad = overlap[overlap["n_splits"] > 1]
-    # Repair: assign all sequences sharing bad events to majority split of their split_group
     if len(bad):
-        # force by split_group_id already; if still bad, move entire split_group to train
         bad_events = set(bad["event_id"])
         touched = exploded[exploded["event_id"].isin(bad_events)]["sequence_id"].unique()
-        groups = seq.loc[seq["sequence_id"].isin(touched), "split_group_id"].unique()
-        seq.loc[seq["split_group_id"].isin(groups), "shadow_split"] = "train"
-        exploded = seq[["shadow_split", "event_ids"]].copy()
+        groups = light.loc[light["sequence_id"].isin(touched), "split_group_id"].unique()
+        light.loc[light["split_group_id"].isin(groups), "shadow_split"] = "train"
+        exploded = light[["shadow_split", "event_ids"]].copy()
         exploded["event_id"] = exploded["event_ids"].map(json.loads)
         exploded = exploded.explode("event_id")
         overlap = exploded.groupby("event_id")["shadow_split"].nunique().reset_index(name="n_splits")
         bad = overlap[overlap["n_splits"] > 1]
 
-    seq.to_parquet(out / "sequences_v2.parquet", index=False)
+    split_map = light.set_index("sequence_id")["shadow_split"]
+    pf = pq.ParquetFile(final_path)
+    tmp_path = out / "sequences_v2.shadow.tmp.parquet"
+    writer: Optional[pq.ParquetWriter] = None
+    for rg in range(pf.metadata.num_row_groups):
+        frame = pf.read_row_group(rg).to_pandas()
+        frame["shadow_split"] = frame["sequence_id"].map(split_map)
+        table = pa.Table.from_pandas(frame, preserve_index=False)
+        if writer is None:
+            writer = pq.ParquetWriter(tmp_path, table.schema, compression="zstd")
+        writer.write_table(table)
+        del frame, table
+    if writer is not None:
+        writer.close()
+        tmp_path.replace(final_path)
+
     report = {
         "event_overlap_after_repair": int(len(bad)),
-        "split_counts": seq["shadow_split"].value_counts().to_dict(),
-        "sequence_count": int(len(seq)),
+        "split_counts": light["shadow_split"].value_counts().to_dict(),
+        "sequence_count": int(len(light)),
     }
     write_json(out / "shadow_split_report_v2.json", report)
     overlap.to_csv(out / "shadow_split_event_overlap_v2.csv", index=False)
@@ -582,92 +649,70 @@ def shadow_split(out: Path) -> dict[str, Any]:
 
 
 def export_training(out: Path, vocab: VocabV2) -> dict[str, Any]:
-    seq = pd.read_parquet(out / "sequences_v2.parquet")
-    # Flatten to event-level rows for Online2ParquetTokenSource compatibility: one row per event occurrence
-    # Simpler path: store sequence-level documents for a dedicated V2 source.
-    rows = []
-    for rec in seq.itertuples(index=False):
-        event_ids = json.loads(rec.event_ids)
-        stgs = json.loads(rec.same_time_group_ids)
-        for pos, event_id in enumerate(event_ids):
-            rows.append(
+    """Export one training row per sequence, streaming by parquet row-group."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    seq_path = out / "sequences_v2.parquet"
+    export_path = out / "training_events_v2.parquet"
+    tmp_path = out / "training_events_v2.tmp.parquet"
+    pf = pq.ParquetFile(seq_path)
+    writer: Optional[pq.ParquetWriter] = None
+    n_rows = 0
+    for rg in range(pf.metadata.num_row_groups):
+        seq = pf.read_row_group(rg).to_pandas()
+        seq_rows = []
+        for rec in seq.itertuples(index=False):
+            event_ids = json.loads(rec.event_ids)
+            stgs = json.loads(rec.same_time_group_ids) if rec.same_time_group_ids else []
+            farm_ids = json.loads(rec.farm_ids) if rec.farm_ids else []
+            seq_rows.append(
                 {
                     "PERSON_ID": rec.PERSON_ID,
                     "sequence_id": rec.sequence_id,
-                    "event_id": event_id,
-                    "event_position": pos,
-                    "time_group_rank": min(pos, max(0, len(stgs) - 1)),
-                    "same_time_group_id": stgs[min(pos, len(stgs) - 1)] if stgs else "",
+                    "event_id": event_ids[0] if event_ids else "",
+                    "event_position": 0,
+                    "time_group_rank": 0,
+                    "same_time_group_id": stgs[0] if stgs else "",
                     "START_DATE": pd.Timestamp("2024-01-01"),
-                    "AGE": float(pos),
-                    "SENTENCE": rec.SENTENCE if pos == 0 else "[EVENT_SEP]",
-                    "event_kind": "SEQUENCE" if pos == 0 else "EVENT",
+                    "AGE": 0.0,
+                    "SENTENCE": rec.SENTENCE,
+                    "event_kind": "SEQUENCE",
                     "narrative_id": rec.narrative_id,
                     "order_semantics": "STRICT_CHRONOLOGICAL",
                     "op_eligible": True,
                     "modality_ref": "[]",
-                    "SEGMENT": (pos % 3) + 1,
-                    "farm_id": json.loads(rec.farm_ids)[0] if rec.farm_ids else "",
+                    "SEGMENT": 1,
+                    "farm_id": farm_ids[0] if farm_ids else "",
                     "zone_id": "",
                     "BACKGROUND_TOKENS": "[]",
                     "build_id": "v2_transductive",
                     "registry_version": "v2",
-                    "embedding_status": "",
+                    "embedding_status": "pending",
                     "sampling_weight": getattr(rec, "sampling_weight", 1.0),
                     "shadow_split": getattr(rec, "shadow_split", "train"),
                     "canonical_context_id": rec.canonical_context_id,
                     "split_group_id": rec.split_group_id,
-                    "measurement_group_ids": rec.measurement_group_ids if pos == 0 else "[]",
-                    "token_roles": rec.token_roles if pos == 0 else "[]",
+                    "measurement_group_ids": rec.measurement_group_ids,
+                    "token_roles": rec.token_roles,
                     "training_mode": "transductive_public_pretraining",
                     "contains_problem_observations": True,
                     "contains_problem_images": True,
                     "contains_problem_hidden_targets": False,
                 }
             )
-    # More efficient: one row per sequence for V2 MLM path
-    seq_rows = []
-    for rec in seq.itertuples(index=False):
-        seq_rows.append(
-            {
-                "PERSON_ID": rec.PERSON_ID,
-                "sequence_id": rec.sequence_id,
-                "event_id": json.loads(rec.event_ids)[0],
-                "event_position": 0,
-                "time_group_rank": 0,
-                "same_time_group_id": json.loads(rec.same_time_group_ids)[0]
-                if json.loads(rec.same_time_group_ids)
-                else "",
-                "START_DATE": pd.Timestamp("2024-01-01"),
-                "AGE": 0.0,
-                "SENTENCE": rec.SENTENCE,
-                "event_kind": "SEQUENCE",
-                "narrative_id": rec.narrative_id,
-                "order_semantics": "STRICT_CHRONOLOGICAL",
-                "op_eligible": True,
-                "modality_ref": "[]",
-                "SEGMENT": 1,
-                "farm_id": json.loads(rec.farm_ids)[0] if rec.farm_ids else "",
-                "zone_id": "",
-                "BACKGROUND_TOKENS": "[]",
-                "build_id": "v2_transductive",
-                "registry_version": "v2",
-                "embedding_status": "pending",
-                "sampling_weight": getattr(rec, "sampling_weight", 1.0),
-                "shadow_split": getattr(rec, "shadow_split", "train"),
-                "canonical_context_id": rec.canonical_context_id,
-                "split_group_id": rec.split_group_id,
-                "measurement_group_ids": rec.measurement_group_ids,
-                "token_roles": rec.token_roles,
-                "training_mode": "transductive_public_pretraining",
-                "contains_problem_observations": True,
-                "contains_problem_images": True,
-                "contains_problem_hidden_targets": False,
-            }
-        )
-    export = pd.DataFrame(seq_rows)
-    export_path = out / "training_events_v2.parquet"
-    export.to_parquet(export_path, index=False)
+        chunk = pd.DataFrame(seq_rows)
+        n_rows += len(chunk)
+        table = pa.Table.from_pandas(chunk, preserve_index=False)
+        if writer is None:
+            writer = pq.ParquetWriter(tmp_path, table.schema, compression="zstd")
+        writer.write_table(table)
+        del seq, seq_rows, chunk, table
+    if writer is not None:
+        writer.close()
+        tmp_path.replace(export_path)
+    else:
+        pd.DataFrame([]).to_parquet(export_path, index=False)
     # life2vec compatible registry
     tokens = [
         {
@@ -682,7 +727,7 @@ def export_training(out: Path, vocab: VocabV2) -> dict[str, Any]:
     ]
     # Map new specials into categories; ensure PAD=0
     write_json(out / "life2vec_token_registry_v2.json", {"tokens": tokens, "registry_version": "v2", "schema_version": "online2-v2"})
-    return {"rows": int(len(export)), "path": str(export_path), "vocab_size": vocab.size()}
+    return {"rows": int(n_rows), "path": str(export_path), "vocab_size": vocab.size()}
 
 
 def validate_grouped_masking(out: Path) -> dict[str, Any]:

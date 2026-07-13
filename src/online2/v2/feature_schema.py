@@ -33,6 +33,11 @@ class FeatureSpec:
     circular_encoding: str = "none"  # none|compass8|sincos
     threshold_tokens_enabled: bool = False
     domain_threshold_ready: bool = False
+    # Optional binning overrides (None → BinningPolicy / adaptive defaults).
+    n_bins_abs: Optional[int] = None
+    n_bins_global_rel: Optional[int] = None
+    n_bins_farm_rel: Optional[int] = None
+    binning_tier: str = ""
     evidence: str = ""
     schema_version: str = SCHEMA_VERSION
     event_view: str = ""

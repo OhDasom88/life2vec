@@ -286,12 +286,7 @@ def export_training_chunked(out: Path, seq_path: Path, vocab: VocabV2) -> dict[s
         {
             "token_id": i,
             "token": vocab.id_to_token[i],
-            "TOKEN": vocab.id_to_token[i],
-            "ID": i,
             "category": "GENERAL"
-            if vocab.id_to_token[i] in {"[PAD]", "[CLS]", "[SEP]", "[MASK]", "[UNK]"}
-            else vocab.id_to_token[i].split("|", 1)[0],
-            "CATEGORY": "GENERAL"
             if vocab.id_to_token[i] in {"[PAD]", "[CLS]", "[SEP]", "[MASK]", "[UNK]"}
             else vocab.id_to_token[i].split("|", 1)[0],
             "registry_version": "v2",
