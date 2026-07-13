@@ -6,6 +6,13 @@ from .vocab import VocabV2, build_vocab_v2
 from .tokenizer import TokenizerV2
 from .masking import GroupedMLMMasker
 from .provenance import ProvenanceMeta, training_mode_meta
+from .event_pooling_finetune import (
+    EventPoolingConfig,
+    EventPoolingDiagnosisModel,
+    PooledAttentionEventDecoder,
+    DiagnosisHead,
+)
+from .diagnosis_dataset import DiagnosisEventDataset, collate_diagnosis_batch
 
 __all__ = [
     "FeatureSchema",
@@ -19,4 +26,10 @@ __all__ = [
     "GroupedMLMMasker",
     "ProvenanceMeta",
     "training_mode_meta",
+    "EventPoolingConfig",
+    "EventPoolingDiagnosisModel",
+    "PooledAttentionEventDecoder",
+    "DiagnosisHead",
+    "DiagnosisEventDataset",
+    "collate_diagnosis_batch",
 ]

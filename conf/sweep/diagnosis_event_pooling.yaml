@@ -1,0 +1,74 @@
+# Wandb sweep: PAD event-pooling diagnosis finetune
+# Metric: farm-stratified 5-fold CV mean best macro-F1
+#
+# Tunables (lr / weight_decay / dropout / hidden_dim) are applied via
+# wandb.config → apply_wandb_config() after wandb.init (not CLI ${lr} macros).
+#
+# Create + run:
+#   wandb sweep --project Berry2Vec --entity dasom-oh \
+#     conf/sweep/diagnosis_event_pooling.yaml
+#   wandb agent dasom-oh/Berry2Vec/<SWEEP_ID>
+
+program: scripts/online2_v2/run_diagnosis_event_pooling_finetune.py
+method: bayes
+metric:
+  name: cv/mean_best_val_macro_f1
+  goal: maximize
+
+parameters:
+  # Fixed / high-batch baseline (also mirrored in command for non-sweep defaults)
+  batch_size:
+    value: 28
+  grad_accum:
+    value: 1
+  epochs:
+    value: 150
+  early_stop_patience:
+    value: 20
+  early_stop_min_epochs:
+    value: 30
+  n_folds:
+    value: 5
+  seed:
+    value: 2023
+  num_heads:
+    value: 4
+
+  # Tuned (read from wandb.config in the training script)
+  lr:
+    values: [1.0e-4, 3.0e-4, 5.0e-4, 1.0e-3]
+  weight_decay:
+    values: [1.0e-3, 1.0e-2, 5.0e-2]
+  dropout:
+    values: [0.1, 0.2, 0.3]
+  hidden_dim:
+    values: [128, 192, 256]
+
+command:
+  - ${env}
+  - /home/dasom/miniconda3/envs/life2vec/bin/python
+  - ${program}
+  - --mode
+  - cv
+  - --n-folds
+  - "5"
+  - --epochs
+  - "150"
+  - --batch-size
+  - "28"
+  - --grad-accum
+  - "1"
+  - --early-stop-patience
+  - "20"
+  - --early-stop-min-epochs
+  - "30"
+  - --device
+  - cuda
+  - --wandb
+  - --wandb-project
+  - Berry2Vec
+  - --wandb-entity
+  - dasom-oh
+  - --wandb-tags
+  - online2_v2,diagnosis,event_pooling,pad,finetuning,sweep
+  - --no-wandb-watch
