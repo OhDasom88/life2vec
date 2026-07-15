@@ -1,0 +1,64 @@
+# Sweep 2 — Metric learning & Open-set (PLAN §12.2)
+# Freeze Sweep-1 winner into fixed params below before launching, or override via agent.
+#
+#   export WANDB_GROUP=finetune_v03_improvement_r1
+#   wandb sweep --project Berry2Vec --entity dasom-oh conf/sweep/finetune_v03_s2_metric_openset.yaml
+
+program: scripts/online2_v2/v03/run_diagnosis_finetune_v03.py
+method: grid
+metric:
+  name: cv/mean_best_macro_f1
+  goal: maximize
+
+parameters:
+  mode:
+    value: cv_repeated
+  n_folds:
+    value: 3
+  n_repeats:
+    value: 3
+  epochs:
+    value: 150
+  monitor:
+    value: val_loss
+  wandb:
+    value: true
+  wandb_group:
+    value: finetune_v03_improvement_r1
+  wandb_job_type:
+    value: sweep_2_metric_openset
+  wandb_tags:
+    value: v03,multitask,repeated3fold,open-set,attention-pooling,sweep2
+
+  # placeholders — replace with Sweep-1 winners
+  lr:
+    value: 3.0e-4
+  lambda_binary:
+    value: 1.0
+  pos_weight:
+    value: "auto"
+  lambda_consistency:
+    value: 0.05
+  binary_threshold:
+    value: 0.5
+  use_image_adapter:
+    value: true
+  task_specific_query:
+    value: false
+  attention_residual:
+    value: false
+
+  lambda_supcon:
+    values: [0.0, 0.05, 0.1]
+  lambda_prototype:
+    values: [0.0, 0.05, 0.1]
+  supcon_temperature:
+    values: [0.05, 0.1, 0.2]
+  use_reject:
+    values: [false, true]
+  use_open_set:
+    values: [false, true]
+  tau_fine:
+    values: [0.0, 0.5, 0.75]
+  min_fold_agreement:
+    values: [3, 4, 5]

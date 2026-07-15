@@ -1,0 +1,21 @@
+# Parent pointer — use stage-specific YAMLs.
+# Shared group: finetune_v03_improvement_r1
+#
+#   conf/sweep/finetune_v03_s1_loss_binary.yaml
+#   conf/sweep/finetune_v03_s2_metric_openset.yaml
+#   conf/sweep/finetune_v03_s3_architecture.yaml
+#
+# Plan: docs/online2/DIAGNOSIS_FINETUNE_V03_PLAN.md
+
+program: scripts/online2_v2/v03/run_diagnosis_finetune_v03.py
+method: grid
+metric:
+  name: cv/mean_best_macro_f1
+  goal: maximize
+parameters:
+  mode:
+    value: cv_repeated
+  monitor:
+    value: val_loss
+  wandb_group:
+    value: finetune_v03_improvement_r1

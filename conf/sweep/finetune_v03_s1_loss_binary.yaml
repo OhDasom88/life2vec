@@ -1,0 +1,67 @@
+# Sweep 1 — Binary & Loss alignment (PLAN §12.1)
+# Shared W&B group with sweep 2/3: set WANDB_GROUP or --wandb-group
+#
+#   export WANDB_GROUP=finetune_v03_improvement_r1
+#   wandb sweep --project Berry2Vec --entity dasom-oh conf/sweep/finetune_v03_s1_loss_binary.yaml
+#   wandb agent dasom-oh/Berry2Vec/<ID> --count 24
+#
+# Select winners by OOF / repeated-CV summary — not fold macro-F1.
+# binary_threshold is eval-only: recorded via --binary-thresholds grid on OOF dumps.
+
+program: scripts/online2_v2/v03/run_diagnosis_finetune_v03.py
+method: grid
+metric:
+  name: cv/mean_best_macro_f1
+  goal: maximize
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args}
+
+parameters:
+  mode:
+    value: cv_repeated
+  n_folds:
+    value: 3
+  n_repeats:
+    value: 3
+  epochs:
+    value: 150
+  monitor:
+    value: val_loss
+  wandb:
+    value: true
+  wandb_group:
+    value: finetune_v03_improvement_r1
+  wandb_job_type:
+    value: sweep_1_loss_binary
+  wandb_tags:
+    value: v03,multitask,repeated3fold,open-set,attention-pooling,sweep1
+
+  # architecture fixed for sweep 1
+  task_specific_query:
+    value: false
+  attention_residual:
+    value: false
+  token_attention_pool:
+    value: false
+  lambda_supcon:
+    value: 0.0
+  lambda_prototype:
+    value: 0.0
+  use_image_adapter:
+    value: true
+
+  lr:
+    values: [1.0e-4, 3.0e-4]
+  lambda_binary:
+    values: [0.5, 1.0, 2.0]
+  pos_weight:
+    values: ["auto", "0.25", "0.5", "1.0"]
+  lambda_consistency:
+    values: [0.0, 0.05, 0.1]
+  binary_threshold:
+    values: [0.25, 0.5, 0.75]
+  binary_thresholds:
+    value: "0.25,0.5,0.75"

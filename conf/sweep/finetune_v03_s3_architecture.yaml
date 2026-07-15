@@ -1,0 +1,61 @@
+# Sweep 3 — Architecture (PLAN §12.3)
+# Freeze Sweep-1/2 winners into fixed params before launching.
+#
+#   export WANDB_GROUP=finetune_v03_improvement_r1
+#   wandb sweep --project Berry2Vec --entity dasom-oh conf/sweep/finetune_v03_s3_architecture.yaml
+#
+# Constraint: token_attention_pool=false ⇒ attention_residual still may be true (event-level).
+# Image adapter always true.
+
+program: scripts/online2_v2/v03/run_diagnosis_finetune_v03.py
+method: grid
+metric:
+  name: cv/mean_best_macro_f1
+  goal: maximize
+
+parameters:
+  mode:
+    value: cv_repeated
+  n_folds:
+    value: 3
+  n_repeats:
+    value: 3
+  epochs:
+    value: 150
+  monitor:
+    value: val_loss
+  wandb:
+    value: true
+  wandb_group:
+    value: finetune_v03_improvement_r1
+  wandb_job_type:
+    value: sweep_3_architecture
+  wandb_tags:
+    value: v03,multitask,repeated3fold,open-set,attention-pooling,sweep3
+
+  # placeholders from prior sweeps
+  lr:
+    value: 3.0e-4
+  lambda_binary:
+    value: 1.0
+  pos_weight:
+    value: "auto"
+  lambda_consistency:
+    value: 0.05
+  lambda_supcon:
+    value: 0.0
+  lambda_prototype:
+    value: 0.05
+  use_image_adapter:
+    value: true
+
+  task_specific_query:
+    values: [false, true]
+  token_attention_pool:
+    values: [false, true]
+  attention_residual:
+    values: [false, true]
+  dropout:
+    values: [0.1, 0.2, 0.3]
+  weight_decay:
+    values: [1.0e-3, 1.0e-2]
