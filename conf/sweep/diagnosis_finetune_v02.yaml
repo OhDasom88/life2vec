@@ -1,0 +1,87 @@
+# Wandb sweep: diagnosis finetune v0.2 (CE + semantic alignment + IMAGE adapter)
+# Goal: maximize CV mean fold val macro-F1; also track ensemble_all35 Acc/F1=1.0
+# (v0.1 winner style: weak fold OK if probability ensemble hits perfect).
+#
+# Key knobs (from v0.1 sweep zbetta4n winner 7czhwn2y + v0.2 extras):
+#   lr, dropout, hidden_dim, weight_decay  — PAD capacity / regularization
+#   lambda_state, lambda_cause            — text-bank alignment weight
+#   monitor                               — ckpt gate (v0.1 used val_loss)
+#
+#   wandb sweep --project Berry2Vec --entity dasom-oh \
+#     conf/sweep/diagnosis_finetune_v02.yaml
+#   wandb agent dasom-oh/Berry2Vec/<SWEEP_ID> --count 20
+
+program: scripts/online2_v2/v02/run_diagnosis_finetune_v02.py
+method: bayes
+metric:
+  name: cv/mean_best_val_macro_f1
+  goal: maximize
+
+parameters:
+  batch_size:
+    value: 28
+  epochs:
+    value: 150
+  early_stop_patience:
+    value: 20
+  early_stop_min_epochs:
+    value: 30
+  n_folds:
+    value: 5
+  seed:
+    value: 2023
+  num_heads:
+    value: 4
+  lambda_rank:
+    value: 0.0
+
+  # Checkpoint selection (v0.1 winner used val_loss; v0.2 default was val_macro_f1)
+  monitor:
+    values: [val_macro_f1, val_loss]
+
+  # Semantic alignment (v0.2 only)
+  lambda_state:
+    values: [0.05, 0.10, 0.20]
+  lambda_cause:
+    values: [0.10, 0.15, 0.25]
+
+  # PAD knobs (same grid as v0.1 successful sweep)
+  lr:
+    values: [1.0e-4, 3.0e-4, 5.0e-4, 1.0e-3]
+  weight_decay:
+    values: [1.0e-3, 1.0e-2, 5.0e-2]
+  dropout:
+    values: [0.1, 0.2, 0.3]
+  hidden_dim:
+    values: [128, 192, 256]
+
+command:
+  - ${env}
+  - /home/dasom/miniconda3/envs/life2vec/bin/python
+  - ${program}
+  - --mode
+  - cv
+  - --n-folds
+  - "5"
+  - --epochs
+  - "150"
+  - --batch-size
+  - "28"
+  - --early-stop-patience
+  - "20"
+  - --early-stop-min-epochs
+  - "30"
+  - --emb-dir
+  - outputs/online2/v2_finetune_v02/event_embeddings
+  - --interpretation-bank
+  - outputs/online2/v2_finetune_v02/interpretation_banks/state_cause_bank.parquet
+  - --device
+  - cuda
+  - --wandb
+  - --wandb-project
+  - Berry2Vec
+  - --wandb-entity
+  - dasom-oh
+  - --wandb-tags
+  - online2_v2,diagnosis,finetune_v02,event_pooling,semantic_align,image_dino,sweep
+  - --no-wandb-watch
