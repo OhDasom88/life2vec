@@ -1,0 +1,21 @@
+{
+  "n": 3929,
+  "cols": [
+    "event_id",
+    "median_saliency",
+    "mean_saliency",
+    "saliency_iqr",
+    "positive_agreement_count",
+    "top_rank_agreement_count",
+    "fold_0_score",
+    "fold_1_score",
+    "fold_2_score",
+    "fold_3_score",
+    "fold_4_score",
+    "timestamp",
+    "view",
+    "zone",
+    "case_age_hours",
+    "local_hour"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "top_keys": [
+    "case_id",
+    "diagnosis",
+    "ensemble_probability",
+    "model_agreement",
+    "diagnosis_support",
+    "state_evidence",
+    "cause_evidence",
+    "image_evidence",
+    "disagreement",
+    "saliency_meta"
+  ],
+  "diagnosis": "정상_운영",
+  "model_agreement": 5,
+  "n_support_events": 30,
+  "has_token_fields": []
+}

@@ -1,0 +1,19 @@
+{
+  "case_id": "F420458_2025-02-16_2025-03-01",
+  "n_events": 3929,
+  "plan": {
+    "n_events": 3929,
+    "per_model_top": 315,
+    "occlusion_cap": 400,
+    "consensus_min": 10,
+    "consensus_max": 30
+  },
+  "n_primary": 214,
+  "n_strong": 79,
+  "n_disputed": 1322,
+  "oof": {
+    "oof_fold": 0,
+    "mode": "example_oof_single_fold"
+  },
+  "occlusion": "skipped"
+}

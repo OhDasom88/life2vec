@@ -1,0 +1,21 @@
+{
+  "vector_cols": {
+    "event_order": "int64",
+    "target_token_start": "int64",
+    "target_token_end": "int64",
+    "context_token_count": "int64",
+    "left_context_count": "int64",
+    "right_context_count": "int64",
+    "n_events_in_window": "int64",
+    "case_age_hours": "float64",
+    "local_hour": "int64",
+    "event_mean": [
+      384
+    ],
+    "event_max": [
+      384
+    ],
+    "has_dino": "bool_"
+  },
+  "n_events": 3929
+}

@@ -1,0 +1,33 @@
+{
+  "n_events": 3929,
+  "columns": [
+    "case_id",
+    "event_id",
+    "event_order",
+    "same_time_group_id",
+    "timestamp",
+    "view",
+    "zone",
+    "target_token_start",
+    "target_token_end",
+    "context_token_count",
+    "left_context_count",
+    "right_context_count",
+    "n_events_in_window",
+    "case_age_hours",
+    "local_hour",
+    "event_mean",
+    "event_max",
+    "event_embedding",
+    "dino_vec",
+    "has_dino"
+  ],
+  "view_counts": {
+    "ENVIRONMENT": 1308,
+    "ROOTZONE": 1308,
+    "ACTUATOR": 1308,
+    "GROWTH": 4,
+    "IMAGE": 1
+  },
+  "zone_counts": null
+}

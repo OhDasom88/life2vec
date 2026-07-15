@@ -1,0 +1,2 @@
+set,farm_id,case_id,diagnosis_raw,diagnosis_normalized,period_start,period_end,score90_path,score90_chars
+example_set,F420458,F420458_2025-02-16_2025-03-01,정상 운영입니다,정상_운영,2025-02-16,2025-03-01,datasets/agrichallenge/online2/answers/reference_answers/score90/F420458_answer.txt,1264

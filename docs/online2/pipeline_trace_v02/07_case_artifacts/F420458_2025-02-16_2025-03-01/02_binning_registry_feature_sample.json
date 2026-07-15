@@ -1,0 +1,869 @@
+{
+  "meta": {
+    "registry_version": "v2_transductive",
+    "fit_scope": "transductive_public_pretrain_pool",
+    "example_observation_count": 1649760,
+    "problem_observation_count": 942720,
+    "source_set_counts": {
+      "example_set": 1649760,
+      "problem_set": 942720,
+      "unknown": 0
+    },
+    "source_file_hashes": {
+      "baseline_inventory.json": "3d1ad3745417d3950bd136814aa7a6f6772f0a0b2b350f9e63e189b463a245a2",
+      "binning_registry.json": "b7002022abf7462086a68a2ab5dab52e24e33c669bedbe4a66a79584ffbdcf6d",
+      "build_manifest.json": "8cdee5586e6586565edc1f7b73603aca33d4e73e8e90a211663cf69c612b10f7",
+      "corpus_statistics.json": "cff33f583d2bdb8e4ea842b69b4f166a656a3210496fe7488b9f1eec9c5e2b78",
+      "life2vec_token_registry.json": "ab0fb6d00b36cebb420b19801ebf51eb8c095dd4da9e49ab9ab49eedec034e25",
+      "prompt_registry.json": "ed194c4bbbdd913233b4ba4854df43721af294ff7c0758a0a9e2233b8c459abb",
+      "tokenization_registry.json": "411270e490c8e970946d5a5d1d5e01d191572439a961d5ee0377818d764c20bd",
+      "training_export_manifest.json": "9c77810fd9d3235230816be5dc9e8d29c62b485baace3d91e956e978e6003d81",
+      "validation_report.json": "f587c9e5e3818483a7d8366f36453ce0e6882e5c61e044d301ee2aad42fa9b5a"
+    },
+    "bin_count": 10,
+    "closed_side": "right",
+    "edge_policy": "equal_frequency_v2",
+    "abs_policy": "equal_frequency_with_zero_inflation_and_optional_anchors",
+    "global_rel_policy": "equal_frequency_with_zero_inflation_and_optional_anchors",
+    "farm_rel_policy": "per_farm_equal_frequency_with_zero_inflation",
+    "zero_mass_threshold": 0.15,
+    "policy_version": "v2.1_adaptive",
+    "default_bins": 10,
+    "outlier_policy": "none_equal_frequency_uses_full_support",
+    "constant_policy": "CONSTANT",
+    "missing_policy": "NULL",
+    "farm_relative": {
+      "enabled": true,
+      "fit_scope": "full_public_farm_distribution",
+      "causal": false
+    },
+    "training_mode": "transductive_public_pretraining",
+    "contains_problem_observations": true,
+    "contains_problem_images": true,
+    "contains_problem_hidden_targets": false,
+    "fit_population_hash": "f486ce79a08971ef1fd3ebb9196a589bc3692e7402080fc7215151ec22525981",
+    "n_fit_values": 891000,
+    "code_commit_hash": "",
+    "created_at": "2026-07-13T00:22:15.965824+00:00",
+    "schema_config_hash": "88dd69270c29f07d727c40a1065774d82c1a16caae364ce4a80c592d363dd7ab",
+    "feature_summaries": {
+      "co2_ppm": {
+        "n_values": 73920,
+        "n_unique": 21140,
+        "abs": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 24,
+          "n_bins_effective": 24,
+          "occupancy_cv": 0.004374088826398532,
+          "zero_mass_frac": 0.0
+        },
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 24,
+          "n_bins_effective": 24,
+          "occupancy_cv": 0.004374088826398532,
+          "zero_mass_frac": 0.0
+        }
+      },
+      "crown_diameter_mm": {
+        "n_values": 440,
+        "n_unique": 331,
+        "abs": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 11,
+          "n_bins_effective": 11,
+          "occupancy_cv": 0.01507556722888818,
+          "zero_mass_frac": 0.0
+        },
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 11,
+          "n_bins_effective": 11,
+          "occupancy_cv": 0.01507556722888818,
+          "zero_mass_frac": 0.0
+        }
+      },
+      "ec_sensor": {
+        "n_values": 73920,
+        "n_unique": 1270,
+        "abs": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 20,
+          "n_bins_effective": 12,
+          "occupancy_cv": 0.5575232180282541,
+          "zero_mass_frac": 0.019331709956709957
+        },
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 20,
+          "n_bins_effective": 12,
+          "occupancy_cv": 0.5575232180282541,
+          "zero_mass_frac": 0.019331709956709957
+        }
+      },
+      "flower_truss_order": {
+        "n_values": 440,
+        "n_unique": 4,
+        "abs": {
+          "strategy": "low_cardinality",
+          "n_bins_requested": 4,
+          "n_bins_effective": 4,
+          "occupancy_cv": 0.7986300253279811,
+          "zero_mass_frac": 0.2431818181818182
+        },
+        "global_rel": {
+          "strategy": "low_cardinality",
+          "n_bins_requested": 4,
+          "n_bins_effective": 4,
+          "occupancy_cv": 0.7986300253279811,
+          "zero_mass_frac": 0.2431818181818182
+        }
+      },
+      "inside_humidity_pct": {
+        "n_values": 73920,
+        "n_unique": 21507,
+        "abs": {
+          "strategy": "equal_frequency_with_anchors",
+          "n_bins_requested": 40,
+          "n_bins_effective": 44,
+          "occupancy_cv": 0.3094233728156446,
+          "zero_mass_frac": 0.0
+        },
+        "global_rel": {
+          "strategy": "equal_frequency_with_anchors",
+          "n_bins_requested": 40,
+          "n_bins_effective": 44,
+          "occupancy_cv": 0.3094233728156446,
+          "zero_mass_frac": 0.0
+        }
+      },
+      "inside_temp_c": {
+        "n_values": 73920,
+        "n_unique": 21648,
+        "abs": {
+          "strategy": "equal_frequency_with_anchors",
+          "n_bins_requested": 36,
+          "n_bins_effective": 41,
+          "occupancy_cv": 0.3006718449644047,
+          "zero_mass_frac": 0.00040584415584415587
+        },
+        "global_rel": {
+          "strategy": "equal_frequency_with_anchors",
+          "n_bins_requested": 36,
+          "n_bins_effective": 41,
+          "occupancy_cv": 0.3006718449644047,
+          "zero_mass_frac": 0.00040584415584415587
+        }
+      },
+      "leaf_count": {
+        "n_values": 440,
+        "n_unique": 15,
+        "abs": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 10,
+          "n_bins_effective": 6,
+          "occupancy_cv": 0.39370039370059057,
+          "zero_mass_frac": 0.0
+        },
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 10,
+          "n_bins_effective": 6,
+          "occupancy_cv": 0.39370039370059057,
+          "zero_mass_frac": 0.0
+        }
+      },
+      "leaf_length_cm": {
+        "n_values": 440,
+        "n_unique": 336,
+        "abs": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 11,
+          "n_bins_effective": 11,
+          "occupancy_cv": 0.01507556722888818,
+          "zero_mass_frac": 0.0
+        },
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 11,
+          "n_bins_effective": 11,
+          "occupancy_cv": 0.01507556722888818,
+          "zero_mass_frac": 0.0
+        }
+      },
+      "leaf_width_cm": {
+        "n_values": 440,
+        "n_unique": 325,
+        "abs": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 11,
+          "n_bins_effective": 11,
+          "occupancy_cv": 0.02383656473113981,
+          "zero_mass_frac": 0.0
+        },
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 11,
+          "n_bins_effective": 11,
+          "occupancy_cv": 0.02383656473113981,
+          "zero_mass_frac": 0.0
+        }
+      },
+      "opened_flower_count": {
+        "n_values": 440,
+        "n_unique": 5,
+        "abs": {
+          "strategy": "low_cardinality",
+          "n_bins_requested": 5,
+          "n_bins_effective": 5,
+          "occupancy_cv": 0.6922683996760813,
+          "zero_mass_frac": 0.3886363636363636
+        },
+        "global_rel": {
+          "strategy": "low_cardinality",
+          "n_bins_requested": 5,
+          "n_bins_effective": 5,
+          "occupancy_cv": 0.6922683996760813,
+          "zero_mass_frac": 0.3886363636363636
+        }
+      },
+      "outside_humidity_pct": {
+        "n_values": 73920,
+        "n_unique": 9021,
+        "abs": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 24,
+          "n_bins_effective": 24,
+          "occupancy_cv": 0.0051224328244757,
+          "zero_mass_frac": 0.0
+        },
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 24,
+          "n_bins_effective": 24,
+          "occupancy_cv": 0.0051224328244757,
+          "zero_mass_frac": 0.0
+        }
+      },
+      "outside_solar_radiation": {
+        "n_values": 73920,
+        "n_unique": 8137,
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 28,
+          "n_bins_effective": 28,
+          "occupancy_cv": 0.07545753625481419,
+          "zero_mass_frac": 0.01139069264069264
+        }
+      },
+      "outside_temp_c": {
+        "n_values": 73920,
+        "n_unique": 9379,
+        "abs": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 24,
+          "n_bins_effective": 24,
+          "occupancy_cv": 0.008205683088376695,
+          "zero_mass_frac": 1.3528138528138528e-05
+        },
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 24,
+          "n_bins_effective": 24,
+          "occupancy_cv": 0.008205683088376695,
+          "zero_mass_frac": 1.3528138528138528e-05
+        }
+      },
+      "petiole_length_cm": {
+        "n_values": 440,
+        "n_unique": 339,
+        "abs": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 11,
+          "n_bins_effective": 11,
+          "occupancy_cv": 0.0337099931231621,
+          "zero_mass_frac": 0.0
+        },
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 11,
+          "n_bins_effective": 11,
+          "occupancy_cv": 0.0337099931231621,
+          "zero_mass_frac": 0.0
+        }
+      },
+      "ph_sensor": {
+        "n_values": 73920,
+        "n_unique": 1954,
+        "abs": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 16,
+          "n_bins_effective": 11,
+          "occupancy_cv": 0.699902906440513,
+          "zero_mass_frac": 0.0
+        },
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 16,
+          "n_bins_effective": 11,
+          "occupancy_cv": 0.699902906440513,
+          "zero_mass_frac": 0.0
+        }
+      },
+      "plant_height_cm": {
+        "n_values": 440,
+        "n_unique": 393,
+        "abs": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 11,
+          "n_bins_effective": 11,
+          "occupancy_cv": 0.021320071635561044,
+          "zero_mass_frac": 0.0
+        },
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 11,
+          "n_bins_effective": 11,
+          "occupancy_cv": 0.021320071635561044,
+          "zero_mass_frac": 0.0
+        }
+      },
+      "substrate_ec_ds_m": {
+        "n_values": 73920,
+        "n_unique": 3610,
+        "abs": {
+          "strategy": "equal_frequency_with_anchors",
+          "n_bins_requested": 36,
+          "n_bins_effective": 41,
+          "occupancy_cv": 0.3018330554188078,
+          "zero_mass_frac": 0.0
+        },
+        "global_rel": {
+          "strategy": "equal_frequency_with_anchors",
+          "n_bins_requested": 36,
+          "n_bins_effective": 41,
+          "occupancy_cv": 0.3018330554188078,
+          "zero_mass_frac": 0.0
+        }
+      },
+      "substrate_temp_c": {
+        "n_values": 73920,
+        "n_unique": 7081,
+        "abs": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 20,
+          "n_bins_effective": 20,
+          "occupancy_cv": 0.00671082943633225,
+          "zero_mass_frac": 0.0
+        },
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 20,
+          "n_bins_effective": 20,
+          "occupancy_cv": 0.00671082943633225,
+          "zero_mass_frac": 0.0
+        }
+      },
+      "substrate_water_content_pct": {
+        "n_values": 73920,
+        "n_unique": 8139,
+        "abs": {
+          "strategy": "equal_frequency_with_anchors",
+          "n_bins_requested": 28,
+          "n_bins_effective": 32,
+          "occupancy_cv": 0.3452589253985506,
+          "zero_mass_frac": 0.0
+        },
+        "global_rel": {
+          "strategy": "equal_frequency_with_anchors",
+          "n_bins_requested": 28,
+          "n_bins_effective": 32,
+          "occupancy_cv": 0.3452589253985506,
+          "zero_mass_frac": 0.0
+        }
+      },
+      "unopened_flower_count": {
+        "n_values": 440,
+        "n_unique": 12,
+        "abs": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 10,
+          "n_bins_effective": 7,
+          "occupancy_cv": 0.3617279467196536,
+          "zero_mass_frac": 0.031818181818181815
+        },
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 10,
+          "n_bins_effective": 7,
+          "occupancy_cv": 0.3617279467196536,
+          "zero_mass_frac": 0.031818181818181815
+        }
+      },
+      "wind_speed_m_s": {
+        "n_values": 73920,
+        "n_unique": 2987,
+        "abs": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 20,
+          "n_bins_effective": 20,
+          "occupancy_cv": 0.011173947618303296,
+          "zero_mass_frac": 0.00017586580086580088
+        },
+        "global_rel": {
+          "strategy": "equal_frequency",
+          "n_bins_requested": 20,
+          "n_bins_effective": 20,
+          "occupancy_cv": 0.011173947618303296,
+          "zero_mass_frac": 0.00017586580086580088
+        }
+      }
+    },
+    "farm_rule_count": 1155,
+    "farm_strategy_histogram": {
+      "equal_frequency": 1047,
+      "low_cardinality": 82,
+      "constant": 26
+    },
+    "registry_hash": "140baf3af4401894b3cedca42f6851b8ac6ef225029539d527d56324b22b8ff5"
+  },
+  "sample_ABS_rules": [
+    {
+      "feature": "ec_sensor",
+      "kind": "ABS",
+      "edges": [
+        0.0,
+        0.2,
+        0.765,
+        0.8,
+        0.9,
+        1.0,
+        1.1,
+        1.2,
+        1.256,
+        1.3,
+        1.4,
+        1.5,
+        2.924
+      ],
+      "scope_id": null,
+      "closed_side": "right",
+      "fit_scope": "transductive_public_pretrain_pool",
+      "causal": false,
+      "uses_problem_inputs": true,
+      "absolute_policy": "equal_frequency",
+      "relative_scope": "n/a",
+      "strategy": "equal_frequency",
+      "zero_mass_frac": 0.019331709956709957,
+      "n_bins_requested": 20,
+      "n_bins_effective": 12,
+      "occupancy_cv": 0.5575232180282541,
+      "diagnostics": {
+        "n_values": 73920,
+        "n_unique": 1270,
+        "zero_mass_frac": 0.019331709956709957,
+        "occupancy": [
+          4001,
+          3393,
+          8330,
+          8045,
+          6488,
+          8072,
+          9290,
+          435,
+          5329,
+          13333,
+          5769,
+          1435
+        ],
+        "min_share": 0.00588474025974026,
+        "max_share": 0.180370670995671,
+        "occupancy_cv": 0.5575232180282541
+      }
+    },
+    {
+      "feature": "inside_humidity_pct",
+      "kind": "ABS",
+      "edges": [
+        18.483,
+        45.867,
+        50.0,
+        51.01795,
+        54.232775000000004,
+        56.872,
+        59.0,
+        60.65425000000001,
+        62.167,
+        63.433,
+        64.65,
+        65.0,
+        65.683,
+        66.733,
+        67.749,
+        68.779675,
+        69.65,
+        70.545,
+        71.433,
+        72.367,
+        73.33465000000001,
+        74.24152500000001,
+        75.23349999999999,
+        76.41295,
+        77.543,
+        78.699425,
+        79.90440000000001,
+        80.0,
+        81.17137500000001,
+        82.0,
+        82.317,
+        83.367,
+        84.5,
+        85.733,
+        86.833,
+        87.967,
+        89.119,
+        90.0,
+        90.217,
+        91.29325,
+        92.4,
+        93.83,
+        95.89620000000001,
+        98.0,
+        100.0
+      ],
+      "scope_id": null,
+      "closed_side": "right",
+      "fit_scope": "transductive_public_pretrain_pool",
+      "causal": false,
+      "uses_problem_inputs": true,
+      "absolute_policy": "equal_frequency_with_anchors",
+      "relative_scope": "n/a",
+      "strategy": "equal_frequency_with_anchors",
+      "zero_mass_frac": 0.0,
+      "n_bins_requested": 40,
+      "n_bins_effective": 44,
+      "occupancy_cv": 0.3094233728156446,
+      "diagnostics": {
+        "n_values": 73920,
+        "n_unique": 21507,
+        "zero_mass_frac": 0.0,
+        "occupancy": [
+          1852,
+          1415,
+          429,
+          1848,
+          1849,
+          2002,
+          1693,
+          1860,
+          1852,
+          1857,
+          571,
+          1261,
+          1863,
+          1826,
+          1846,
+          1849,
+          1848,
+          1869,
+          1841,
+          1833,
+          1848,
+          1848,
+          1848,
+          1850,
+          1846,
+          1848,
+          159,
+          1689,
+          3175,
+          548,
+          1822,
+          1850,
+          1846,
+          1850,
+          1846,
+          1848,
+          1496,
+          355,
+          1844,
+          1860,
+          1838,
+          1846,
+          2182,
+          1514
+        ],
+        "min_share": 0.002150974025974026,
+        "max_share": 0.042951839826839824,
+        "occupancy_cv": 0.3094233728156446
+      }
+    },
+    {
+      "feature": "inside_temp_c",
+      "kind": "ABS",
+      "edges": [
+        -0.724,
+        6.0,
+        6.163305555555556,
+        7.8612222222222226,
+        8.895,
+        9.347,
+        9.74,
+        10.083,
+        10.509,
+        11.067,
+        11.662,
+        12.032,
+        12.518,
+        13.062,
+        13.635,
+        14.281,
+        14.878583333333331,
+        15.0,
+        15.427,
+        16.015,
+        16.6625,
+        17.401,
+        18.14,
+        18.753,
+        19.298,
+        19.842,
+        20.0,
+        20.34,
+        20.83263888888889,
+        21.312,
+        21.86425,
+        22.144,
+        22.722,
+        23.397,
+        24.157,
+        25.0,
+        25.072,
+        26.397,
+        27.71938888888889,
+        29.08269444444444,
+        30.0,
+        37.646
+      ],
+      "scope_id": null,
+      "closed_side": "right",
+      "fit_scope": "transductive_public_pretrain_pool",
+      "causal": false,
+      "uses_problem_inputs": true,
+      "absolute_policy": "equal_frequency_with_anchors",
+      "relative_scope": "n/a",
+      "strategy": "equal_frequency_with_anchors",
+      "zero_mass_frac": 0.00040584415584415587,
+      "n_bins_requested": 36,
+      "n_bins_effective": 41,
+      "occupancy_cv": 0.3006718449644047,
+      "diagnostics": {
+        "n_values": 73920,
+        "n_unique": 21648,
+        "zero_mass_frac": 0.00040584415584415587,
+        "occupancy": [
+          1930,
+          124,
+          2053,
+          2054,
+          2062,
+          2053,
+          2046,
+          2054,
+          2054,
+          2059,
+          2050,
+          2049,
+          2053,
+          2057,
+          2050,
+          2052,
+          599,
+          1464,
+          2045,
+          2052,
+          2054,
+          2054,
+          2053,
+          2053,
+          2056,
+          554,
+          1497,
+          2052,
+          2055,
+          2052,
+          2054,
+          2054,
+          2055,
+          2060,
+          1904,
+          141,
+          2056,
+          2049,
+          2053,
+          833,
+          1221
+        ],
+        "min_share": 0.0016774891774891775,
+        "max_share": 0.027895021645021646,
+        "occupancy_cv": 0.3006718449644047
+      }
+    },
+    {
+      "feature": "outside_humidity_pct",
+      "kind": "ABS",
+      "edges": [
+        23.69,
+        37.758,
+        43.574,
+        47.672,
+        51.663,
+        55.015,
+        58.001,
+        60.83024999999999,
+        63.542,
+        65.637,
+        67.392,
+        69.585,
+        71.672,
+        73.602,
+        75.264,
+        76.841,
+        79.064,
+        81.005,
+        82.737,
+        84.985,
+        87.017,
+        88.703,
+        90.863,
+        93.025,
+        99.524
+      ],
+      "scope_id": null,
+      "closed_side": "right",
+      "fit_scope": "transductive_public_pretrain_pool",
+      "causal": false,
+      "uses_problem_inputs": true,
+      "absolute_policy": "equal_frequency",
+      "relative_scope": "n/a",
+      "strategy": "equal_frequency",
+      "zero_mass_frac": 0.0,
+      "n_bins_requested": 24,
+      "n_bins_effective": 24,
+      "occupancy_cv": 0.0051224328244757,
+      "diagnostics": {
+        "n_values": 73920,
+        "n_unique": 9021,
+        "zero_mass_frac": 0.0,
+        "occupancy": [
+          3094,
+          3080,
+          3092,
+          3068,
+          3075,
+          3080,
+          3071,
+          3087,
+          3084,
+          3091,
+          3059,
+          3086,
+          3104,
+          3050,
+          3082,
+          3079,
+          3102,
+          3075,
+          3062,
+          3119,
+          3062,
+          3089,
+          3065,
+          3064
+        ],
+        "min_share": 0.04126082251082251,
+        "max_share": 0.04219426406926407,
+        "occupancy_cv": 0.0051224328244757
+      }
+    },
+    {
+      "feature": "outside_temp_c",
+      "kind": "ABS",
+      "edges": [
+        -9.863,
+        -5.083,
+        -3.322,
+        -1.675,
+        -0.385,
+        0.827,
+        2.025,
+        3.15,
+        4.247,
+        5.377,
+        6.547,
+        7.875,
+        9.335,
+        10.925,
+        13.132,
+        15.182,
+        17.453,
+        19.582,
+        20.538,
+        21.555,
+        22.705,
+        23.615,
+        24.85,
+        27.68,
+        36.853
+      ],
+      "scope_id": null,
+      "closed_side": "right",
+      "fit_scope": "transductive_public_pretrain_pool",
+      "causal": false,
+      "uses_problem_inputs": true,
+      "absolute_policy": "equal_frequency",
+      "relative_scope": "n/a",
+      "strategy": "equal_frequency",
+      "zero_mass_frac": 1.3528138528138528e-05,
+      "n_bins_requested": 24,
+      "n_bins_effective": 24,
+      "occupancy_cv": 0.008205683088376695,
+      "diagnostics": {
+        "n_values": 73920,
+        "n_unique": 9379,
+        "zero_mass_frac": 1.3528138528138528e-05,
+        "occupancy": [
+          3083,
+          3081,
+          3081,
+          3082,
+          3102,
+          3066,
+          3149,
+          2998,
+          3085,
+          3080,
+          3079,
+          3081,
+          3093,
+          3070,
+          3084,
+          3091,
+          3076,
+          3073,
+          3104,
+          3055,
+          3107,
+          3069,
+          3075,
+          3056
+        ],
+        "min_share": 0.040557359307359306,
+        "max_share": 0.04260010822510823,
+        "occupancy_cv": 0.008205683088376695
+      }
+    }
+  ],
+  "n_rules": 1196,
+  "n_features": 21
+}

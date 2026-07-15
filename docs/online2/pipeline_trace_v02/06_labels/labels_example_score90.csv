@@ -1,0 +1,36 @@
+set,farm_id,case_id,diagnosis_raw,diagnosis_normalized,period_start,period_end,score90_path,score90_chars
+example_set,F420458,F420458_2025-02-16_2025-03-01,정상 운영입니다,정상_운영,2025-02-16,2025-03-01,datasets/agrichallenge/online2/answers/reference_answers/score90/F420458_answer.txt,1264
+example_set,F385790,F385790_2025-03-20_2025-04-02,탄저병 발생 위험,탄저병_발생_위험,2025-03-20,2025-04-02,datasets/agrichallenge/online2/answers/reference_answers/score90/F385790_answer.txt,1637
+example_set,F279269,F279269_2024-10-17_2024-10-30,영양생장 과다,영양생장_과다,2024-10-17,2024-10-30,datasets/agrichallenge/online2/answers/reference_answers/score90/F279269_answer.txt,1577
+example_set,F662255,F662255_2025-02-05_2025-02-18,동해 (난방 실패),동해_난방실패,2025-02-05,2025-02-18,datasets/agrichallenge/online2/answers/reference_answers/score90/F662255_answer.txt,1605
+example_set,F393975,F393975_2024-10-21_2024-11-03,뿌리 발육 부진,뿌리_발육_부진,2024-10-21,2024-11-03,datasets/agrichallenge/online2/answers/reference_answers/score90/F393975_answer.txt,1569
+example_set,F538612,F538612_2025-01-05_2025-01-18,영양생장 부족,영양생장_부족,2025-01-05,2025-01-18,datasets/agrichallenge/online2/answers/reference_answers/score90/F538612_answer.txt,1540
+example_set,F705994,F705994_2025-01-05_2025-01-18,잿빛곰팡이병 발생 위험,잿빛곰팡이병_발생_위험,2025-01-05,2025-01-18,datasets/agrichallenge/online2/answers/reference_answers/score90/F705994_answer.txt,1627
+example_set,F194265,F194265_2024-10-23_2024-11-05,정상 운영입니다,정상_운영,2024-10-23,2024-11-05,datasets/agrichallenge/online2/answers/reference_answers/score90/F194265_answer.txt,1255
+example_set,F773675,F773675_2024-10-29_2024-11-11,영양생장 과다,영양생장_과다,2024-10-29,2024-11-11,datasets/agrichallenge/online2/answers/reference_answers/score90/F773675_answer.txt,1548
+example_set,F814133,F814133_2025-03-24_2025-04-06,기형과 생리장해,기형과_생리장해,2025-03-24,2025-04-06,datasets/agrichallenge/online2/answers/reference_answers/score90/F814133_answer.txt,1606
+example_set,F332196,F332196_2025-03-08_2025-03-21,흰가루병 발생 위험,흰가루병_발생_위험,2025-03-08,2025-03-21,datasets/agrichallenge/online2/answers/reference_answers/score90/F332196_answer.txt,1608
+example_set,F605134,F605134_2025-02-18_2025-03-03,잿빛곰팡이병 발생 위험,잿빛곰팡이병_발생_위험,2025-02-18,2025-03-03,datasets/agrichallenge/online2/answers/reference_answers/score90/F605134_answer.txt,1639
+example_set,F882016,F882016_2024-09-16_2024-09-29,흰가루병 발생 위험,흰가루병_발생_위험,2024-09-16,2024-09-29,datasets/agrichallenge/online2/answers/reference_answers/score90/F882016_answer.txt,1607
+example_set,F541562,F541562_2024-12-07_2024-12-20,칼슘부족 / 잎끝마름,칼슘부족_잎끝마름,2024-12-07,2024-12-20,datasets/agrichallenge/online2/answers/reference_answers/score90/F541562_answer.txt,1628
+example_set,F354848,F354848_2025-03-25_2025-04-07,기형과 생리장해,기형과_생리장해,2025-03-25,2025-04-07,datasets/agrichallenge/online2/answers/reference_answers/score90/F354848_answer.txt,1623
+example_set,F155481,F155481_2024-12-24_2025-01-06,잿빛곰팡이병 발생 위험,잿빛곰팡이병_발생_위험,2024-12-24,2025-01-06,datasets/agrichallenge/online2/answers/reference_answers/score90/F155481_answer.txt,1637
+example_set,F584775,F584775_2024-11-08_2024-11-21,영양생장 과다,영양생장_과다,2024-11-08,2024-11-21,datasets/agrichallenge/online2/answers/reference_answers/score90/F584775_answer.txt,1571
+example_set,F551358,F551358_2024-09-21_2024-10-04,뿌리 발육 부진,뿌리_발육_부진,2024-09-21,2024-10-04,datasets/agrichallenge/online2/answers/reference_answers/score90/F551358_answer.txt,1574
+example_set,F188026,F188026_2025-02-08_2025-02-21,칼슘부족 / 잎끝마름,칼슘부족_잎끝마름,2025-02-08,2025-02-21,datasets/agrichallenge/online2/answers/reference_answers/score90/F188026_answer.txt,1626
+example_set,F760592,F760592_2025-01-15_2025-01-28,영양생장 부족,영양생장_부족,2025-01-15,2025-01-28,datasets/agrichallenge/online2/answers/reference_answers/score90/F760592_answer.txt,1547
+example_set,F209570,F209570_2025-03-01_2025-03-14,정상 운영입니다,정상_운영,2025-03-01,2025-03-14,datasets/agrichallenge/online2/answers/reference_answers/score90/F209570_answer.txt,1255
+example_set,F302129,F302129_2024-10-15_2024-10-28,흰가루병 발생 위험,흰가루병_발생_위험,2024-10-15,2024-10-28,datasets/agrichallenge/online2/answers/reference_answers/score90/F302129_answer.txt,1604
+example_set,F596090,F596090_2025-01-18_2025-01-31,칼슘부족 / 잎끝마름,칼슘부족_잎끝마름,2025-01-18,2025-01-31,datasets/agrichallenge/online2/answers/reference_answers/score90/F596090_answer.txt,1639
+example_set,F257178,F257178_2024-12-21_2025-01-03,동해 (난방 실패),동해_난방실패,2024-12-21,2025-01-03,datasets/agrichallenge/online2/answers/reference_answers/score90/F257178_answer.txt,1630
+example_set,F541027,F541027_2025-03-07_2025-03-20,기형과 생리장해,기형과_생리장해,2025-03-07,2025-03-20,datasets/agrichallenge/online2/answers/reference_answers/score90/F541027_answer.txt,1625
+example_set,F396544,F396544_2025-01-25_2025-02-07,정상 운영입니다,정상_운영,2025-01-25,2025-02-07,datasets/agrichallenge/online2/answers/reference_answers/score90/F396544_answer.txt,1239
+example_set,F944488,F944488_2024-09-21_2024-10-04,뿌리 발육 부진,뿌리_발육_부진,2024-09-21,2024-10-04,datasets/agrichallenge/online2/answers/reference_answers/score90/F944488_answer.txt,1565
+example_set,F854780,F854780_2024-09-23_2024-10-06,탄저병 발생 위험,탄저병_발생_위험,2024-09-23,2024-10-06,datasets/agrichallenge/online2/answers/reference_answers/score90/F854780_answer.txt,1639
+example_set,F135380,F135380_2024-12-24_2025-01-06,동해 (난방 실패),동해_난방실패,2024-12-24,2025-01-06,datasets/agrichallenge/online2/answers/reference_answers/score90/F135380_answer.txt,1628
+example_set,F451640,F451640_2025-03-22_2025-04-04,기형과 생리장해,기형과_생리장해,2025-03-22,2025-04-04,datasets/agrichallenge/online2/answers/reference_answers/score90/F451640_answer.txt,1607
+example_set,F295998,F295998_2024-12-08_2024-12-21,영양생장 부족,영양생장_부족,2024-12-08,2024-12-21,datasets/agrichallenge/online2/answers/reference_answers/score90/F295998_answer.txt,1559
+example_set,F968401,F968401_2025-03-24_2025-04-06,탄저병 발생 위험,탄저병_발생_위험,2025-03-24,2025-04-06,datasets/agrichallenge/online2/answers/reference_answers/score90/F968401_answer.txt,1628
+example_set,F972654,F972654_2024-10-01_2024-10-14,탄저병 발생 위험,탄저병_발생_위험,2024-10-01,2024-10-14,datasets/agrichallenge/online2/answers/reference_answers/score90/F972654_answer.txt,1636
+example_set,F981237,F981237_2024-12-18_2024-12-31,칼슘부족 / 잎끝마름,칼슘부족_잎끝마름,2024-12-18,2024-12-31,datasets/agrichallenge/online2/answers/reference_answers/score90/F981237_answer.txt,1633
+example_set,F995842,F995842_2025-02-12_2025-02-25,칼슘부족 / 잎끝마름,칼슘부족_잎끝마름,2025-02-12,2025-02-25,datasets/agrichallenge/online2/answers/reference_answers/score90/F995842_answer.txt,1626
