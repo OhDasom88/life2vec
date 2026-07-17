@@ -24,6 +24,7 @@ from src.online2.v2.finetune_v03.counterfactual.candidates.bundle_bank_index imp
 )
 from src.online2.v2.finetune_v03.counterfactual.evaluation.bank_integrity import (
     BANK_MODE_DEPLOYMENT,
+    as_sequence_list,
 )
 from src.online2.v2.finetune_v03.counterfactual.candidates.bundle_bank_loader import (
     load_continuous_feature_names,
@@ -154,7 +155,7 @@ def main() -> int:
         result.update(bank_query)
 
         # Ensure at least original + one other if possible
-        if not any(list(b.get("tokens") or []) == list(eligible["tokens"]) for b in bundles):
+        if not any(as_sequence_list(b.get("tokens")) == list(eligible["tokens"]) for b in bundles):
             bundles = list(bundles) + [
                 {
                     "feature": eligible["feature"],
@@ -206,9 +207,16 @@ def main() -> int:
                 "n_bundles_input": len(bundles),
             }
         )
+        # Set substantive pass flag before A2 eval (A2 requires the explicit flag).
+        result["functional_smoke_passed"] = bool(
+            int(result.get("decoder_forward_call_count") or 0) >= 1
+            and int(result.get("unique_scored_bundle_count") or 0) >= 2
+            and result.get("cf_evaluation_performed") is not True
+            and str(result.get("run_type")) == "FUNCTIONAL_DECODER_SMOKE"
+        )
         a2 = evaluate_a2_functional_smoke(result)
-        result["functional_smoke_passed"] = bool(a2["a2_pass"])
         result["a2_eval"] = a2
+        result["functional_smoke_passed"] = bool(a2["a2_pass"])
         write_json(paths.artifacts / "mlm_functional_smoke_result.json", result)
         print(json.dumps(result, indent=2, ensure_ascii=False))
         exit_code = 0 if result["functional_smoke_passed"] else 1
