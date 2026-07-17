@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from ..grounding.raw_target import decode_interval, nearest_feasible_interior, adjacent_bin_targets
+from ..evaluation.bank_integrity import as_sequence_list
 
 
 def build_path_a_candidates(
@@ -58,7 +59,7 @@ def candidates_from_mlm_bundles(
     out = []
     for b in bundles:
         if isinstance(b, Mapping):
-            toks = list(b.get("tokens") or [])
+            toks = as_sequence_list(b.get("tokens"))
             score = b.get("score")
             is_orig = bool(
                 b.get("is_original")

@@ -15,6 +15,7 @@ import torch
 import torch.nn.functional as F
 
 from .inference_masker import InferenceMaskResult, mask_measurement_group
+from ..evaluation.bank_integrity import as_sequence_list
 
 
 @dataclass
@@ -83,9 +84,9 @@ def filter_bundles(
             # if bank has signature, enforce; empty expected allows length match
             if b.get("signature"):
                 continue
-        if expected_signature and len(b.get("tokens") or []) != len(expected_signature):
+        if expected_signature and len(as_sequence_list(b.get("tokens"))) != len(expected_signature):
             continue
-        if original_tokens is not None and list(b["tokens"]) == list(original_tokens):
+        if original_tokens is not None and as_sequence_list(b.get("tokens")) == list(original_tokens):
             b = dict(b)
             b["is_original"] = True
         else:

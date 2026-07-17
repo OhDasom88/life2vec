@@ -16,6 +16,7 @@ from ..evaluation.bank_integrity import (
     BANK_SCHEMA_VERSION,
     SOURCE_PARTITION_PROBLEM,
     SOURCE_PARTITION_TRAINING,
+    as_sequence_list,
     build_two_tier_integrity_record,
     canonical_policy_fields_for_mode,
 )
@@ -88,7 +89,7 @@ def observations_and_uniques_from_rows(
 
     for row in rows:
         feat = str(row.get("feature") or "")
-        tokens = list(row.get("tokens") or [])
+        tokens = as_sequence_list(row.get("tokens"))
         if not feat or not tokens:
             continue
         roles = list(row.get("roles") or [])
@@ -224,7 +225,9 @@ def annotate_bundles_with_token_ids(
     out: List[Dict[str, Any]] = []
     for b in bundles:
         row = dict(b)
-        tokens = list(row.get("tokens") or row.get("canonical_full_mg_bundle") or [])
+        tokens = as_sequence_list(row.get("tokens"))
+        if not tokens:
+            tokens = as_sequence_list(row.get("canonical_full_mg_bundle"))
         row["tokens"] = tokens
         tids = list(row.get("token_ids") or [])
         if len(tids) != len(tokens):
@@ -419,7 +422,10 @@ def query_unique_bundles_from_bank(
         if str(u.get("feature")) != feat and str(u.get("feature")).lower() != feat.lower():
             continue
         row = dict(u)
-        row["tokens"] = list(u.get("canonical_full_mg_bundle") or u.get("tokens") or [])
+        tokens = as_sequence_list(u.get("canonical_full_mg_bundle"))
+        if not tokens:
+            tokens = as_sequence_list(u.get("tokens"))
+        row["tokens"] = tokens
         base = int(
             u.get("observation_count_used_for_provenance")
             or u.get("deduplicated_observation_count")

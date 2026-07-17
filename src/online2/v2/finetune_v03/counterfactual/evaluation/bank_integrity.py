@@ -9,6 +9,29 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 
+def as_sequence_list(value: Any) -> List[Any]:
+    """Coerce parquet/pandas cell values to a list without ndarray truthiness errors."""
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return list(value)
+    if isinstance(value, tuple):
+        return list(value)
+    if isinstance(value, str):
+        return [value] if value else []
+    # numpy.ndarray / pandas Series: avoid bool(array) ambiguity
+    tolist = getattr(value, "tolist", None)
+    if callable(tolist):
+        out = tolist()
+        if isinstance(out, list):
+            return out
+        return [out]
+    try:
+        return list(value)
+    except TypeError:
+        return [value]
+
+
 BANK_MODE_DEPLOYMENT = "deployment"
 BANK_MODE_RECONSTRUCTION_EVAL = "reconstruction_eval"
 BANK_SCHEMA_VERSION = "mlm_bundle_bank_v1"
@@ -113,7 +136,9 @@ def observation_index_content_sha256(observations: Sequence[Mapping[str, Any]]) 
 def unique_bundle_index_content_sha256(uniques: Sequence[Mapping[str, Any]]) -> str:
     rows = []
     for u in uniques:
-        tokens = list(u.get("canonical_full_mg_bundle") or u.get("tokens") or [])
+        tokens = as_sequence_list(u.get("canonical_full_mg_bundle"))
+        if not tokens:
+            tokens = as_sequence_list(u.get("tokens"))
         rows.append(
             {
                 "bundle_id": str(u.get("bundle_id") or ""),

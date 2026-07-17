@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from ..candidates.bundle_bank_loader import bundle_fingerprint
 from ..candidates.mlm_raw_inversion import invert_mlm_bundle_to_raw
+from ..evaluation.bank_integrity import as_sequence_list
 from ..gates.local_rules import compare_token_bundles
 from ..retokenization.full_event_retokenizer import tokenize_mg_production
 
@@ -36,11 +37,11 @@ def select_structural_fixture(
     # Deterministic scan order
     ordered = sorted(
         bank_bundles,
-        key=lambda b: bundle_fingerprint(feature, list(b.get("tokens") or [])),
+        key=lambda b: bundle_fingerprint(feature, as_sequence_list(b.get("tokens"))),
     )
     candidates = []
     for b in ordered:
-        toks = list(b.get("tokens") or [])
+        toks = as_sequence_list(b.get("tokens"))
         if list(toks) == list(original_tokens):
             continue
         if b.get("is_original"):

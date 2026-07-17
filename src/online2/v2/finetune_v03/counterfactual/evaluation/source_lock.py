@@ -38,10 +38,11 @@ P1_ENTRYPOINT_PATHS: Tuple[str, ...] = (
 )
 
 P1_RUNTIME_DEPENDENCY_GLOBS: Tuple[str, ...] = (
-    "src/online2/v2/finetune_v03/counterfactual/**/*.py",
-    "src/online2/v2/finetune_v03/checkpoint.py",
-    "src/online2/v2/tokenizer.py",
-    "src/online2/v2/feature_schema.py",
+    # Full import closure observed by P1 GPU entrypoints (model + transformer stack).
+    "src/__init__.py",
+    "src/utils.py",
+    "src/online2/**/*.py",
+    "src/transformer/**/*.py",
     "src/data_new/**/*.py",
     "scripts/online2_v2/cache_stage_a_event_embeddings.py",
     "tests/v2/counterfactual_m1/**/*.py",
