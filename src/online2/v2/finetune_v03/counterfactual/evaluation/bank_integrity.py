@@ -792,8 +792,8 @@ def bank_content_payload(
         rows.append(
             {
                 "feature": str(b.get("feature") or ""),
-                "tokens": list(b.get("tokens") or []),
-                "roles": list(b.get("roles") or []),
+                "tokens": as_sequence_list(b.get("tokens")),
+                "roles": as_sequence_list(b.get("roles")),
                 "fingerprint": str(b.get("fingerprint") or ""),
                 "is_original": bool(b.get("is_original")),
                 "event_id": str(b.get("event_id") or ""),

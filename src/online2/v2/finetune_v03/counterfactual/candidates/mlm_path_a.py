@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 import pandas as pd
 import torch
 
-from ..evaluation.bank_integrity import BANK_MODE_DEPLOYMENT
+from ..evaluation.bank_integrity import BANK_MODE_DEPLOYMENT, as_sequence_list
 from .bundle_bank_index import (
     annotate_bundles_with_token_ids,
     build_bank_query_record,
@@ -163,7 +163,7 @@ def run_constrained_mlm_for_locus(
         )
     else:
         for b in bundles:
-            b["is_original"] = list(b.get("tokens") or []) == list(orig_toks)
+            b["is_original"] = as_sequence_list(b.get("tokens")) == list(orig_toks)
 
     window = stage_a_mod.construct_target_window(events, target_event_idx, max_length=1024)
     x, pad_mask, _L = stage_a_mod.window_to_tensors(
@@ -254,7 +254,8 @@ def run_constrained_mlm_for_locus(
                     "terminal_status": TERMINAL_FAILED,
                     "terminal_failure_reason": term_reason,
                     "last_completed_stage": "RAW_INVERSION",
-                    "bundle_tokens": list(c.get("proposed_token_bundle") or c.get("tokens") or []),
+                    "bundle_tokens": as_sequence_list(c.get("proposed_token_bundle"))
+                    or as_sequence_list(c.get("tokens")),
                 }
             )
         elif c.get("is_noop") or (
@@ -268,7 +269,8 @@ def run_constrained_mlm_for_locus(
                     "terminal_status": TERMINAL_FAILED,
                     "terminal_failure_reason": "TARGET_RAW_COLLAPSED_TO_NOOP",
                     "last_completed_stage": "RAW_INVERSION",
-                    "bundle_tokens": list(c.get("proposed_token_bundle") or c.get("tokens") or []),
+                    "bundle_tokens": as_sequence_list(c.get("proposed_token_bundle"))
+                    or as_sequence_list(c.get("tokens")),
                 }
             )
         else:
@@ -281,7 +283,8 @@ def run_constrained_mlm_for_locus(
                     "last_completed_stage": "RAW_INVERSION",
                     "pending_downstream": True,
                     "target_raw": c.get("target_raw"),
-                    "bundle_tokens": list(c.get("proposed_token_bundle") or c.get("tokens") or []),
+                    "bundle_tokens": as_sequence_list(c.get("proposed_token_bundle"))
+                    or as_sequence_list(c.get("tokens")),
                 }
             )
 

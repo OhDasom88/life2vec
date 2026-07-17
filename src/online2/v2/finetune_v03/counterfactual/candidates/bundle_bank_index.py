@@ -92,7 +92,7 @@ def observations_and_uniques_from_rows(
         tokens = as_sequence_list(row.get("tokens"))
         if not feat or not tokens:
             continue
-        roles = list(row.get("roles") or [])
+        roles = as_sequence_list(row.get("roles"))
         sig = str(row.get("signature") or "|".join(str(r) for r in roles))
         bid = make_bundle_id(feat, tokens, role_signature=sig)
         ts_utc = canonical_timestamp_utc(row.get("timestamp") or row.get("timestamp_utc"))
@@ -130,7 +130,7 @@ def observations_and_uniques_from_rows(
                 **obs,
                 "tokens": tokens,
                 "roles": roles,
-                "token_ids": list(row.get("token_ids") or []),
+                "token_ids": as_sequence_list(row.get("token_ids")),
             }
         )
 
@@ -138,7 +138,7 @@ def observations_and_uniques_from_rows(
     for bid, items in sorted(by_bundle.items()):
         tokens = list(items[0]["tokens"])
         roles = list(items[0]["roles"])
-        token_ids = list(items[0].get("token_ids") or [])
+        token_ids = as_sequence_list(items[0].get("token_ids"))
         raw_n = len(items)
         seen = set()
         dedup = 0
@@ -229,13 +229,15 @@ def annotate_bundles_with_token_ids(
         if not tokens:
             tokens = as_sequence_list(row.get("canonical_full_mg_bundle"))
         row["tokens"] = tokens
-        tids = list(row.get("token_ids") or [])
+        tids = as_sequence_list(row.get("token_ids"))
         if len(tids) != len(tokens):
             tids = [int(vocab_token2index.get(t, unk_id)) for t in tokens]
-        row["token_ids"] = tids
+        row["token_ids"] = [int(x) for x in tids]
         if "roles" not in row or row["roles"] is None:
             sig = str(row.get("role_signature") or "")
             row["roles"] = [x for x in sig.split("|") if x]
+        else:
+            row["roles"] = as_sequence_list(row.get("roles"))
         out.append(row)
     return out
 

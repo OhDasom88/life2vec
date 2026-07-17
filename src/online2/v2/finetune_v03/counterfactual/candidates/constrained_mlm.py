@@ -58,10 +58,10 @@ def build_observed_bundle_bank(
             {
                 "feature": feat,
                 "tokens": list(toks),
-                "token_ids": [int(x) for x in row["token_ids"]],
-                "roles": [str(r) for r in row.get("roles") or []],
+                "token_ids": [int(x) for x in as_sequence_list(row.get("token_ids"))],
+                "roles": [str(r) for r in as_sequence_list(row.get("roles"))],
                 "event_id": eid,
-                "signature": role_signature(row.get("roles") or []),
+                "signature": role_signature(as_sequence_list(row.get("roles"))),
             }
         )
     return dict(bank)
