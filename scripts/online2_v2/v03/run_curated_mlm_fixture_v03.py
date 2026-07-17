@@ -60,6 +60,7 @@ from src.online2.v2.finetune_v03.counterfactual.pipeline_m2 import (
     _bin_edges_for_feature,
     _load_case_events,
     _normalize_feature_name,
+    stage_m2_preflight,
 )
 from src.online2.v2.finetune_v03.counterfactual.retokenization.full_event_retokenizer import (
     apply_raw_edit_closure,
@@ -108,6 +109,12 @@ def main() -> int:
         paths = M1Paths(Path(cfg["output_root"]))
         case_id = str(cfg["case_id"])
         device = torch.device(cfg.get("device", "cuda") if torch.cuda.is_available() else "cpu")
+
+        # Curated fixture needs fold checkpoint paths from M2 prereq manifest;
+        # create it here when running before natural_path_a in the locked sequence.
+        if not (paths.manifests / "cf_m2_prereq_manifest.json").is_file():
+            print("[curated] building cf_m2_prereq_manifest via stage_m2_preflight", flush=True)
+            stage_m2_preflight(cfg, paths)
 
         stage_a = load_stage_a_module()
         vocab = RegistryVocabulary(
