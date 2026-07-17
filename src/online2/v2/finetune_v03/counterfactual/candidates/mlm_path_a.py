@@ -14,6 +14,7 @@ from .bundle_bank_index import (
     build_bank_query_record,
     load_two_tier_bank,
     query_unique_bundles_from_bank,
+    wrap_executed_query_record,
 )
 from .bundle_bank_loader import (
     load_continuous_feature_names,
