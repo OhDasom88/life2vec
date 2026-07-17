@@ -664,7 +664,7 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
                 device=device,
             )
             write_json(
-                paths.artifacts / "mlm_bundle_bank_meta.json",
+                paths.artifacts / "mlm_path_a_bank_query_meta.json",
                 mlm_run.get("bank_meta") or {},
             )
             write_json(
