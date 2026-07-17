@@ -233,15 +233,17 @@ def resolve_training_case_ids(
     example_cohort_values: Sequence[str] = ("example_set", "example", "EXAMPLE"),
 ) -> List[str]:
     df = pd.read_csv(labels_path)
-    if "cohort" in df.columns:
-        mask = df["cohort"].astype(str).isin(set(str(x) for x in example_cohort_values))
-        # also accept diagnosis-based example if cohort missing values
+    # Labels may use either "cohort" or "set" for example_set vs problem_set.
+    partition_col = "cohort" if "cohort" in df.columns else ("set" if "set" in df.columns else None)
+    if partition_col is not None:
+        mask = df[partition_col].astype(str).isin(set(str(x) for x in example_cohort_values))
         ids = df.loc[mask, "case_id"].astype(str).tolist()
         if ids:
             return sorted(set(ids))
-    # fallback: all cases except explicit problem_set
-    if "cohort" in df.columns:
-        ids = df.loc[df["cohort"].astype(str) != "problem_set", "case_id"].astype(str).tolist()
+        # fallback: all cases except explicit problem_set
+        ids = df.loc[
+            df[partition_col].astype(str) != "problem_set", "case_id"
+        ].astype(str).tolist()
         if ids:
             return sorted(set(ids))
     return sorted(set(df["case_id"].astype(str).tolist()))
