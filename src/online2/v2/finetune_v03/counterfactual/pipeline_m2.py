@@ -677,6 +677,7 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
                     "inversion_failures": mlm_run.get("inversion_failures"),
                     "lift_meta": mlm_run.get("lift_meta"),
                     "n_scored": len(mlm_run.get("scored_bundles") or []),
+                    "bank_query_record": mlm_run.get("bank_meta") or {},
                     **(mlm_run.get("funnel") or {}),
                 },
             )

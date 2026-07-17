@@ -62,6 +62,7 @@ def _consumer_bank_refs(paths: M1Paths) -> List[Dict[str, Any]]:
     sources = [
         (paths.artifacts / "mlm_functional_smoke_result.json", "functional_smoke"),
         (paths.reports / "curated_fixture_result.json", "curated_fixture"),
+        (paths.artifacts / "mlm_path_a_bank_query_meta.json", "natural_path_a"),
         (paths.artifacts / "mlm_path_a_funnel.json", "natural_path_a"),
         (
             paths.reports / "bank_query_set_manifest_reconstruction_selection.json",
