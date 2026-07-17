@@ -208,3 +208,135 @@ def mlm_outcome_from_candidates(
         "mlm_reconstruction_quality": quality,
         "mlm_cf_candidate_outcome": cand,
     }
+
+
+def evaluate_p1_acceptance_conditions(
+    *,
+    a1_preflight_pass: bool,
+    a2_functional: bool,
+    a3_curated_non_original_critic: bool,
+    a4_outcome_equals_natural: bool,
+    a5_contracts: bool,
+    a6_final_code_lock: bool,
+    a7_rerun_after_lock: bool,
+    a8_artifact_lock: bool,
+    a8_1_bank_hashes: bool = True,
+    a8_2_selection_exact_match: bool = True,
+    q1: bool = False,
+    q2: bool = False,
+    q3: bool = False,
+    q4: bool = False,
+    q5: bool = False,
+    mlm_cf_candidate_outcome: str = "NOT_EVALUATED",
+    natural_integration_outcome: str = "NOT_EVALUATED",
+    selection_manifest_chain_hash: Optional[str] = None,
+    reconstruction_metric_audit_status: Optional[str] = None,
+    quality_override: Optional[str] = None,
+    extra: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    """P1 acceptance with numbered conditions A1–A8 / Q1–Q5 / R1–R3.
+
+    Official quality enum: PASS | FAIL | NOT_EVALUATED.
+    PROVISIONAL_PASS is forbidden on official quality field.
+    A8 = A8-1 ∧ A8-2.
+    """
+    a8_combined = (
+        bool(a8_artifact_lock)
+        and bool(selection_manifest_chain_hash)
+        and bool(a8_1_bank_hashes)
+        and bool(a8_2_selection_exact_match)
+    )
+    conditions = {
+        "A1": bool(a1_preflight_pass),
+        "A2": bool(a2_functional),
+        "A3": bool(a3_curated_non_original_critic),
+        "A4": bool(a4_outcome_equals_natural),
+        "A5": bool(a5_contracts),
+        "A6": bool(a6_final_code_lock),
+        "A7": bool(a7_rerun_after_lock),
+        "A8": a8_combined,
+        "A8_1": bool(a8_artifact_lock)
+        and bool(selection_manifest_chain_hash)
+        and bool(a8_1_bank_hashes),
+        "A8_2": bool(a8_2_selection_exact_match),
+        "Q1": bool(q1),
+        "Q2": bool(q2),
+        "Q3": bool(q3),
+        "Q4": bool(q4),
+        "Q5": bool(q5),
+    }
+    impl_pass = all(conditions[k] for k in ("A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"))
+
+    # Quality / audit separation
+    # A8-2 OK → audit can be PASS even if Q fails; Q alone never forces audit FAIL
+    if not a8_2_selection_exact_match:
+        quality = "NOT_EVALUATED"
+        audit = "FAIL"
+        impl_pass = False
+        conditions["A8"] = False
+        conditions["A8_2"] = False
+    elif quality_override is not None:
+        quality = str(quality_override)
+        if quality == "PROVISIONAL_PASS":
+            quality = "NOT_EVALUATED"
+            audit = "FAIL"
+        elif quality == "NOT_EVALUATED":
+            audit = str(reconstruction_metric_audit_status or "FAIL")
+        else:
+            # Prefer explicit audit from caller; default PASS when A8-2 ok
+            audit = str(reconstruction_metric_audit_status or "PASS")
+    else:
+        quality_pass = all(conditions[k] for k in ("Q1", "Q2", "Q3", "Q4", "Q5"))
+        quality = "PASS" if quality_pass else "FAIL"
+        audit = str(reconstruction_metric_audit_status or "PASS")
+
+    if quality not in {"PASS", "FAIL", "NOT_EVALUATED"}:
+        quality = "NOT_EVALUATED"
+        audit = "FAIL"
+
+    quality_pass_flag = quality == "PASS"
+    if impl_pass and quality_pass_flag:
+        readiness = "PASS"
+        r_id = "R1"
+    elif impl_pass:
+        readiness = "CONDITIONAL_PASS"
+        r_id = "R2"
+    else:
+        readiness = "FAIL"
+        r_id = "R3"
+
+    out = {
+        "mlm_implementation": "PASS" if impl_pass else "FAIL",
+        "mlm_reconstruction_quality": quality,
+        "reconstruction_metric_audit_status": audit,
+        "mlm_cf_candidate_outcome": mlm_cf_candidate_outcome,
+        "natural_integration_outcome": natural_integration_outcome,
+        "p1_readiness": readiness,
+        "acceptance_conditions": {
+            "A1_A8": "PASS" if impl_pass else "FAIL",
+            "Q1_Q5": "PASS" if quality_pass_flag else ("NOT_EVALUATED" if quality == "NOT_EVALUATED" else "FAIL"),
+            "R": readiness,
+            "R_id": r_id,
+            **{
+                k: (
+                    "PASS"
+                    if v
+                    else (
+                        "NOT_EVALUATED"
+                        if k.startswith("Q") and quality == "NOT_EVALUATED"
+                        else "FAIL"
+                    )
+                )
+                for k, v in conditions.items()
+            },
+        },
+        "selection_manifest_chain_hash": selection_manifest_chain_hash,
+        "rerun_after_final_lock": bool(a7_rerun_after_lock),
+        "final_code_source_lock": "PASS" if a6_final_code_lock else "FAIL",
+        "artifact_lock": "PASS" if a8_artifact_lock else "FAIL",
+        "a8_1_bank_hashes": "PASS" if a8_1_bank_hashes else "FAIL",
+        "a8_2_selection_exact_match": "PASS" if a8_2_selection_exact_match else "FAIL",
+    }
+    if extra:
+        out["extra"] = dict(extra)
+    return out

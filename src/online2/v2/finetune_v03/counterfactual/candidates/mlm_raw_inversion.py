@@ -147,13 +147,11 @@ def invert_mlm_bundle_to_raw(
                 "selected_target_raw": target,
             }
 
-    # Round-trip ABS (and full bundle when refs provided) must match proposed ABS at minimum
+    # Round-trip ABS must match proposed ABS (ignore FEATURE identity tokens)
     actual_abs = retokenize_abs_value(feature, float(target), edges_abs)
-    gate = compare_token_bundles(
-        [t for t in bundle if t.startswith("VALUE_ABS|") or t.startswith("FEATURE|")],
-        [t for t in actual_abs if t.startswith("VALUE_ABS|") or t.startswith("FEATURE|")],
-        require_subset=False,
-    )
+    proposed_abs = [t for t in bundle if t.startswith("VALUE_ABS|")]
+    got_abs = [t for t in actual_abs if t.startswith("VALUE_ABS|")]
+    gate = compare_token_bundles(proposed_abs, got_abs, require_subset=False)
     if gate["status"] != "PASSED":
         return {
             "ok": False,

@@ -75,7 +75,7 @@ stage_a:
 
 mlm:
   enabled: true
-  run_in_path_a_smoke: false
+  run_in_path_a_smoke: true
   bundles_per_locus: 3
   leave_target_event_out: true
   exclude_original_from_edits: true
@@ -84,6 +84,11 @@ mlm:
   bundle_bank_scope: training_corpus_plus_case_past
   exclude_target_event: true
   exclude_same_case_future: true
+  min_recoverable_mg: 20
+  deterministic_expansion_schedule:
+    - max_mg_per_feature: 5
+    - max_mg_per_feature: 10
+    - max_mg_per_feature: 20
 
 raw_grounding:
   tolerance_seconds: 0

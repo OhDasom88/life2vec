@@ -75,8 +75,9 @@ def filter_bundles(
 ) -> List[Dict[str, Any]]:
     sig = role_signature(expected_signature)
     out = []
+    feat_l = str(feature).lower()
     for b in bank:
-        if str(b.get("feature")) != str(feature):
+        if str(b.get("feature") or "").lower() != feat_l:
             continue
         if tuple(b.get("signature") or ()) != sig and sig:
             # if bank has signature, enforce; empty expected allows length match

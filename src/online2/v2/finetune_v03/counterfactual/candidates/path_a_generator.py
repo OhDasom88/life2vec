@@ -57,14 +57,20 @@ def candidates_from_mlm_bundles(
 
     out = []
     for b in bundles:
-        toks = list(b.get("tokens") or getattr(b, "tokens", []) or [])
-        score = b.get("score") if isinstance(b, Mapping) else getattr(b, "score", None)
-        is_orig = bool(
-            (b.get("is_original") if isinstance(b, Mapping) else getattr(b, "is_original", False))
-            or str((b.get("source") if isinstance(b, Mapping) else getattr(b, "source", "")) or "").startswith(
-                "noop"
+        if isinstance(b, Mapping):
+            toks = list(b.get("tokens") or [])
+            score = b.get("score")
+            is_orig = bool(
+                b.get("is_original")
+                or str(b.get("source") or "").startswith("noop")
             )
-        )
+        else:
+            toks = list(getattr(b, "tokens", []) or [])
+            score = getattr(b, "score", None)
+            is_orig = bool(
+                getattr(b, "is_original", False)
+                or str(getattr(b, "source", "") or "").startswith("noop")
+            )
         if is_orig:
             out.append(
                 {

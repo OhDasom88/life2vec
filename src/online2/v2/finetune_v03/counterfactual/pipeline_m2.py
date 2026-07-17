@@ -15,8 +15,10 @@ from .attribution.token_ixg_v03 import (
     compute_token_ixg_for_case,
     preselect_events_search_folds,
 )
+from .candidates.mlm_path_a import run_constrained_mlm_for_locus
 from .candidates.path_a_generator import build_path_a_candidates
 from .evaluation.acceptance import build_acceptance_report, mlm_outcome_from_candidates
+from .evaluation.mlm_preflight import run_mlm_decoder_preflight
 from .evaluation.canonical_locus import (
     canonical_locus_key,
     canonical_target_raw,
@@ -488,6 +490,19 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
 
     device = torch.device(cfg.get("device", "cuda") if torch.cuda.is_available() else "cpu")
     stage_a, encoder, vocab, abspos_ts, _hp = _resolve_vocab_and_encoder(cfg, device)
+    mlm_cfg = cfg.get("mlm") or {}
+    preflight_art = run_mlm_decoder_preflight(
+        encoder,
+        vocab_size=int(vocab.size()),
+        device=device,
+        golden_logits_path=(
+            Path(mlm_cfg["golden_logits_path"]) if mlm_cfg.get("golden_logits_path") else None
+        ),
+    )
+    write_json(paths.artifacts / "mlm_decoder_preflight.json", preflight_art)
+    if mlm_cfg.get("enabled", True) and mlm_cfg.get("run_in_path_a_smoke", False):
+        if not preflight_art.get("decoder_preflight_passed"):
+            raise RuntimeError(f"MLM decoder preflight FAILED: {preflight_art.get('fail_reasons')}")
     _sa, events, _farm, period_start = _load_case_events(cfg, case_id)
     sa_cfg = cfg.get("stage_a") or {}
     reenc = StageAReencoder(
@@ -587,6 +602,7 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
     strict_exact = bool(gate0_cfg.get("strict_exact", True))
     allow_probe = bool(gate0_cfg.get("allow_abs_bin_probe", False))
 
+    recovered: Dict[str, Any] = {"ok": False, "reason": "NOT_ATTEMPTED"}
     if not no_eligible_locus:
         # Recover raw that reproduces original MG (Gate0 prerequisite) — grounded only in strict
         ev0 = events[events_by_id[event_id]]
@@ -612,6 +628,76 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
             paths.artifacts / "observed_raw_recovery.json",
             {"ok": False, "reason": "NO_ELIGIBLE_LOCUS"},
         )
+
+    mlm_run: Dict[str, Any] = {
+        "mlm_executed": False,
+        "decoder_forward_call_count": 0,
+        "unique_scored_bundle_count": 0,
+        "n_valid_mlm_edits": 0,
+        "inversion_failures": 0,
+        "n_eligible_loci": 0,
+    }
+    if (
+        (not no_eligible_locus)
+        and cands is not None
+        and bool(mlm_cfg.get("enabled", True))
+        and bool(mlm_cfg.get("run_in_path_a_smoke", False))
+        and recovered.get("ok")
+    ):
+        ev_list_idx = events_by_id.get(event_id)
+        if ev_list_idx is not None:
+            mlm_run = run_constrained_mlm_for_locus(
+                cfg=cfg,
+                encoder=encoder,
+                stage_a_mod=stage_a,
+                vocab=vocab,
+                abspos_reference=abspos_ts,
+                case_t0=period_start,
+                events=events,
+                target_event_idx=int(ev_list_idx),
+                event_id=str(event_id),
+                feature=feat,
+                measurement_group_id=mg_id,
+                observed_raw=float(observed),
+                edges_abs=edges,
+                case_id=str(case_id),
+                device=device,
+            )
+            write_json(
+                paths.artifacts / "mlm_bundle_bank_meta.json",
+                mlm_run.get("bank_meta") or {},
+            )
+            write_json(
+                paths.artifacts / "mlm_path_a_funnel.json",
+                {
+                    "reason": mlm_run.get("reason"),
+                    "decoder_forward_call_count": mlm_run.get("decoder_forward_call_count"),
+                    "unique_scored_bundle_count": mlm_run.get("unique_scored_bundle_count"),
+                    "n_valid_mlm_edits": mlm_run.get("n_valid_mlm_edits"),
+                    "inversion_failures": mlm_run.get("inversion_failures"),
+                    "lift_meta": mlm_run.get("lift_meta"),
+                    "n_scored": len(mlm_run.get("scored_bundles") or []),
+                    **(mlm_run.get("funnel") or {}),
+                },
+            )
+            # Merge invertible non-original MLM edits into Path A candidate list
+            for mc in mlm_run.get("valid_edit_candidates") or []:
+                cands.append(dict(mc))
+    elif bool(mlm_cfg.get("run_in_path_a_smoke", False)) and no_eligible_locus:
+        mlm_run = {
+            "mlm_executed": True,
+            "reason": "NO_ELIGIBLE_LOCUS",
+            "decoder_forward_call_count": 0,
+            "unique_scored_bundle_count": 0,
+            "n_valid_mlm_edits": 0,
+            "inversion_failures": 0,
+            "n_eligible_loci": 0,
+        }
+        write_json(
+            paths.artifacts / "mlm_path_a_funnel.json",
+            {"reason": "NO_ELIGIBLE_LOCUS", "decoder_forward_call_count": 0},
+        )
+
     for cand in cands:
         target_raw = float(cand["target_raw"])
         ev_list_idx = events_by_id.get(event_id)
@@ -627,6 +713,8 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
             edit_direction=direction,
         )
         canon = canonical_target_raw(target_raw, edges=edges)
+        mlm_bank_bundle = cand.get("proposed_token_bundle")
+        # Gate4 must compare production retokenization; MLM bank relatives are diagnostic only.
         proposed = tokenize_mg_production(
             prod_tok, feature=feat, raw_value=target_raw, farm_id=farm_id
         )
@@ -698,7 +786,9 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
         row = {
             "artifact_schema_version": ARTIFACT_SCHEMA,
             "case_id": case_id,
-            "candidate_id": f"adj::{locus_key}::{canon['canonical_target_raw']}",
+            "candidate_id": (
+                f"{cand.get('source', 'adjacent_bin')}::{locus_key}::{canon['canonical_target_raw']}"
+            ),
             "source": cand.get("source", "adjacent_bin"),
             "candidate_sources": [cand.get("source", "adjacent_bin")],
             "is_noop": False,
@@ -715,7 +805,12 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
             "canonical_target_raw": canon["canonical_target_raw"],
             "canonicalization_policy": canon["canonicalization_policy"],
             "proposed_token_bundle": proposed,
+            "mlm_bank_bundle": mlm_bank_bundle,
             "actual_retokenized_bundle": rtok.actual_retokenized_bundle,
+            "mlm_bundle_score": cand.get("mlm_bundle_score", cand.get("mlm_score")),
+            "bundle_rank": cand.get("bundle_rank"),
+            "target_event_excluded": cand.get("target_event_excluded"),
+            "inversion_ok": cand.get("inversion_ok"),
             "reference_policy": rtok.reference_policy,
             "reference_refit": False,
             "gate0_baseline_roundtrip_valid": rtok.baseline_roundtrip_valid,
@@ -923,9 +1018,45 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
         scenario = "OOF_REFERENCE_ONLY"
 
     mlm_cfg = cfg.get("mlm") or {}
+    n_valid_mlm_cf = 0
+    if mlm_run.get("mlm_executed"):
+        n_valid_mlm_cf = sum(
+            1
+            for r in ranked
+            if (not r.get("is_noop"))
+            and str(r.get("source")) == "constrained_mlm"
+            and str(r.get("gate4_status")) == "PASSED"
+            and int(r.get("token_edit_count") or 0) > 0
+        )
+    recon_path = paths.reports / "mlm_reconstruction_metrics.json"
+    reconstruction_pass = None
+    if recon_path.exists():
+        try:
+            recon = json.loads(recon_path.read_text(encoding="utf-8"))
+            reconstruction_pass = bool(recon.get("quality_pass"))
+        except Exception:
+            reconstruction_pass = False
     mlm_flags = mlm_outcome_from_candidates(
-        mlm_executed=False,
+        mlm_executed=bool(mlm_run.get("mlm_executed")),
         deferred=not bool(mlm_cfg.get("run_in_path_a_smoke", False)),
+        n_eligible_loci=int(mlm_run.get("n_eligible_loci") or (0 if no_eligible_locus else 1)),
+        n_valid_mlm_cf=int(n_valid_mlm_cf),
+        inversion_failures=int(mlm_run.get("inversion_failures") or 0),
+        reconstruction_pass=reconstruction_pass,
+    )
+    natural_outcome = mlm_flags["mlm_cf_candidate_outcome"]
+    if no_eligible_locus and bool(mlm_cfg.get("run_in_path_a_smoke", False)):
+        natural_outcome = "NO_ELIGIBLE_LOCUS"
+        mlm_flags["mlm_cf_candidate_outcome"] = natural_outcome
+    write_json(
+        paths.artifacts / "mlm_natural_outcome.json",
+        {
+            "natural_integration_outcome": natural_outcome,
+            "mlm_cf_candidate_outcome": mlm_flags["mlm_cf_candidate_outcome"],
+            "decoder_forward_call_count": mlm_run.get("decoder_forward_call_count"),
+            "unique_scored_bundle_count": mlm_run.get("unique_scored_bundle_count"),
+            "preflight": preflight_art,
+        },
     )
 
     if no_eligible_locus:
