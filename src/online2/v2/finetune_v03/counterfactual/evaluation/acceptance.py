@@ -294,6 +294,11 @@ def evaluate_p1_acceptance_conditions(
         quality = "NOT_EVALUATED"
         audit = "FAIL"
 
+    # Authoritative contract: audit FAIL → quality NOT_EVALUATED → impl FAIL → R3
+    if str(audit) == "FAIL":
+        quality = "NOT_EVALUATED"
+        impl_pass = False
+
     quality_pass_flag = quality == "PASS"
     if impl_pass and quality_pass_flag:
         readiness = "PASS"
@@ -304,6 +309,14 @@ def evaluate_p1_acceptance_conditions(
     else:
         readiness = "FAIL"
         r_id = "R3"
+
+    # Invariant: CONDITIONAL_PASS requires audit PASS
+    if readiness == "CONDITIONAL_PASS" and str(audit) != "PASS":
+        readiness = "FAIL"
+        r_id = "R3"
+        impl_pass = False
+        quality = "NOT_EVALUATED" if str(audit) == "FAIL" else quality
+
 
     out = {
         "mlm_implementation": "PASS" if impl_pass else "FAIL",

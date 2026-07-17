@@ -38,6 +38,22 @@ def aggregate_q4_q5_from_per_mg(
             missing_eligibility += 1
             audit_errors.append(f"row[{i}].missing_metric_eligible")
             continue
+        if row.get("metric_audit_error") is True:
+            detail = row.get("metric_audit_errors") or row.get("metric_ineligible_reasons") or []
+            audit_errors.append(
+                f"row[{i}].metric_audit_error:{detail!r}"
+            )
+            # still classify for counts, but audit already failed
+            flag = row.get("metric_eligible")
+            if flag is False:
+                reason = row.get("metric_ineligible_reason")
+                reasons_list = row.get("metric_ineligible_reasons")
+                if not reason and isinstance(reasons_list, (list, tuple)) and reasons_list:
+                    reason = reasons_list[0]
+                if reason:
+                    ineligible.append(row)
+                    ineligible_reasons[str(reason)] += 1
+            continue
         flag = row.get("metric_eligible")
         if flag is True:
             cand = row.get("candidate_count")
@@ -54,6 +70,12 @@ def aggregate_q4_q5_from_per_mg(
                 continue
             if row.get("scoring_completed") is not True:
                 audit_errors.append(f"row[{i}].metric_eligible_scoring_not_completed")
+                continue
+            # Eligible rows must also be manifest_recoverable when the field is present
+            if "manifest_recoverable" in row and row.get("manifest_recoverable") is not True:
+                audit_errors.append(
+                    f"row[{i}].metric_eligible_without_manifest_recoverable"
+                )
                 continue
             rank = row.get("original_rank")
             if not is_strict_int(rank):
@@ -94,6 +116,9 @@ def aggregate_q4_q5_from_per_mg(
             eligible.append(row)
         elif flag is False:
             reason = row.get("metric_ineligible_reason")
+            reasons_list = row.get("metric_ineligible_reasons")
+            if not reason and isinstance(reasons_list, (list, tuple)) and reasons_list:
+                reason = reasons_list[0]
             if not reason:
                 audit_errors.append(f"row[{i}].metric_ineligible_missing_reason")
                 continue

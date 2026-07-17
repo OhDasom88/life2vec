@@ -468,3 +468,74 @@ def test_a8_2_mismatch_forces_quality_not_evaluated_and_impl_fail():
     assert rep["mlm_implementation"] == "FAIL"
     assert rep["mlm_reconstruction_quality"] == "NOT_EVALUATED"
     assert rep["reconstruction_metric_audit_status"] == "FAIL"
+
+
+def _a_pass_kwargs(**extra):
+    base = dict(
+        a1_preflight_pass=True,
+        a2_functional=True,
+        a3_curated_non_original_critic=True,
+        a4_outcome_equals_natural=True,
+        a5_contracts=True,
+        a6_final_code_lock=True,
+        a7_rerun_after_lock=True,
+        a8_artifact_lock=True,
+        a8_1_bank_hashes=True,
+        a8_2_selection_exact_match=True,
+        selection_manifest_chain_hash="abc",
+    )
+    base.update(extra)
+    return base
+
+
+def test_audit_fail_with_a1_a8_pass_is_r3_not_r2():
+    rep = evaluate_p1_acceptance_conditions(
+        **_a_pass_kwargs(
+            q1=True,
+            q2=True,
+            q3=True,
+            q4=False,
+            q5=False,
+            reconstruction_metric_audit_status="FAIL",
+        )
+    )
+    assert rep["mlm_reconstruction_quality"] == "NOT_EVALUATED"
+    assert rep["mlm_implementation"] == "FAIL"
+    assert rep["p1_readiness"] == "FAIL"
+    assert rep["acceptance_conditions"]["R_id"] == "R3"
+    assert rep["reconstruction_metric_audit_status"] == "FAIL"
+
+
+def test_audit_pass_q_fail_a_pass_is_r2():
+    rep = evaluate_p1_acceptance_conditions(
+        **_a_pass_kwargs(
+            q1=True,
+            q2=True,
+            q3=True,
+            q4=False,
+            q5=False,
+            reconstruction_metric_audit_status="PASS",
+        )
+    )
+    assert rep["mlm_reconstruction_quality"] == "FAIL"
+    assert rep["mlm_implementation"] == "PASS"
+    assert rep["p1_readiness"] == "CONDITIONAL_PASS"
+    assert rep["acceptance_conditions"]["R_id"] == "R2"
+    assert rep["reconstruction_metric_audit_status"] == "PASS"
+
+
+def test_audit_pass_q_pass_a_pass_is_r1():
+    rep = evaluate_p1_acceptance_conditions(
+        **_a_pass_kwargs(
+            q1=True,
+            q2=True,
+            q3=True,
+            q4=True,
+            q5=True,
+            reconstruction_metric_audit_status="PASS",
+        )
+    )
+    assert rep["mlm_reconstruction_quality"] == "PASS"
+    assert rep["mlm_implementation"] == "PASS"
+    assert rep["p1_readiness"] == "PASS"
+    assert rep["acceptance_conditions"]["R_id"] == "R1"

@@ -329,6 +329,8 @@ def main() -> int:
         if not a8_2:
             quality_override = "NOT_EVALUATED"
             audit = "FAIL"
+        elif str(audit) == "FAIL":
+            quality_override = "NOT_EVALUATED"
 
         p1 = evaluate_p1_acceptance_conditions(
             a1_preflight_pass=bool(preflight.get("decoder_preflight_passed")),
@@ -353,6 +355,15 @@ def main() -> int:
             quality_override=quality_override,
             extra={"a5_detail": a5, "a7_detail": a7, "a8_2_detail": a8_2_detail, "a8_1_detail": a8_1_eval},
         )
+        # Hard-fail invariant: audit FAIL must never promote to PASS / CONDITIONAL_PASS
+        if (
+            str(p1.get("reconstruction_metric_audit_status")) == "FAIL"
+            and str(p1.get("p1_readiness")) in {"PASS", "CONDITIONAL_PASS"}
+        ):
+            raise RuntimeError(
+                "acceptance_invariant_violation: audit FAIL with readiness "
+                f"{p1.get('p1_readiness')!r}"
+            )
         write_json(paths.reports / "p1_acceptance_report.json", p1)
 
         pkg = Path(args.package)

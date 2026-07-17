@@ -44,6 +44,9 @@ from src.online2.v2.finetune_v03.counterfactual.candidates.mlm_window_lift impor
 from src.online2.v2.finetune_v03.counterfactual.evaluation.execution_provenance import (
     dump_runtime_imports_from_env,
 )
+from src.online2.v2.finetune_v03.counterfactual.evaluation.metric_eligibility import (
+    classify_metric_eligibility,
+)
 from src.online2.v2.finetune_v03.counterfactual.evaluation.reconstruction_selection import (
     MIN_RECONSTRUCTION_CANDIDATES,
     build_selected_mg_flag_rows,
@@ -188,6 +191,55 @@ def evaluate_recoverable(
     return n_ok
 
 
+def _append_per_mg_row(
+    per_mg: List[Dict[str, Any]],
+    *,
+    k: str,
+    row: Dict[str, Any],
+    candidate_count: Any,
+    original_rank: Any,
+    scoring_completed: bool,
+    manifest_recoverable: bool,
+    early_ineligible_reason: str | None = None,
+    recall_at_1: int = 0,
+    recall_at_3: int = 0,
+    reciprocal_rank: float = 0.0,
+    random_recall_at_3: float = 0.0,
+    original_tokens: List[Any] | None = None,
+) -> None:
+    """Build one per-MG row; recoverable always mirrors frozen manifest (never re-inferred)."""
+    clf = classify_metric_eligibility(
+        manifest_recoverable=manifest_recoverable,
+        original_rank=original_rank,
+        scoring_completed=scoring_completed,
+        candidate_count=candidate_count,
+        early_ineligible_reason=early_ineligible_reason,
+    )
+    per_mg.append(
+        {
+            "mg_key": k,
+            "feature": row["feature"],
+            "case_id": row["case_id"],
+            "event_id": row["event_id"],
+            "candidate_count": candidate_count,
+            "manifest_recoverable": bool(manifest_recoverable),
+            "recoverable": bool(manifest_recoverable),
+            "original_rank": original_rank,
+            "recall_at_1": recall_at_1,
+            "recall_at_3": recall_at_3,
+            "reciprocal_rank": reciprocal_rank,
+            "random_recall_at_3": random_recall_at_3,
+            "original_tokens": list(original_tokens or row["original_tokens"]),
+            "scoring_completed": bool(scoring_completed),
+            "metric_eligible": clf["metric_eligible"],
+            "metric_ineligible_reason": clf["metric_ineligible_reason"],
+            "metric_ineligible_reasons": clf["metric_ineligible_reasons"],
+            "metric_audit_error": clf["metric_audit_error"],
+            "metric_audit_errors": clf["metric_audit_errors"],
+        }
+    )
+
+
 def final_metrics_for_keys(
     keys: List[str],
     pool: List[Dict[str, Any]],
@@ -200,6 +252,7 @@ def final_metrics_for_keys(
     device: torch.device,
     observations,
     uniques,
+    manifest_recoverable_by_key: Dict[str, bool] | None = None,
 ) -> Dict[str, Any]:
     key_set = set(keys)
     by_key = {mg_key(r): r for r in pool}
@@ -209,12 +262,15 @@ def final_metrics_for_keys(
     metrics_list = []
     per_mg: List[Dict[str, Any]] = []
     evaluated_mg_keys: List[str] = []
-    covered = 0
+    scored_mg_count = 0
+    ranked_original_mg_count = 0
+    manifest_map = dict(manifest_recoverable_by_key or {})
     for k in keys:
         row = by_key.get(k)
         if row is None:
             # selected key missing from pool → not evaluated (A8-2 must fail)
             continue
+        manifest_recoverable = bool(manifest_map.get(k, False))
         try:
             _sa, events, _farm, period_start = _load_case_events(cfg, row["case_id"])
         except Exception:
@@ -245,24 +301,15 @@ def final_metrics_for_keys(
         # Always count as evaluated once we attempt this selected key in the pool
         evaluated_mg_keys.append(k)
         if len(bundles) < MIN_RECONSTRUCTION_CANDIDATES:
-            per_mg.append(
-                {
-                    "mg_key": k,
-                    "feature": row["feature"],
-                    "case_id": row["case_id"],
-                    "event_id": row["event_id"],
-                    "candidate_count": len(bundles),
-                    "recoverable": False,
-                    "original_rank": None,
-                    "recall_at_1": 0,
-                    "recall_at_3": 0,
-                    "reciprocal_rank": 0.0,
-                    "random_recall_at_3": 0.0,
-                    "original_tokens": list(row["original_tokens"]),
-                    "scoring_completed": False,
-                    "metric_eligible": False,
-                    "metric_ineligible_reason": "insufficient_candidates",
-                }
+            _append_per_mg_row(
+                per_mg,
+                k=k,
+                row=row,
+                candidate_count=len(bundles),
+                original_rank=None,
+                scoring_completed=False,
+                manifest_recoverable=manifest_recoverable,
+                early_ineligible_reason="insufficient_candidates",
             )
             continue
         window = stage_a.construct_target_window(events, tidx, max_length=1024)
@@ -295,48 +342,30 @@ def final_metrics_for_keys(
                 device=device,
             )
         except Exception:
-            per_mg.append(
-                {
-                    "mg_key": k,
-                    "feature": row["feature"],
-                    "case_id": row["case_id"],
-                    "event_id": row["event_id"],
-                    "candidate_count": len(bundles),
-                    "recoverable": False,
-                    "original_rank": None,
-                    "recall_at_1": 0,
-                    "recall_at_3": 0,
-                    "reciprocal_rank": 0.0,
-                    "random_recall_at_3": 0.0,
-                    "original_tokens": list(row["original_tokens"]),
-                    "scoring_completed": False,
-                    "metric_eligible": False,
-                    "metric_ineligible_reason": "scoring_failed",
-                }
+            _append_per_mg_row(
+                per_mg,
+                k=k,
+                row=row,
+                candidate_count=len(bundles),
+                original_rank=None,
+                scoring_completed=False,
+                manifest_recoverable=manifest_recoverable,
+                early_ineligible_reason="scoring_failed",
             )
             continue
         if not scored:
-            per_mg.append(
-                {
-                    "mg_key": k,
-                    "feature": row["feature"],
-                    "case_id": row["case_id"],
-                    "event_id": row["event_id"],
-                    "candidate_count": len(bundles),
-                    "recoverable": False,
-                    "original_rank": None,
-                    "recall_at_1": 0,
-                    "recall_at_3": 0,
-                    "reciprocal_rank": 0.0,
-                    "random_recall_at_3": 0.0,
-                    "original_tokens": list(row["original_tokens"]),
-                    "scoring_completed": False,
-                    "metric_eligible": False,
-                    "metric_ineligible_reason": "scoring_empty",
-                }
+            _append_per_mg_row(
+                per_mg,
+                k=k,
+                row=row,
+                candidate_count=len(bundles),
+                original_rank=None,
+                scoring_completed=False,
+                manifest_recoverable=manifest_recoverable,
+                early_ineligible_reason="scoring_empty",
             )
             continue
-        covered += 1
+        scored_mg_count += 1
         m = mlm_reconstruction_metrics(
             scored,
             original_tokens=row["original_tokens"],
@@ -346,24 +375,21 @@ def final_metrics_for_keys(
         orig = list(row["original_tokens"])
         ranks = [i for i, c in enumerate(scored, start=1) if list(c.tokens) == orig]
         original_rank = ranks[0] if ranks else None
-        per_mg.append(
-            {
-                "mg_key": k,
-                "feature": row["feature"],
-                "case_id": row["case_id"],
-                "event_id": row["event_id"],
-                "candidate_count": len(scored),
-                "recoverable": original_rank is not None,
-                "original_rank": original_rank,
-                "recall_at_1": int(m["recall@1"]),
-                "recall_at_3": int(m["recall@3"]),
-                "reciprocal_rank": float(m["MRR"]),
-                "random_recall_at_3": float(m["random_baseline_recall@3"]),
-                "original_tokens": orig,
-                "scoring_completed": True,
-                "metric_eligible": True,
-                "metric_ineligible_reason": None,
-            }
+        if original_rank is not None:
+            ranked_original_mg_count += 1
+        _append_per_mg_row(
+            per_mg,
+            k=k,
+            row=row,
+            candidate_count=len(scored),
+            original_rank=original_rank,
+            scoring_completed=True,
+            manifest_recoverable=manifest_recoverable,
+            recall_at_1=int(m["recall@1"]),
+            recall_at_3=int(m["recall@3"]),
+            reciprocal_rank=float(m["MRR"]),
+            random_recall_at_3=float(m["random_baseline_recall@3"]),
+            original_tokens=orig,
         )
 
     n = max(len(metrics_list), 1)
@@ -374,13 +400,26 @@ def final_metrics_for_keys(
         sum(m["random_baseline_recall@3"] for m in metrics_list) / n if metrics_list else 0.0
     )
     lift = (recall3 / rand3) if rand3 > 0 else 0.0
-    selected_cov = covered / float(max(len(rows), 1))
+    selected_cov = scored_mg_count / float(max(len(rows), 1))
+    recoverable_mg_count = sum(1 for k in keys if bool(manifest_map.get(k, False)))
+    metric_eligible_mg_count = sum(1 for r in per_mg if r.get("metric_eligible") is True)
     return {
         "eligible_mg_count": len(pool),
-        "selected_mg_count": len(rows),
-        "recoverable_mg_count": covered,
+        "selected_mg_count": len(keys),
+        "recoverable_mg_count": recoverable_mg_count,
+        "scored_mg_count": scored_mg_count,
+        "scored_candidate_available_mg_count": scored_mg_count,
+        "ranked_original_mg_count": ranked_original_mg_count,
+        "metric_eligible_mg_count": metric_eligible_mg_count,
         "selected_bank_coverage": selected_cov,
-        "full_pool_bank_coverage": covered / float(max(len(pool), 1)),
+        "full_pool_bank_coverage": scored_mg_count / float(max(len(pool), 1)),
+        "diagnostic_raw_metrics": {
+            "recall_at_3": recall3,
+            "recall_at_1": recall1,
+            "MRR": mrr,
+            "mean_random_recall_at_3": rand3,
+            "lift": lift,
+        },
         "recall@1": recall1,
         "recall@3": recall3,
         "MRR": mrr,
@@ -473,6 +512,10 @@ def main() -> int:
             )
             return 1
 
+        manifest_recoverable_by_key = {
+            str(f.get("mg_key")): bool(f.get("is_recoverable")) for f in manifest_flags
+        }
+
         print("[4] final metrics after freeze (manifest read-only)", flush=True)
         # Independent recoverable flags — do NOT write back to selection_manifest_final.json
         key_set = set(selected_keys)
@@ -505,6 +548,7 @@ def main() -> int:
             device=device,
             observations=observations,
             uniques=uniques,
+            manifest_recoverable_by_key=manifest_recoverable_by_key,
         )
         evaluated_mg_keys = list(metrics.get("evaluated_mg_keys") or [])
         # A8-2 keys: independent evaluated set (not a copy of selected_keys)
@@ -608,6 +652,16 @@ def main() -> int:
             "quality_pass": quality_pass,
             "mlm_reconstruction_quality": quality_enum,
             "reconstruction_metric_audit_status": audit,
+            "official_strict_metrics": {
+                "audit_status": audit,
+                "recall_at_3": mean_r3,
+                "lift": lift_from_file,
+                "mean_random_recall_at_3": mean_rand,
+                "q4": q4,
+                "q5": q5,
+                "q4_q5_evaluable": q45_agg.get("q4_q5_evaluable"),
+                "metric_eligible_mg_count": q45_agg.get("metric_eligible_mg_count"),
+            },
             "Q1": q1,
             "Q2": q2,
             "Q3": q3,
