@@ -1,0 +1,98 @@
+# CF M2 prereq smoke — v3 P0 (cohort-correct; no force_crossfit)
+output_root: /home/dasom/life2vec/outputs/m1_m2_prereq
+# Problem abnormal: true crossfit search/holdout
+case_id: F152840_2025-03-01_2025-03-14
+cohort: problem_set
+# GT-normal Example: OOF-only over-edit audit
+normal_case_id: F420458_2025-02-16_2025-03-01
+normal_cohort: example_set
+gt_normal_labels: [정상_운영, 정상, normal]
+run_dir: /home/dasom/life2vec/outputs/online2/v2_finetune_v03/runs/cv_repeated_20260715_161945
+repeat: 0
+embeddings_dir: /home/dasom/life2vec/outputs/online2/v2_finetune_v02/event_embeddings
+labels_path: /home/dasom/life2vec/outputs/online2/v2_finetune_v02/labels_example35_problem20.csv
+label_map_path: /home/dasom/life2vec/outputs/online2/v2_finetune/label_map.json
+tokenizer_path: /home/dasom/life2vec/outputs/online2/build-v8-active80-r3/tokenization_registry.json
+vocabulary_path: /home/dasom/life2vec/outputs/online2/v2_build/life2vec_token_registry_v2.json
+feature_schema_path: /home/dasom/life2vec/outputs/online2/v2_build/feature_schema_v2.yaml
+binning_registry_path: /home/dasom/life2vec/outputs/online2/v2_build/binning_registry_v2_transductive.json
+cells_path: /home/dasom/life2vec/outputs/online2/build-v8-active80-r3/cell_occurrences.parquet
+events_path: /home/dasom/life2vec/outputs/online2/v2_build/events_tokenized_v2.parquet
+stage_a_ckpt: /home/dasom/life2vec/outputs/online2/v2_runs/full_event_grain_earlystop/best.ckpt
+abspos_reference_path: /home/dasom/life2vec/outputs/online2/v2_build/abspos_reference.json
+feature_audit_csv: /home/dasom/life2vec/outputs/online2/v2_audit/feature_semantics_and_units.csv
+device: cuda
+gpu_memory_fraction: 0.4
+path_a_probe_feature: inside_temp_c
+include_image: false
+
+cf_m2_prereq:
+  enabled: true
+  fallback_policy: error
+  artifact_schema_version: cf_m2_prereq_v1
+
+attribution:
+  method: token_ixg_v03
+  objective: binary_abnormal_logit
+  event_preselect_top_k: 8
+  token_locus_top_k: 8
+
+critic:
+  holdout_mode: fixed
+  search_fold_ids: [0, 1]
+  holdout_fold_ids: [2]
+  risk_metric: abnormal_probability
+  configured_material_epsilon: 0.01
+  material_delta_r_abs: 0.01
+  min_search_folds_improved: 2
+  noop_noise_multiplier: 10.0
+  noop_noise_artifact: outputs/cf_calibration/noop_noise.json
+  effective_epsilon_frozen: true
+  strict_calibration: true
+  # force_crossfit_smoke: FORBIDDEN
+
+attribution_fold:
+  fold_normalization: l1
+  min_abs_score_per_fold: 1.0e-5
+  require_sign_agreement: true
+
+gate0:
+  strict_exact: true
+  allow_abs_bin_probe: false
+
+retokenization:
+  allowed_token_families: [ABS, GLOBAL_REL, FARM_REL]
+  reject_features_with_temporal_derived_tokens: true
+  reference_policy: FROZEN_ORIGINAL_ARTIFACT
+  farm_relative_enabled: true
+
+stage_a:
+  require_cache_parity: true
+  parity_cosine_min: 0.9999
+  parity_mean_max_abs_error: 0.0001
+  parity_max_max_abs_error: 0.0005
+  noop_delta_abs_max: 0.000001
+
+mlm:
+  enabled: true
+  run_in_path_a_smoke: false
+  bundles_per_locus: 3
+  leave_target_event_out: true
+  exclude_original_from_edits: true
+  continuous_features_only: true
+  raw_interval_interior_margin_ratio: 0.001
+  bundle_bank_scope: training_corpus_plus_case_past
+  exclude_target_event: true
+  exclude_same_case_future: true
+
+raw_grounding:
+  tolerance_seconds: 0
+
+token_role_weights:
+  abs_value: 1.0
+  global_value: 0.5
+  farm_relative_value: 0.5
+  trend: 0.25
+  feature_identity: 0.0
+
+wandb: false
