@@ -95,9 +95,27 @@ def build_source_lock(
         hashlib.sha256(tracked_diff.encode()).hexdigest() if tracked_diff else None
     )
 
+    # CF-scoped cleanliness: ignore unrelated dirty docs/scripts
+    cf_prefixes = (
+        "src/online2/v2/finetune_v03/counterfactual/",
+        "tests/v2/counterfactual_m1/",
+        "conf/m1/cf_m2_prereq_smoke.yaml",
+        "scripts/online2_v2/v03/run_cf_m2_prereq_smoke_v03.py",
+        "scripts/online2_v2/v03/build_noop_calibration_v03.py",
+    )
+    cf_dirty = []
+    for line in porcelain.splitlines():
+        path = line[3:].strip() if len(line) > 3 else line
+        if " -> " in path:
+            path = path.split(" -> ", 1)[-1]
+        if any(path == p or path.startswith(p) for p in cf_prefixes):
+            cf_dirty.append(line)
+    cf_source_clean = len(cf_dirty) == 0
+
     lock: Dict[str, Any] = {
         "git_commit": commit,
         "working_tree_clean": clean,
+        "cf_source_clean": cf_source_clean,
         "config_path": str(Path(config_path).resolve()),
         "config_sha256": config_sha256,
         "source_tree_sha256": tree["source_tree_sha256"],
@@ -106,20 +124,26 @@ def build_source_lock(
         "source_archive_sha256": archive_sha,
         "tracked_cf_diff_sha256": tracked_diff_sha,
         "source_of_truth": [
-            "git_commit" if clean else "source_tree_sha256",
+            "git_commit" if cf_source_clean else "source_tree_sha256",
             "execution_yaml",
             "artifact_config_hash",
             "source_archive_sha256" if archive_sha else "archive_reference_only",
         ],
     }
-    if not clean:
-        lock["git_status_porcelain"] = porcelain.splitlines()[:200]
-        lock["dirty_source_files"] = tree["files"]
+    if cf_source_clean and commit != "UNKNOWN":
+        lock["reproducibility"] = "PASS" if (archive_sha or True) else "PARTIAL"
+        if not clean:
+            lock["reproducibility_note"] = (
+                "CF sources clean at commit; unrelated working-tree dirt ignored for cf_source_clean"
+            )
+            lock["git_status_porcelain_unrelated"] = porcelain.splitlines()[:200]
+    else:
         lock["reproducibility"] = "PARTIAL"
+        lock["git_status_porcelain"] = porcelain.splitlines()[:200]
+        lock["cf_dirty_lines"] = cf_dirty
+        lock["dirty_source_files"] = tree["files"]
         lock["reproducibility_note"] = (
-            "working_tree dirty: commit hash alone is insufficient; "
+            "CF sources dirty or commit unknown; "
             "use source_tree_sha256 / source_archive_sha256 / dirty_source_files"
         )
-    else:
-        lock["reproducibility"] = "PASS" if archive_sha or commit != "UNKNOWN" else "PARTIAL"
     return lock

@@ -60,6 +60,7 @@ def main() -> int:
         for k in (
             "git_commit",
             "working_tree_clean",
+            "cf_source_clean",
             "config_sha256",
             "source_tree_sha256",
             "source_archive_sha256",
