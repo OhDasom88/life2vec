@@ -17,16 +17,27 @@ from .attribution.token_ixg_v03 import (
 )
 from .candidates.mlm_path_a import run_constrained_mlm_for_locus
 from .candidates.path_a_generator import build_path_a_candidates
+from .candidates.path_a_schema_dispatch import (
+    KIND_CIRCULAR,
+    KIND_LINEAR,
+    KIND_UNSUPPORTED,
+    PathAEditStrategy,
+    build_schema_dispatched_candidates,
+    resolve_strategy_from_spec,
+)
 from .evaluation.acceptance import build_acceptance_report, mlm_outcome_from_candidates
 from .evaluation.mlm_preflight import run_mlm_decoder_preflight
 from .evaluation.canonical_locus import (
     canonical_locus_key,
     canonical_target_raw,
+    dedup_key,
     edit_direction_from_raw,
     ensure_canonical_noop,
     merge_duplicate_candidates,
 )
+from .evaluation.funnel_accounting import build_cf0_case_funnel, count_mlm_provenance
 from .evaluation.case_batch import load_case_batch, tensor_batch_only
+from src.online2.v2.feature_schema import FeatureSchema
 from .evaluation.case_fold_manifest import (
     build_case_fold_record,
     load_split_manifest,
@@ -295,6 +306,48 @@ def _bin_edges_for_feature(cfg: Dict[str, Any], feature: str) -> List[float]:
     raise RuntimeError(f"no bin edges for feature={feature}")
 
 
+def _feature_schema_path(cfg: Dict[str, Any]) -> Path:
+    feature_schema_path = Path(
+        cfg.get("feature_schema_path") or "outputs/online2/v2_build/feature_schema_v2.yaml"
+    )
+    if not feature_schema_path.is_absolute():
+        feature_schema_path = Path("/home/dasom/life2vec") / feature_schema_path
+    return feature_schema_path
+
+
+def _load_feature_spec(cfg: Dict[str, Any], feature: str):
+    schema = FeatureSchema.load(_feature_schema_path(cfg))
+    feat = _normalize_feature_name(feature)
+    return schema.features.get(feat)
+
+
+def _maybe_wind_speed_mps(cells: pd.DataFrame, grounding: Dict[str, Any]) -> Optional[float]:
+    """Best-effort wind speed for circular confidence metadata only."""
+    try:
+        farm = grounding.get("farm_id")
+        zone = grounding.get("zone_id")
+        ts = grounding.get("timestamp")
+        if cells is None or not len(cells):
+            return None
+        work = cells
+        if "feature" in work.columns:
+            speed = work[work["feature"].astype(str).str.lower().isin({"wind_speed_mps", "wind_speed"})]
+        else:
+            return None
+        if farm is not None and "farm_id" in speed.columns:
+            speed = speed[speed["farm_id"].astype(str) == str(farm)]
+        if zone is not None and "zone_id" in speed.columns:
+            speed = speed[speed["zone_id"].astype(str) == str(zone)]
+        if ts is not None and "timestamp" in speed.columns:
+            speed = speed[speed["timestamp"].astype(str) == str(ts)]
+        if not len(speed):
+            return None
+        val = speed.iloc[0].get("value")
+        return float(val) if val is not None else None
+    except Exception:
+        return None
+
+
 def stage_m2_compute_attribution(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]:
     m2 = _cfg_m2(cfg)
     if not m2.get("enabled", False):
@@ -451,12 +504,22 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
         cands = []
         edges = []
         er = None
+        edit_strategy = None
+        locus_skip_reason = None
+        unsupported_locus_count = 0
+        candidate_generation_skip_reason_counts: Dict[str, int] = {}
+        wind_speed = None
     else:
         event_id = str(top["event_id"])
         mg_id = str(top.get("measurement_group_id") or "")
         feat = _normalize_feature_name(str(top.get("feature") or feature))
         if feat in {"unknown", ""}:
             feat = _normalize_feature_name(feature)
+        edit_strategy = None
+        locus_skip_reason = None
+        unsupported_locus_count = 0
+        candidate_generation_skip_reason_counts = {}
+        wind_speed = None
 
     batch, side = load_case_batch(
         case_id=case_id,
@@ -484,9 +547,49 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
         if not is_exact(grounding):
             raise RuntimeError(f"raw grounding not EXACT: {grounding}")
 
-        edges = _bin_edges_for_feature(cfg, feat)
         observed = float(grounding["observed_raw"])
-        cands = build_path_a_candidates(feature=feat, observed_raw=observed, edges=edges)
+        spec = _load_feature_spec(cfg, feat)
+        edit_strategy = resolve_strategy_from_spec(feat, spec)
+        edges = []
+        wind_speed = _maybe_wind_speed_mps(cells, grounding)
+        if edit_strategy.kind == KIND_LINEAR:
+            try:
+                edges = _bin_edges_for_feature(cfg, feat)
+            except RuntimeError:
+                edit_strategy = PathAEditStrategy(
+                    kind=KIND_UNSUPPORTED,
+                    feature=feat,
+                    feature_type="LINEAR_BINS_MISSING",
+                    skip_reason="NO_SCHEMA_SUPPORTED_CANDIDATE",
+                )
+        try:
+            cands, locus_skip_reason = build_schema_dispatched_candidates(
+                strategy=edit_strategy,
+                observed_raw=observed,
+                edges=edges,
+                wind_speed_mps=wind_speed,
+                build_linear_fn=build_path_a_candidates,
+            )
+        except RuntimeError as exc:
+            if "no bin edges" in str(exc):
+                cands = []
+                locus_skip_reason = "NO_SCHEMA_SUPPORTED_CANDIDATE"
+                edit_strategy = PathAEditStrategy(
+                    kind=KIND_UNSUPPORTED,
+                    feature=feat,
+                    feature_type="LINEAR_BINS_MISSING",
+                    skip_reason=locus_skip_reason,
+                )
+            else:
+                raise
+        if locus_skip_reason:
+            unsupported_locus_count = 1
+            candidate_generation_skip_reason_counts[locus_skip_reason] = (
+                int(candidate_generation_skip_reason_counts.get(locus_skip_reason, 0)) + 1
+            )
+            cands = []
+        else:
+            cands = list(cands or [])
 
     device = torch.device(cfg.get("device", "cuda") if torch.cuda.is_available() else "cpu")
     stage_a, encoder, vocab, abspos_ts, _hp = _resolve_vocab_and_encoder(cfg, device)
@@ -539,11 +642,7 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
     gate0_failures = 0
     retokenize_failures = 0
 
-    feature_schema_path = Path(
-        cfg.get("feature_schema_path") or "outputs/online2/v2_build/feature_schema_v2.yaml"
-    )
-    if not feature_schema_path.is_absolute():
-        feature_schema_path = Path("/home/dasom/life2vec") / feature_schema_path
+    feature_schema_path = _feature_schema_path(cfg)
     vocab_path = Path(cfg.get("vocabulary_path") or cfg["tokenizer_path"])
     prod_tok, runtime_hashes = load_frozen_tokenizer_v2(
         feature_schema_path=feature_schema_path,
@@ -622,7 +721,25 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
             cands = []
         else:
             observed = float(recovered["observed_raw"])
-            cands = build_path_a_candidates(feature=feat, observed_raw=observed, edges=edges)
+            if edit_strategy is not None and not locus_skip_reason:
+                rebuilt, skip2 = build_schema_dispatched_candidates(
+                    strategy=edit_strategy,
+                    observed_raw=observed,
+                    edges=edges,
+                    wind_speed_mps=wind_speed,
+                    build_linear_fn=build_path_a_candidates,
+                )
+                if skip2:
+                    locus_skip_reason = skip2
+                    unsupported_locus_count = 1
+                    candidate_generation_skip_reason_counts[skip2] = (
+                        int(candidate_generation_skip_reason_counts.get(skip2, 0)) + 1
+                    )
+                    cands = []
+                else:
+                    cands = list(rebuilt or [])
+            else:
+                cands = []
     else:
         write_json(
             paths.artifacts / "observed_raw_recovery.json",
@@ -637,15 +754,27 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
         "inversion_failures": 0,
         "n_eligible_loci": 0,
     }
+    raw_proposals: List[Dict[str, Any]] = []
+    if not no_eligible_locus and cands is not None:
+        for c in cands:
+            raw_proposals.append(dict(c))
+    mlm_rejected_rows: List[Dict[str, Any]] = []
+    allow_mlm_linear = (
+        edit_strategy is not None
+        and edit_strategy.kind == KIND_LINEAR
+        and not locus_skip_reason
+    )
     if (
         (not no_eligible_locus)
         and cands is not None
+        and allow_mlm_linear
         and bool(mlm_cfg.get("enabled", True))
         and bool(mlm_cfg.get("run_in_path_a_smoke", False))
         and recovered.get("ok")
     ):
         ev_list_idx = events_by_id.get(event_id)
         if ev_list_idx is not None:
+            bank_dir_cfg = mlm_cfg.get("bundle_bank_dir")
             mlm_run = run_constrained_mlm_for_locus(
                 cfg=cfg,
                 encoder=encoder,
@@ -662,11 +791,13 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
                 edges_abs=edges,
                 case_id=str(case_id),
                 device=device,
+                bank_dir=Path(bank_dir_cfg) if bank_dir_cfg else None,
             )
             write_json(
                 paths.artifacts / "mlm_path_a_bank_query_meta.json",
                 mlm_run.get("bank_meta") or {},
             )
+            # Provisional partial funnel; rewritten after downstream terminalization.
             write_json(
                 paths.artifacts / "mlm_path_a_funnel.json",
                 {
@@ -678,9 +809,16 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
                     "lift_meta": mlm_run.get("lift_meta"),
                     "n_scored": len(mlm_run.get("scored_bundles") or []),
                     "bank_query_record": mlm_run.get("bank_meta") or {},
+                    "pending_downstream_stages": True,
                     **(mlm_run.get("funnel") or {}),
                 },
             )
+            for mc in mlm_run.get("candidates") or []:
+                if bool(mc.get("is_noop")) or str(mc.get("source")) == "noop":
+                    continue
+                raw_proposals.append(dict(mc))
+                if mc.get("rejected") or not mc.get("inversion_ok"):
+                    mlm_rejected_rows.append(dict(mc))
             # Merge invertible non-original MLM edits into Path A candidate list
             for mc in mlm_run.get("valid_edit_candidates") or []:
                 cands.append(dict(mc))
@@ -696,16 +834,48 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
         }
         write_json(
             paths.artifacts / "mlm_path_a_funnel.json",
-            {"reason": "NO_ELIGIBLE_LOCUS", "decoder_forward_call_count": 0},
+            {
+                "reason": "NO_ELIGIBLE_LOCUS",
+                "decoder_forward_call_count": 0,
+                "pending_downstream_stages": False,
+            },
+        )
+    elif (
+        bool(mlm_cfg.get("run_in_path_a_smoke", False))
+        and (not no_eligible_locus)
+        and not allow_mlm_linear
+    ):
+        mlm_run = {
+            "mlm_executed": False,
+            "reason": "SCHEMA_NON_LINEAR_MLM_SKIPPED",
+            "decoder_forward_call_count": 0,
+            "unique_scored_bundle_count": 0,
+            "n_valid_mlm_edits": 0,
+            "inversion_failures": 0,
+            "n_eligible_loci": 0 if locus_skip_reason else 1,
+            "edit_strategy_kind": getattr(edit_strategy, "kind", None),
+        }
+        write_json(
+            paths.artifacts / "mlm_path_a_funnel.json",
+            {
+                "reason": "SCHEMA_NON_LINEAR_MLM_SKIPPED",
+                "decoder_forward_call_count": 0,
+                "pending_downstream_stages": True,
+                "edit_strategy_kind": getattr(edit_strategy, "kind", None),
+            },
         )
 
     for cand in cands:
+        if cand.get("target_raw") is None:
+            continue
         target_raw = float(cand["target_raw"])
         ev_list_idx = events_by_id.get(event_id)
         if ev_list_idx is None:
             continue
         orig_toks = list(events[ev_list_idx].sentence_tokens)
-        direction = edit_direction_from_raw(observed, target_raw)
+        direction = str(cand.get("edit_direction") or "") or edit_direction_from_raw(
+            observed, target_raw
+        )
         locus_key = canonical_locus_key(
             feature=feat,
             zone=str(er["zone"]),
@@ -713,8 +883,24 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
             timestamp=er["timestamp"],
             edit_direction=direction,
         )
-        canon = canonical_target_raw(target_raw, edges=edges)
+        if edit_strategy is not None and edit_strategy.kind != KIND_LINEAR:
+            canon = {
+                "canonical_target_raw": float(target_raw),
+                "canonicalization_policy": (
+                    "COMPASS8_CANONICAL_DEG"
+                    if edit_strategy.kind == KIND_CIRCULAR
+                    else "BOOLEAN_BINARY_STATE"
+                ),
+            }
+        else:
+            canon = canonical_target_raw(target_raw, edges=edges)
         mlm_bank_bundle = cand.get("proposed_token_bundle")
+        src = str(cand.get("source", "adjacent_bin"))
+        # adjacent_bin / schema_categorical: rule-based — bank/decoder stages auto-pass
+        # constrained_mlm: arrived via bank+decoder path
+        bank_supported = True
+        decoder_scored = True
+        inversion_pass = True if src != "constrained_mlm" else bool(cand.get("inversion_ok", True))
         # Gate4 must compare production retokenization; MLM bank relatives are diagnostic only.
         proposed = tokenize_mg_production(
             prod_tok, feature=feat, raw_value=target_raw, farm_id=farm_id
@@ -735,63 +921,31 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
             expected_tokenizer_hash=expected_tok,
             strict_exact=strict_exact,
         )
-        if not rtok.baseline_roundtrip_valid:
-            gate0_failures += 1
-            invalid_excluded += 1
-            continue
+        gate0_pass = bool(rtok.baseline_roundtrip_valid)
         gate4 = rtok.gate4 or compare_token_bundles(
             proposed, rtok.actual_retokenized_bundle, require_subset=False
         )
-        if gate4["status"] != "PASSED" or not rtok.unchanged_outside_mg:
-            retokenize_failures += 1
-            invalid_excluded += 1
-            continue
-
-        new_toks = list(rtok.new_sentence_tokens)
-        result = reenc.apply_edits_and_reencode(
-            events,
-            [{"event_id": event_id, "to_tokens": new_toks, "replace_sentence": True}],
-            {k: v.to(device) for k, v in base.items()},
-            event_id_to_index=eid_to_idx,
-        )
-        after = result.batch
-        search_stats = score_candidate_folds(
-            split.search_ckpts(),
-            {k: v.cpu() for k, v in base.items()},
-            {k: (v.cpu() if torch.is_tensor(v) else v) for k, v in after.items()},
-            normal_class_id=int(batch["_normal_class_id"]),
-            fold_ids=split.search_fold_ids,
-            device=str(cfg.get("device", "cuda")),
-            gpu_fraction=float(cfg.get("gpu_memory_fraction", 0.4)),
-        )
-        token_edit_count = int(
-            sum(a != b for a, b in zip(orig_toks, new_toks))
-            if len(orig_toks) == len(new_toks)
-            else abs(len(orig_toks) - len(new_toks))
-        )
-        search_effect = (
-            float(search_stats["delta_r"]) <= -eps
-            and int(search_stats["folds_improved"])
-            >= int(critic_cfg.get("min_search_folds_improved", 2))
-        )
-        validity_partial = build_cf_validity(
-            ctx=ctx,
-            structurally_valid=True,
-            raw_edit_valid=True,
-            retokenization_valid=gate4["status"] == "PASSED" and rtok.unchanged_outside_mg,
-            stage_a_valid=True,
-            search_effect_valid=search_effect if ctx.independently_evaluable else None,
-            holdout_effect_valid=None,
-            is_noop=False,
-        )
-        row = {
+        gate4_raw_pass = gate4["status"] == "PASSED" and bool(rtok.unchanged_outside_mg)
+        # Sequential gate4: only counts after inversion+gate0 (hard-constraint invariant)
+        gate4_pass = bool(inversion_pass and gate0_pass and gate4_raw_pass)
+        hard_pass = bool(inversion_pass and gate0_pass and gate4_pass)
+        obs_eligibility = cand.get("operational_eligibility")
+        if obs_eligibility:
+            op_elig = str(obs_eligibility)
+        else:
+            op_elig = eligibility_for_path("A")
+        actionability = bool(cand.get("actionability")) if "actionability" in cand else False
+        if src == "schema_categorical_adjacent":
+            actionability = False
+            op_elig = "OBSERVATIONAL_SENSITIVITY_ONLY"
+        base_row: Dict[str, Any] = {
             "artifact_schema_version": ARTIFACT_SCHEMA,
             "case_id": case_id,
             "candidate_id": (
-                f"{cand.get('source', 'adjacent_bin')}::{locus_key}::{canon['canonical_target_raw']}"
+                f"{src}::{locus_key}::{canon['canonical_target_raw']}"
             ),
-            "source": cand.get("source", "adjacent_bin"),
-            "candidate_sources": [cand.get("source", "adjacent_bin")],
+            "source": src,
+            "candidate_sources": [src],
             "is_noop": False,
             "attribution_method": "token_ixg_v03",
             "search_fold_ids": list(ctx.search_fold_ids),
@@ -811,12 +965,174 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
             "mlm_bundle_score": cand.get("mlm_bundle_score", cand.get("mlm_score")),
             "bundle_rank": cand.get("bundle_rank"),
             "target_event_excluded": cand.get("target_event_excluded"),
-            "inversion_ok": cand.get("inversion_ok"),
+            "inversion_ok": inversion_pass,
+            "inversion_pass": inversion_pass,
+            "inversion_reason_code": cand.get("inversion_reason_code"),
+            "bank_supported": bank_supported,
+            "decoder_scored": decoder_scored,
+            "gate0_pass": gate0_pass,
+            "gate4_raw_pass": gate4_raw_pass,
+            "gate4_pass": gate4_pass,
+            "hard_constraint_pass": hard_pass,
+            "plausibility_pass": bool(hard_pass and bank_supported),
             "reference_policy": rtok.reference_policy,
             "reference_refit": False,
             "gate0_baseline_roundtrip_valid": rtok.baseline_roundtrip_valid,
             "unchanged_outside_mg": rtok.unchanged_outside_mg,
             "gate4_status": gate4["status"],
+            "operational_eligibility": op_elig,
+            "actionability": actionability,
+            "recommendation_eligible": bool(
+                actionability and op_elig == "RECOMMENDATION_ELIGIBLE"
+            ),
+            "validity_labels": list(cand.get("validity_labels") or []),
+            "feature_type": cand.get("feature_type"),
+            "current_category": cand.get("current_category"),
+            "candidate_categories": cand.get("candidate_categories"),
+            "candidate_source": cand.get("candidate_source") or src,
+            "wind_direction_semantic_confidence": cand.get(
+                "wind_direction_semantic_confidence"
+            ),
+            "structurally_valid": True,
+            "effective_epsilon": eps,
+            "abs_raw_delta": abs(target_raw - observed),
+        }
+        if not gate0_pass:
+            gate0_failures += 1
+            invalid_excluded += 1
+            base_row.update(
+                {
+                    "stage_a_pass": False,
+                    "critic_scored": False,
+                    "effect_pass": False,
+                    "stability_pass": False,
+                    "search_material": False,
+                    "cf_valid": False,
+                    "token_edit_count": 0,
+                    "token_hamming": 0.0,
+                    "reason_codes": ["GATE0_BASELINE_FAIL"],
+                }
+            )
+            scored_rows.append(base_row)
+            continue
+        if not gate4_raw_pass:
+            retokenize_failures += 1
+            invalid_excluded += 1
+            base_row["gate4_pass"] = False
+            base_row["hard_constraint_pass"] = False
+            base_row.update(
+                {
+                    "stage_a_pass": False,
+                    "critic_scored": False,
+                    "effect_pass": False,
+                    "stability_pass": False,
+                    "search_material": False,
+                    "cf_valid": False,
+                    "token_edit_count": 0,
+                    "token_hamming": 0.0,
+                    "reason_codes": ["RETOKENIZATION_MISMATCH"],
+                }
+            )
+            scored_rows.append(base_row)
+            continue
+
+        new_toks = list(rtok.new_sentence_tokens)
+        try:
+            result = reenc.apply_edits_and_reencode(
+                events,
+                [{"event_id": event_id, "to_tokens": new_toks, "replace_sentence": True}],
+                {k: v.to(device) for k, v in base.items()},
+                event_id_to_index=eid_to_idx,
+            )
+            after = result.batch
+            stage_a_pass = True
+            stage_a_failure_reason = None
+        except Exception as exc:  # noqa: BLE001 — CF-0 execution-error separation
+            stage_a_pass = False
+            stage_a_failure_reason = "STAGE_A_FORWARD_ERROR"
+            base_row.update(
+                {
+                    "stage_a_pass": False,
+                    "stage_a_failure_reason": stage_a_failure_reason,
+                    "critic_scored": False,
+                    "effect_pass": False,
+                    "stability_pass": False,
+                    "search_material": False,
+                    "cf_valid": False,
+                    "token_edit_count": 0,
+                    "token_hamming": 0.0,
+                    "reason_codes": [stage_a_failure_reason],
+                    "execution_error_detail": str(exc),
+                }
+            )
+            scored_rows.append(base_row)
+            continue
+        try:
+            search_stats = score_candidate_folds(
+                split.search_ckpts(),
+                {k: v.cpu() for k, v in base.items()},
+                {k: (v.cpu() if torch.is_tensor(v) else v) for k, v in after.items()},
+                normal_class_id=int(batch["_normal_class_id"]),
+                fold_ids=split.search_fold_ids,
+                device=str(cfg.get("device", "cuda")),
+                gpu_fraction=float(cfg.get("gpu_memory_fraction", 0.4)),
+            )
+            critic_scored = True
+            critic_failure_reason = None
+        except Exception as exc:  # noqa: BLE001
+            base_row.update(
+                {
+                    "stage_a_pass": True,
+                    "stage_a_reencode_mode": result.stage_a_reencode_mode,
+                    "critic_scored": False,
+                    "critic_failure_reason": "CRITIC_EXECUTION_FAILURE",
+                    "effect_pass": False,
+                    "stability_pass": False,
+                    "search_material": False,
+                    "cf_valid": False,
+                    "token_edit_count": 0,
+                    "token_hamming": 0.0,
+                    "reason_codes": ["CRITIC_EXECUTION_FAILURE"],
+                    "execution_error_detail": str(exc),
+                }
+            )
+            scored_rows.append(base_row)
+            continue
+        token_edit_count = int(
+            sum(a != b for a, b in zip(orig_toks, new_toks))
+            if len(orig_toks) == len(new_toks)
+            else abs(len(orig_toks) - len(new_toks))
+        )
+        folds = search_stats.get("delta_r_folds")
+        all_neg = True
+        if folds is not None:
+            try:
+                all_neg = all(float(x) < 0.0 for x in list(folds))
+            except Exception:
+                all_neg = False
+        search_effect = (
+            float(search_stats["delta_r"]) <= -eps
+            and int(search_stats["folds_improved"])
+            >= int(critic_cfg.get("min_search_folds_improved", 2))
+            and all_neg
+        )
+        stability_pass = bool(all_neg and int(search_stats["folds_improved"]) >= 1)
+        validity_partial = build_cf_validity(
+            ctx=ctx,
+            structurally_valid=True,
+            raw_edit_valid=True,
+            retokenization_valid=gate4_raw_pass,
+            stage_a_valid=stage_a_pass,
+            search_effect_valid=search_effect if ctx.independently_evaluable else None,
+            holdout_effect_valid=None,
+            is_noop=False,
+        )
+        row = {
+            **base_row,
+            "stage_a_pass": stage_a_pass,
+            "stage_a_failure_reason": stage_a_failure_reason,
+            "critic_scored": critic_scored,
+            "critic_failure_reason": critic_failure_reason,
             "stage_a_reencode_mode": result.stage_a_reencode_mode,
             "directly_edited_event_ids": rtok.directly_edited_event_ids,
             "retokenization_affected_event_ids": rtok.retokenization_affected_event_ids,
@@ -826,12 +1142,10 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
             "folds_improved_search": search_stats["folds_improved"],
             "risk_before_search": search_stats["risk_before"],
             "risk_after_search": search_stats["risk_after"],
-            "abs_raw_delta": abs(target_raw - observed),
             "token_edit_count": token_edit_count,
             "token_hamming": float(token_edit_count),
-            "operational_eligibility": eligibility_for_path("A"),
-            "structurally_valid": True,
-            "effective_epsilon": eps,
+            "effect_pass": bool(search_effect),
+            "stability_pass": bool(stability_pass and search_effect),
             "search_effect_valid": validity_partial["search_effect_valid"],
             "holdout_effect_valid": validity_partial["holdout_effect_valid"],
             "cf_valid": validity_partial["cf_valid"],
@@ -840,6 +1154,45 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
             "_after_batch": {k: v.cpu() for k, v in after.items() if torch.is_tensor(v)},
         }
         scored_rows.append(row)
+
+    # Record MLM inversion failures as terminal ledger rows (not scored).
+    for mc in mlm_rejected_rows:
+        inv_reason = str(mc.get("inversion_reason_code") or "NON_INVERTIBLE_BUNDLE")
+        scored_rows.append(
+            {
+                "artifact_schema_version": ARTIFACT_SCHEMA,
+                "case_id": case_id,
+                "candidate_id": f"constrained_mlm::inversion_fail::{inv_reason}::{len(scored_rows)}",
+                "source": "constrained_mlm",
+                "candidate_sources": ["constrained_mlm"],
+                "is_noop": False,
+                "attribution_method": "token_ixg_v03",
+                "evaluation_mode": ctx.evaluation_mode,
+                "cohort": ctx.cohort,
+                "canonical_locus_key": "",
+                "target_raw": mc.get("target_raw"),
+                "canonical_target_raw": mc.get("target_raw"),
+                "proposed_token_bundle": mc.get("proposed_token_bundle"),
+                "actual_retokenized_bundle": mc.get("proposed_token_bundle") or [],
+                "bank_supported": True,
+                "decoder_scored": True,
+                "inversion_pass": False,
+                "inversion_ok": False,
+                "inversion_reason_code": inv_reason,
+                "gate0_pass": False,
+                "gate4_pass": False,
+                "hard_constraint_pass": False,
+                "plausibility_pass": False,
+                "stage_a_pass": False,
+                "critic_scored": False,
+                "effect_pass": False,
+                "stability_pass": False,
+                "search_material": False,
+                "cf_valid": False,
+                "token_edit_count": 0,
+                "reason_codes": [inv_reason],
+            }
+        )
 
     noop_after = {k: v.clone() for k, v in base.items()}
     noop_stats = score_candidate_folds(
@@ -897,6 +1250,26 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
 
     meta_rows = [{k: v for k, v in r.items() if k != "_after_batch"} for r in scored_rows]
     meta_rows = ensure_canonical_noop(merge_duplicate_candidates(meta_rows), case_id=case_id)
+    # Stable dedup_candidate_id for CF-0 candidate-level funnel
+    for r in meta_rows:
+        if r.get("is_noop") or str(r.get("source") or "").startswith("noop"):
+            r["dedup_candidate_id"] = f"noop::{case_id}"
+            continue
+        bundle = r.get("actual_retokenized_bundle") or r.get("proposed_token_bundle") or []
+        key = dedup_key(
+            case_id=str(case_id),
+            locus_id=str(r.get("canonical_locus_key") or ""),
+            canonical_target_raw_value=float(
+                r.get("canonical_target_raw")
+                if r.get("canonical_target_raw") is not None
+                else r.get("target_raw")
+                or 0.0
+            ),
+            actual_retokenized_bundle=list(bundle),
+        )
+        r["dedup_candidate_id"] = "|".join(
+            [str(key[0]), str(key[1]), f"{key[2]:.8g}", str(hash(key[3]) & 0xFFFFFFFF)]
+        )
     batch_by_id = {}
     for r in scored_rows:
         cid = r.get("candidate_id") or f"{r.get('source')}:{r.get('delta_r_search')}"
@@ -907,6 +1280,20 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
         material_delta_r_abs=eps,
         min_search_folds_improved=int(critic_cfg.get("min_search_folds_improved", 2)),
     )
+    # Propagate effect/stability from search_material for rows that reached critic
+    for r in ranked:
+        if r.get("is_noop"):
+            continue
+        if r.get("critic_scored") and r.get("hard_constraint_pass"):
+            r["effect_pass"] = bool(r.get("search_material"))
+            folds = r.get("delta_r_folds_search") or r.get("delta_r_folds")
+            all_neg = True
+            if folds is not None:
+                try:
+                    all_neg = all(float(x) < 0.0 for x in list(folds))
+                except Exception:
+                    all_neg = False
+            r["stability_pass"] = bool(r.get("effect_pass") and all_neg)
     selected_meta = select_best_on_search(ranked, require_material=True)
     if selected_meta is None:
         selected_meta = next(r for r in ranked if r.get("is_noop"))
@@ -1019,16 +1406,11 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
         scenario = "OOF_REFERENCE_ONLY"
 
     mlm_cfg = cfg.get("mlm") or {}
-    n_valid_mlm_cf = 0
-    if mlm_run.get("mlm_executed"):
-        n_valid_mlm_cf = sum(
-            1
-            for r in ranked
-            if (not r.get("is_noop"))
-            and str(r.get("source")) == "constrained_mlm"
-            and str(r.get("gate4_status")) == "PASSED"
-            and int(r.get("token_edit_count") or 0) > 0
-        )
+    mlm_prov = count_mlm_provenance(raw_proposals=raw_proposals, dedup_rows=out_rows)
+    n_mlm_raw_proposals = int(mlm_prov["n_mlm_raw_proposals"])
+    n_mlm_origin_candidates = int(mlm_prov["n_mlm_origin_candidates"])
+    # Final outcome uses only MLM-origin AND cf_valid=true unique candidates
+    n_valid_mlm_cf = int(mlm_prov["n_valid_mlm_cf"])
     recon_path = paths.reports / "mlm_reconstruction_metrics.json"
     reconstruction_pass = None
     if recon_path.exists():
@@ -1054,9 +1436,97 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
         {
             "natural_integration_outcome": natural_outcome,
             "mlm_cf_candidate_outcome": mlm_flags["mlm_cf_candidate_outcome"],
+            "n_mlm_raw_proposals": n_mlm_raw_proposals,
+            "n_mlm_origin_candidates": n_mlm_origin_candidates,
+            "n_valid_mlm_cf": n_valid_mlm_cf,
             "decoder_forward_call_count": mlm_run.get("decoder_forward_call_count"),
             "unique_scored_bundle_count": mlm_run.get("unique_scored_bundle_count"),
             "preflight": preflight_art,
+        },
+    )
+
+    # CF-0 candidate-level funnel (complete downstream terminals)
+    funnel_warnings: List[Dict[str, Any]] = []
+    if edit_strategy is not None and edit_strategy.kind == KIND_CIRCULAR:
+        funnel_warnings.append(
+            {
+                "warning_code": "CIRCULAR_OBSERVATIONAL_SENSITIVITY_ONLY",
+                "feature": feat,
+                "affected_candidate_count": sum(
+                    1
+                    for r in out_rows
+                    if not r.get("is_noop")
+                    and str(r.get("source")) == "schema_categorical_adjacent"
+                ),
+                "blocking": False,
+                "recommendation_eligible": False,
+            }
+        )
+    if edit_strategy is not None and edit_strategy.kind == KIND_UNSUPPORTED:
+        funnel_warnings.append(
+            {
+                "warning_code": "NO_SCHEMA_SUPPORTED_CANDIDATE",
+                "feature": feat,
+                "affected_candidate_count": 0,
+                "blocking": False,
+                "locus_level_skip": True,
+            }
+        )
+    bank_unique = int(
+        (mlm_run.get("funnel") or {}).get("n_bank_unique")
+        or (mlm_run.get("bank_meta") or {}).get("n_unique_fingerprints")
+        or 0
+    )
+    scored_unique = int(
+        mlm_run.get("unique_scored_bundle_count")
+        or (mlm_run.get("funnel") or {}).get("n_scored_unique")
+        or 0
+    )
+    editable_loci = 0 if no_eligible_locus else int(mlm_run.get("n_eligible_loci") or 1)
+    if locus_skip_reason and not no_eligible_locus:
+        # Locus existed but schema could not emit candidates
+        editable_loci = max(editable_loci, 1)
+    cf0_funnel = build_cf0_case_funnel(
+        case_id=str(case_id),
+        cohort=str(ctx.cohort),
+        editable_loci_count=editable_loci,
+        raw_proposals=raw_proposals,
+        dedup_rows=out_rows,
+        selected=holdout,
+        bank_unique_bundle_count=bank_unique,
+        decoder_scored_unique_bundle_count=scored_unique,
+        warnings=funnel_warnings,
+        evaluation_mode=str(ctx.evaluation_mode),
+        unsupported_locus_count=int(unsupported_locus_count),
+        candidate_generation_skip_reason_counts=dict(
+            candidate_generation_skip_reason_counts or {}
+        ),
+        edit_strategy_kind=getattr(edit_strategy, "kind", None),
+    )
+    write_json(paths.artifacts / "cf0_case_funnel.json", cf0_funnel)
+    # Rewrite MLM funnel artifact with downstream completion flag
+    prior_funnel = {}
+    prior_path = paths.artifacts / "mlm_path_a_funnel.json"
+    if prior_path.exists():
+        try:
+            prior_funnel = json.loads(prior_path.read_text(encoding="utf-8"))
+        except Exception:
+            prior_funnel = {}
+    write_json(
+        prior_path,
+        {
+            **prior_funnel,
+            "pending_downstream_stages": bool(cf0_funnel.get("pending_downstream_stages")),
+            "cf0_funnel_audit_status": cf0_funnel.get("funnel_audit_status"),
+            "n_mlm_raw_proposals": n_mlm_raw_proposals,
+            "n_mlm_origin_candidates": n_mlm_origin_candidates,
+            "n_valid_mlm_cf": n_valid_mlm_cf,
+            "first_zero_stage": cf0_funnel.get("first_zero_stage"),
+            "hard_constraint_pass_count": cf0_funnel.get("hard_constraint_pass_count"),
+            "effect_pass_count": cf0_funnel.get("effect_pass_count"),
+            "valid_cf_count": cf0_funnel.get("valid_cf_count"),
+            "monotonicity_pass": cf0_funnel.get("monotonicity_pass"),
+            "conservation_pass": cf0_funnel.get("conservation_pass"),
         },
     )
 
@@ -1163,4 +1633,8 @@ def stage_m2_path_a_smoke(cfg: Dict[str, Any], paths: M1Paths) -> Dict[str, Any]
         "no_eligible_locus": no_eligible_locus,
         "fold_usage": fold_usage,
         "leakage_free": bool(leak["leakage_free"]),
+        "cf0_funnel": cf0_funnel,
+        "n_mlm_raw_proposals": n_mlm_raw_proposals,
+        "n_mlm_origin_candidates": n_mlm_origin_candidates,
+        "n_valid_mlm_cf": n_valid_mlm_cf,
     }

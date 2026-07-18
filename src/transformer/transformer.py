@@ -152,8 +152,13 @@ class MaskedLanguageModel(nn.Module):
             log.info("MLM decoder WITH Wight Tying")
             try:
                 self.out.weight = embedding.token.parametrizations.weight.original
-            except:
-                log.warning("MLM decoder parametrization failed")
+            except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
+                log.warning(
+                    "NON_BLOCKING_WEIGHT_TYING_FALLBACK: exception_type=%s detail=%s; "
+                    "using embedding.token.weight",
+                    type(exc).__name__,
+                    exc,
+                )
                 self.out.weight = embedding.token.weight
 
         if self.hparams.parametrize_emb:

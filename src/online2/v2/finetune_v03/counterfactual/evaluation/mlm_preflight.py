@@ -99,13 +99,35 @@ def run_mlm_decoder_preflight(
             ):
                 weight_tying_verified = True
             else:
-                warnings.append("MLM decoder parametrization failed")
+                warnings.append(
+                    {
+                        "warning_code": "NON_BLOCKING_WEIGHT_TYING_FALLBACK",
+                        "blocking": False,
+                        "fallback_used": True,
+                        "detail": "embedding and decoder out weights are not tied",
+                    }
+                )
                 # parameter integrity via checksum still allowed
                 weight_tying_verified = False
         except Exception as e:
-            warnings.append(f"weight_tying_check_error:{e}")
+            warnings.append(
+                {
+                    "warning_code": "NON_BLOCKING_WEIGHT_TYING_FALLBACK",
+                    "blocking": False,
+                    "fallback_used": True,
+                    "exception_type": type(e).__name__,
+                    "detail": str(e),
+                }
+            )
     else:
-        warnings.append("embedding_or_out_missing_for_tying_check")
+        warnings.append(
+            {
+                "warning_code": "NON_BLOCKING_WEIGHT_TYING_FALLBACK",
+                "blocking": False,
+                "fallback_used": False,
+                "detail": "embedding_or_out_missing_for_tying_check",
+            }
+        )
 
     param_checksum = None
     if out_w is not None:
@@ -193,10 +215,12 @@ def run_mlm_decoder_preflight(
         "vocab_size": int(vocab_size),
         "vocab_dim_match": bool(vocab_match),
         "forward_ok": bool(forward_ok),
+        "decoder_forward_ok": bool(forward_ok),
         "logits_shape": logits_shape,
         "decoder_forward_call_count": int(decoder_forward_call_count),
         "golden_reference_sha256": golden_sha,
         "fail_reasons": fail_reasons,
         "warnings": warnings,
+        "blocking": not bool(passed),
         "status": "PASS" if passed else "FAIL",
     }
