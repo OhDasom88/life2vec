@@ -19,6 +19,28 @@ def risk_from_batch(
     normal_class_id: int,
     use_binary: bool = True,
 ) -> float:
+    # Prefer encode_events so task_specific_query models (pad=None, task_pad set) work.
+    if hasattr(model, "encode_events"):
+        enc = model.encode_events(
+            batch["event_mean"],
+            batch["event_max"],
+            batch["case_age_hours"],
+            batch["view_id"],
+            batch["zone_id"],
+            batch["local_hour"],
+            batch["padding_mask"],
+            dino_vec=batch.get("dino_vec"),
+            dino_mask=batch.get("dino_mask"),
+        )
+        h_bin = enc.get("h_binary", enc["h_case"])
+        h_fine = enc.get("h_fine", enc["h_case"])
+        if use_binary and hasattr(model, "binary_head"):
+            return float(risk_from_binary_logit(model.binary_head(h_bin))[0].item())
+        logits = model.fine_head(h_fine) if hasattr(model, "fine_head") else model.head(h_fine)
+        return float(
+            torch.sigmoid(risk_margin_from_logits(logits, normal_class_id=normal_class_id))[0].item()
+        )
+
     event_mean = batch["event_mean"]
     event_max = batch["event_max"]
     if hasattr(model, "fuse_image_into_events"):
@@ -37,7 +59,11 @@ def risk_from_batch(
         batch["local_hour"],
         batch["padding_mask"],
     )
-    h_case, _ = model.pad(z, batch["padding_mask"])
+    if getattr(model, "task_pad", None) is not None:
+        pools = model.task_pad(z, batch["padding_mask"])
+        h_case = pools["h_binary"] if use_binary else pools["h_fine"]
+    else:
+        h_case, _ = model.pad(z, batch["padding_mask"])
     if use_binary and hasattr(model, "binary_head"):
         return float(risk_from_binary_logit(model.binary_head(h_case))[0].item())
     logits = model.fine_head(h_case) if hasattr(model, "fine_head") else model.head(h_case)

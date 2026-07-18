@@ -114,11 +114,19 @@ def token_ixg_for_event_v03(
             batch["local_hour"],
             batch["padding_mask"],
         )
-        h_case, _ = model.pad(z, batch["padding_mask"])
         obj_id = objective_id
         if obj_id == OBJECTIVE_BINARY and not hasattr(model, "binary_head"):
             obj_id = OBJECTIVE_MARGIN
             used_objective = OBJECTIVE_MARGIN
+        if getattr(model, "task_pad", None) is not None:
+            pools = model.task_pad(z, batch["padding_mask"])
+            h_case = (
+                pools["h_binary"]
+                if obj_id == OBJECTIVE_BINARY and "h_binary" in pools
+                else pools.get("h_fine", pools.get("h_case"))
+            )
+        else:
+            h_case, _ = model.pad(z, batch["padding_mask"])
         objective = _objective(model, h_case, normal_class_id=normal_class_id, objective_id=obj_id)
         model.zero_grad(set_to_none=True)
         if emb.grad is not None:

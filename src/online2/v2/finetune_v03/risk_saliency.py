@@ -67,7 +67,11 @@ def event_ixg_abnormal_margin(
         batch["padding_mask"],
     )
     z = z.detach().requires_grad_(True)
-    h_case, _attn = model.pad(z, batch["padding_mask"])
+    if getattr(model, "task_pad", None) is not None:
+        pools = model.task_pad(z, batch["padding_mask"])
+        h_case = pools["h_binary"] if use_binary else pools["h_fine"]
+    else:
+        h_case, _attn = model.pad(z, batch["padding_mask"])
 
     if use_binary and hasattr(model, "binary_head"):
         objective = model.binary_head(h_case)[0]
