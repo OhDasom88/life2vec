@@ -311,28 +311,12 @@ def main() -> int:
             device=device,
         )
         selected = select_mlm_candidates(scored, top_k=5, exclude_original_from_edits=True)
-        observed_raw = float(fixture["selected_target_raw"])  # structural seed; prefer recovered below
+        # Frozen structural fixture is authoritative for integration.
+        # Do not let post-hoc decoder ranking rewrite target_raw/proposed — that can
+        # collapse a preverified non-original bundle into a NO_OP (token_edit_count=0).
+        _ = selected  # scored for decoder_forward / unique_scored metrics only
         target_raw = float(fixture["selected_target_raw"])
         proposed = list(fixture["selected_bundle_tokens"])
-        non_orig = [c for c in selected if not c.is_original]
-        if non_orig:
-            raw_cands = candidates_from_mlm_bundles(
-                feature=feat,
-                observed_raw=float(fixture["observed_raw"]),
-                edges=fixture["edges"],
-                bundles=[non_orig[0]],
-                margin_ratio=0.001,
-            )
-            edit = next((c for c in raw_cands if c.get("inversion_ok") and not c.get("is_noop")), None)
-            if edit is not None:
-                target_raw = float(edit["target_raw"])
-                from src.online2.v2.finetune_v03.counterfactual.retokenization.full_event_retokenizer import (
-                    tokenize_mg_production,
-                )
-
-                proposed = tokenize_mg_production(
-                    prod_tok, feature=feat, raw_value=target_raw, farm_id=farm_id
-                )
 
         man = json.loads((paths.manifests / "cf_m2_prereq_manifest.json").read_text())
         split = resolve_fold_split(
