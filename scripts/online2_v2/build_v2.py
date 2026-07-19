@@ -674,7 +674,10 @@ def export_training(out: Path, vocab: VocabV2) -> dict[str, Any]:
                     "event_position": 0,
                     "time_group_rank": 0,
                     "same_time_group_id": stgs[0] if stgs else "",
-                    "START_DATE": pd.Timestamp("2024-01-01"),
+                    # Placeholder only for flat sequence export. Prefer
+                    # export_training_events_v2_event_grain.py for Stage A pretrain
+                    # (real observation_timestamp → START_DATE / AGE).
+                    "START_DATE": pd.Timestamp("1970-01-01"),
                     "AGE": 0.0,
                     "SENTENCE": rec.SENTENCE,
                     "event_kind": "SEQUENCE",
