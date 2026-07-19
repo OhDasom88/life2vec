@@ -715,6 +715,23 @@ def main() -> None:
             for sp in splits:
                 if args.fold is not None and int(sp["fold"]) != int(args.fold):
                     continue
+                result_path = run_dir / f"{sp['split_id']}_result.json"
+                if result_path.exists():
+                    try:
+                        prev = json.loads(result_path.read_text(encoding="utf-8"))
+                    except Exception as e:
+                        raise RuntimeError(f"failed to load existing result {result_path}: {e}") from e
+                    results.append(prev)
+                    append_progress(
+                        {
+                            "phase": "fold_skip",
+                            "repeat": sp["repeat"],
+                            "fold": sp["fold"],
+                            "split_id": sp["split_id"],
+                            "reason": "result_exists",
+                        }
+                    )
+                    continue
                 append_progress(
                     {
                         "phase": "fold_start",
@@ -738,7 +755,7 @@ def main() -> None:
                     global_step=global_step,
                 )
                 results.append(res)
-                (run_dir / f"{sp['split_id']}_result.json").write_text(
+                result_path.write_text(
                     json.dumps(res, indent=2, ensure_ascii=False, default=str)
                 )
         else:
