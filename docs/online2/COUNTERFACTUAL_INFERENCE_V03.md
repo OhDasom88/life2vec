@@ -3,7 +3,8 @@
 상태: **설계 검토 반영**  
 작성일: 2026-07-15  
 상위 계획: [`DIAGNOSIS_FINETUNE_V03.md`](./DIAGNOSIS_FINETUNE_V03.md)  
-파이프라인 사실: [`pipeline_trace_v02/`](./pipeline_trace_v02/)
+파이프라인 사실: [`pipeline_trace_v02/`](./pipeline_trace_v02/)  
+**토큰 편집 → 원시 수치·용량·지속시간:** [`CF_ACTION_GROUNDING_V03.md`](./CF_ACTION_GROUNDING_V03.md) (갭 전용; 본 문서는 모델 공간 편집까지)
 
 본 문서는 “v0.2에서 정상 맥락 counterfactual 실험 준비” 권고안을 **현재 소스·산출물·v0.3 우선순위**에 대조한 검토이다.
 
@@ -56,7 +57,9 @@
    `cache_stage_a_event_embeddings.py`에 이미 있음 → `stage_a_reencoder`는 새 발명보다 래핑.
 
 7. **Actuator = ZERO/POSITIVE**  
-   Path B의 “3시간→1시간”은 timestamp 구간 병합으로는 표현 가능하나, **세기/중간 상태는 약함**.
+   Path B의 “3시간→1시간”은 timestamp 구간 병합으로는 표현 가능하나, **세기/중간 상태는 약함**.  
+   → 지속시간·용량·℃ 등 **실행 단위로의 변환은 본 CF 문서 범위 밖**이며 [`CF_ACTION_GROUNDING_V03.md`](./CF_ACTION_GROUNDING_V03.md)에서 계층으로 정의한다.  
+   → Path B 탐색의 1급 객체는 단일 이벤트 `token_edits`가 아니라 **segment `edit_scope`** (truncate_end / clear_span 등). `token_edits`는 scope 적용의 파생 결과.
 
 ### 2.2 권고안에서 보강할 점
 
@@ -109,6 +112,7 @@ src/online2/v2/counterfactual/   # 또는 finetune_v03/counterfactual/
   validator.py
   diff.py
   intervention.py              # Path B만
+  action_grounding.py          # 토큰 diff → raw/용량/지속시간 (CF_ACTION_GROUNDING_V03)
 ```
 
 스크립트: `scripts/online2_v2/v03/run_counterfactual_smoke_v03.py`
@@ -208,7 +212,8 @@ R = \sigma(H_{\mathrm{binary}}(h))
 3. **saliency/risk의 DINO fuse 정렬 + token/raw 연결을 P0/CF 공통 게이트**로 둔다.  
 4. MLM은 **constrained infill 엔진**으로만 문서화한다 (물리 WM 아님).  
 5. v0.3 multi-task binary가 생기면 risk를 binary로 승격하고, v0.2 10-class proxy 실험 로그는 baseline으로만 남긴다.  
-6. 구현 isolation: `counterfactual/` 신규 패키지 + `v03` 스크립트; v0.2 eval 엔트리포인트는 유지.
+6. 구현 isolation: `counterfactual/` 신규 패키지 + `v03` 스크립트; v0.2 eval 엔트리포인트는 유지.  
+7. 운영/보고서용 개입 문장은 토큰 diff만으로 끝내지 말고 [`CF_ACTION_GROUNDING_V03.md`](./CF_ACTION_GROUNDING_V03.md)의 `grounded_actions`(또는 명시적 `ungroundable`)를 동봉한다.
 
 ---
 

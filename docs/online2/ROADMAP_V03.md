@@ -1,7 +1,8 @@
 # v0.3 진행 순서
 
-상위: [`DIAGNOSIS_FINETUNE_V03.md`](./DIAGNOSIS_FINETUNE_V03.md) · CF: [`COUNTERFACTUAL_INFERENCE_V03.md`](./COUNTERFACTUAL_INFERENCE_V03.md)  
-CV 결과: [`DIAGNOSIS_FINETUNE_V03_CV_REPORT.md`](./DIAGNOSIS_FINETUNE_V03_CV_REPORT.md) · **개선 정본:** [`DIAGNOSIS_FINETUNE_V03_PLAN.md`](./DIAGNOSIS_FINETUNE_V03_PLAN.md) · 초기 분석·튜닝: [`DIAGNOSIS_FINETUNE_V03_IMPROVEMENT.md`](./DIAGNOSIS_FINETUNE_V03_IMPROVEMENT.md)
+상위: [`DIAGNOSIS_FINETUNE_V03.md`](./DIAGNOSIS_FINETUNE_V03.md) · CF: [`COUNTERFACTUAL_INFERENCE_V03.md`](./COUNTERFACTUAL_INFERENCE_V03.md) · Grounding: [`CF_ACTION_GROUNDING_V03.md`](./CF_ACTION_GROUNDING_V03.md)  
+CV 결과: [`DIAGNOSIS_FINETUNE_V03_CV_REPORT.md`](./DIAGNOSIS_FINETUNE_V03_CV_REPORT.md) · **개선 정본:** [`DIAGNOSIS_FINETUNE_V03_PLAN.md`](./DIAGNOSIS_FINETUNE_V03_PLAN.md) · 초기 분석·튜닝: [`DIAGNOSIS_FINETUNE_V03_IMPROVEMENT.md`](./DIAGNOSIS_FINETUNE_V03_IMPROVEMENT.md)  
+**후속 구축·게이트:** [`DIAGNOSIS_FINETUNE_V03_FOLLOWUP.md`](./DIAGNOSIS_FINETUNE_V03_FOLLOWUP.md) (Sweep1→final5→evidence→열린진단→CF)
 
 원칙: **v0.1/v0.2 in-place 수정 금지** → `finetune_v03/` · `scripts/.../v03/` · `outputs/.../v2_finetune_v03/`.
 
@@ -98,23 +99,24 @@ Negative transfer 심하면 λ·lr 조정 후, 최후 수단으로 2계열(≤10
 
 전제: P0 (특히 fuse·token·raw·재인코딩). P1 binary가 있으면 risk를 binary로 승격(없으면 v0.2 margin proxy).
 
-1. `counterfactual/` 패키지: risk · selector · attr · inference_masker · constrained_mlm · stage_a_reencoder · search  
+1. `counterfactual/` 패키지: risk · selector · attr · inference_masker · constrained_mlm · stage_a_reencoder · search · **action_grounding**  
 2. Smoke: 비정상 1건 · fold1 · event3 · beam4 · edit≤2  
 3. MLM 복원 테스트 → 정상 4건 과편집 검사 → 예시 확장  
-4. 5-fold + (이후) holdout critic · 최소 편집
+4. 5-fold + (이후) holdout critic · 최소 편집  
+5. Path A 후보에 **bin→원시 구간 grounding** dry-run ([`CF_ACTION_GROUNDING_V03.md`](./CF_ACTION_GROUNDING_V03.md))
 
-**완료 게이트:** “후보 bundle 적용 시 risk가 재현 가능하게 감소” 로그 + schema 유효.
+**완료 게이트:** “후보 bundle 적용 시 risk가 재현 가능하게 감소” 로그 + schema 유효 (+ grounding 또는 `ungroundable` 필드).
 
 ## P4b — 관리 개입 (Path B)
 
 전제: **P4a 게이트 통과**.
 
-1. Actuator whitelist · 시간 구간 병합  
+1. Actuator whitelist · **지속시간(run-length) API** · capacity B0(참고 raw)  
 2. 영향 ENV/ROOT mask 규칙 · **개입 이후 IMAGE 제외**  
 3. Beam + holdout critic + Importance  
-4. 직접개입 / 기대상태 / 검증지표 분리 출력  
+4. 직접개입 / 기대상태 / 검증지표 분리 출력 (`grounded_actions` 동봉)  
 
-MLM = constrained infill only (물리 WM 아님).
+MLM = constrained infill only (물리 WM 아님). 용량 정밀도는 토큰 세분화(B2) 전제 — 상세는 grounding 문서.
 
 ---
 

@@ -1,6 +1,7 @@
 # Finetune v0.3 script root
 
-Canonical plan: [`docs/online2/DIAGNOSIS_FINETUNE_V03_PLAN.md`](../../../docs/online2/DIAGNOSIS_FINETUNE_V03_PLAN.md)
+Canonical plan: [`docs/online2/DIAGNOSIS_FINETUNE_V03_PLAN.md`](../../../docs/online2/DIAGNOSIS_FINETUNE_V03_PLAN.md)  
+Follow-up build plan: [`docs/online2/DIAGNOSIS_FINETUNE_V03_FOLLOWUP.md`](../../../docs/online2/DIAGNOSIS_FINETUNE_V03_FOLLOWUP.md)
 
 | | path |
 |--|------|

@@ -13,7 +13,8 @@
 
 > **Callout — 문서 역할**  
 > 본 문서(`DIAGNOSIS_FINETUNE_V03_PLAN.md`)가 v0.3 개선의 **정본(canonical) 상세 계획**입니다.  
-> [`DIAGNOSIS_FINETUNE_V03_IMPROVEMENT.md`](./DIAGNOSIS_FINETUNE_V03_IMPROVEMENT.md)는 초기 CV 분석·튜닝 스케치로 유지합니다.
+> [`DIAGNOSIS_FINETUNE_V03_IMPROVEMENT.md`](./DIAGNOSIS_FINETUNE_V03_IMPROVEMENT.md)는 초기 CV 분석·튜닝 스케치로 유지합니다.  
+> 운용 단위 후속 구축(Sweep→라우팅 평가→evidence→CF)은 [`DIAGNOSIS_FINETUNE_V03_FOLLOWUP.md`](./DIAGNOSIS_FINETUNE_V03_FOLLOWUP.md).
 
 ---
 

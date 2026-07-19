@@ -4,7 +4,7 @@
 |---------|--------|-------|
 | **v0.1** | shipped / active baseline | Classification only (Stage A cache → PAD → 10-way head) |
 | **v0.2** | active (sweep / eval / Gemma) | + semantic align (state/cause) + IMAGE adapter + consensus saliency + Gemma |
-| **v0.3** | **active (first CV + OOF report)** | Multi-task heads (binary + 10-class + projection), Known/Unknown open-set, P0 evidence recovery → open diagnosis; CF as later track. See [`DIAGNOSIS_FINETUNE_V03_CV_REPORT.md`](./DIAGNOSIS_FINETUNE_V03_CV_REPORT.md), canonical plan [`DIAGNOSIS_FINETUNE_V03_PLAN.md`](./DIAGNOSIS_FINETUNE_V03_PLAN.md), initial sketch [`DIAGNOSIS_FINETUNE_V03_IMPROVEMENT.md`](./DIAGNOSIS_FINETUNE_V03_IMPROVEMENT.md) |
+| **v0.3** | **active (Sweep1 + follow-up build)** | Multi-task heads (binary + 10-class + projection), Known/Unknown open-set, P0 evidence recovery → open diagnosis; CF as later track. See [`DIAGNOSIS_FINETUNE_V03_CV_REPORT.md`](./DIAGNOSIS_FINETUNE_V03_CV_REPORT.md), canonical plan [`DIAGNOSIS_FINETUNE_V03_PLAN.md`](./DIAGNOSIS_FINETUNE_V03_PLAN.md), follow-up [`DIAGNOSIS_FINETUNE_V03_FOLLOWUP.md`](./DIAGNOSIS_FINETUNE_V03_FOLLOWUP.md), initial sketch [`DIAGNOSIS_FINETUNE_V03_IMPROVEMENT.md`](./DIAGNOSIS_FINETUNE_V03_IMPROVEMENT.md) |
 
 ## Isolation rules
 
@@ -18,7 +18,7 @@
 
 | Role | v0.1 | v0.2 | v0.3 |
 |------|------|------|------|
-| Plan | `docs/online2/DIAGNOSIS_FINETUNE_PLAN.md` | `docs/online2/DIAGNOSIS_FINETUNE_V02.md` | **`docs/online2/DIAGNOSIS_FINETUNE_V03.md`** (+ [`DIAGNOSIS_FINETUNE_V03_PLAN.md`](./DIAGNOSIS_FINETUNE_V03_PLAN.md), [`COUNTERFACTUAL_INFERENCE_V03.md`](./COUNTERFACTUAL_INFERENCE_V03.md)) |
+| Plan | `docs/online2/DIAGNOSIS_FINETUNE_PLAN.md` | `docs/online2/DIAGNOSIS_FINETUNE_V02.md` | **`docs/online2/DIAGNOSIS_FINETUNE_V03.md`** (+ [`DIAGNOSIS_FINETUNE_V03_PLAN.md`](./DIAGNOSIS_FINETUNE_V03_PLAN.md), [`COUNTERFACTUAL_INFERENCE_V03.md`](./COUNTERFACTUAL_INFERENCE_V03.md), [`CF_ACTION_GROUNDING_V03.md`](./CF_ACTION_GROUNDING_V03.md)) |
 | Pipeline trace | — | `docs/online2/pipeline_trace_v02/` | (reuse v02 trace; v03 deltas in V03 plan) |
 | Model | `event_pooling_finetune.py` | `finetune_v02/model.py` | `finetune_v03/` (planned) |
 | Train / CV | `run_diagnosis_event_pooling_finetune.py` | `v02/run_diagnosis_finetune_v02.py` | `v03/…` (planned) |

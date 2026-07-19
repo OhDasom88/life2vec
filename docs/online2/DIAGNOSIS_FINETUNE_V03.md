@@ -238,7 +238,8 @@ Retrieval: sequence embedding + DINO + (선택) 생육·환경 조건.
 
 ## 11. Counterfactual / 관리 제안 (P4)
 
-상세 의사결정·코드 대조: [`COUNTERFACTUAL_INFERENCE_V03.md`](./COUNTERFACTUAL_INFERENCE_V03.md)
+상세 의사결정·코드 대조: [`COUNTERFACTUAL_INFERENCE_V03.md`](./COUNTERFACTUAL_INFERENCE_V03.md)  
+토큰 최소 편집 → ℃/용량/지속시간: [`CF_ACTION_GROUNDING_V03.md`](./CF_ACTION_GROUNDING_V03.md) (**현재 부재 계층; 신규 설계**)
 
 ### 11.1 두 경로 (반드시 분리)
 
@@ -311,9 +312,10 @@ Actuator ZERO/POSITIVE 한계 → 구간 병합은 가능, 세기 표현은 P0 �
 
 ### P4 — 의사결정 (선택)
 
-- **P4a:** 진단 counterfactual ([`COUNTERFACTUAL_INFERENCE_V03.md`](./COUNTERFACTUAL_INFERENCE_V03.md))  
-- **P4b:** actuator-only 관리 개입 + 미래 mask/infill (A 통과 후)  
+- **P4a:** 진단 counterfactual ([`COUNTERFACTUAL_INFERENCE_V03.md`](./COUNTERFACTUAL_INFERENCE_V03.md)) + Path A **action grounding**  
+- **P4b:** actuator-only 관리 개입 + 미래 mask/infill (A 통과 후) + **duration/capacity grounding**  
 - holdout critic · 최소 편집 · (선택) 별도 future-span 복원 모듈  
+- 접지 계약: [`CF_ACTION_GROUNDING_V03.md`](./CF_ACTION_GROUNDING_V03.md)  
 
 ---
 
