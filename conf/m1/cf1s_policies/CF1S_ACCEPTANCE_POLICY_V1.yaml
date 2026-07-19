@@ -1,0 +1,84 @@
+policy_id: CF1S_ACCEPTANCE_POLICY_V1
+locked_before: primary_32
+labels:
+  - MULTI_EVENT_MODEL_SENSITIVITY
+  - SEQUENCE_EDIT_FEASIBILITY
+  - NON_CAUSAL
+  - NOT_AN_ACTION
+  - NOT_RECOMMENDATION
+
+status_enum:
+  feasibility: [SUPPORTED, LIMITED, NOT_SUPPORTED, NOT_EVALUABLE]
+  saliency_efficiency: [GAIN, NO_EFFICIENCY_GAIN, NOT_EVALUABLE]
+
+primary_authority:
+  cohort: problem20_blind
+  arm: CONTROL_LIKE
+  selector: SALIENCY_TOP_K
+
+effect_fold_aggregation:
+  aggregate_statistic: MEDIAN
+  effect_pass_epsilon: 0.01
+  sign_consensus:
+    rule: STRICT_MAJORITY
+    zero_sign_tolerance: 0.001
+    ties_pass: false
+  effect_pass_consensus:
+    rule: STRICT_MAJORITY
+    ties_pass: false
+  magnitude_retention_min: 0.5
+  sign_evaluable_min_abs_delta: 0.001
+  holdout_min_abs_delta: 0.01
+
+incremental_gain:
+  min_incremental_abs_gain: 0.001
+  boundary: ">="
+  search_requires_strict_majority: false
+  holdout_requires_strict_majority: true
+
+interaction:
+  atomic_sum_noise_floor: 0.001
+  additive_tolerance_abs: 0.001
+  amplification_threshold_abs: 0.001
+  cancellation_threshold_abs: 0.001
+  boundary_precedence: ADDITIVE_FIRST
+  indeterminate_status_enabled: true
+  classification_order:
+    - EMERGENT_BUNDLE_MODEL_EFFECT
+    - ADDITIVE_CUMULATIVE_MODEL_SENSITIVITY
+    - NONLINEAR_MULTI_EVENT_MODEL_AMPLIFICATION
+    - MODEL_OUTPUT_CANCELLATION
+    - INTERACTION_INDETERMINATE
+
+parity:
+  mode: DETERMINISTIC_SAMPLE
+  parity_policy_same_across_cohorts: true
+  hash_mod: 10
+  max_abs_logit_diff_tolerance: 1.0e-6
+  max_abs_risk_diff_tolerance: 1.0e-6
+  minimum_per_evaluable_case: 1
+  minimum_per_arm: 20
+  include_all_boundary_and_error_candidates: true
+
+identity:
+  pure_identity_repeat_count_min: 3
+  base_risk_tolerance: 1.0e-6
+  base_logit_tolerance: 1.0e-6
+  noise_multiplier: 2.0
+  require_deterministic_contract_verified: true
+
+cohort_overall_priority:
+  - problem20_min_evaluable_fail -> NOT_EVALUABLE
+  - problem20_SUPPORTED -> SUPPORTED
+  - problem20_LIMITED -> LIMITED
+  - problem20_NOT_SUPPORTED -> NOT_SUPPORTED
+
+minimum_evaluable_cases:
+  development_3: 1
+  primary_internal_validation_32: 8
+  problem20_blind: 5
+
+action_authorization: false
+recommendation_authorization: false
+cf1b_authorization: false
+push_allowed: false

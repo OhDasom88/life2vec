@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cf1s_edit_proposal.v1",
+  "title": "CF1S Edit Proposal Case Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "proposal_output_schema_version",
+    "case_id",
+    "disposition",
+    "scientific_status",
+    "ordering_status",
+    "recommendation",
+    "executable_edit",
+    "interpretation_scope",
+    "causal_effect_claim_authorized",
+    "real_world_action_authorized"
+  ],
+  "properties": {
+    "proposal_output_schema_version": { "const": "cf1s_edit_proposal.v1" },
+    "case_id": { "type": "string", "minLength": 1 },
+    "evaluation_stage": {
+      "type": "string",
+      "enum": ["CONTRACT", "DEVELOPMENT_PRODUCTION", "PRIMARY32", "PROBLEM20_BLIND"]
+    },
+    "evidence_kind": {
+      "type": "string",
+      "enum": ["SYNTHETIC_CONTRACT", "ACTUAL_MODEL_FORWARD", "LEGACY_INCOMPLETE"]
+    },
+    "disposition": {
+      "type": "string",
+      "enum": ["CONTRACT_ONLY", "EVIDENCE_ONLY", "WITHHELD", "AUTHORIZED_RECOMMENDATION"]
+    },
+    "construction_status": {
+      "type": "string",
+      "enum": ["COMPLETE", "NOT_CONSTRUCTIBLE", "INCOMPLETE"]
+    },
+    "scientific_status": {
+      "type": "string",
+      "enum": ["NOT_EVALUATED", "NOT_EVALUABLE", "SUPPORTED", "NOT_SUPPORTED", "INCONCLUSIVE"]
+    },
+    "ordering_status": {
+      "type": "string",
+      "enum": ["NOT_ORDERABLE", "EVIDENCE_ORDERED", "ORDERING_FAILED"]
+    },
+    "core_acceptance_status": { "type": ["string", "null"] },
+    "direction_consistency": {
+      "type": ["string", "null"],
+      "enum": [
+        null,
+        "CONSISTENT",
+        "INCONSISTENT",
+        "ONE_SCOPE_MATERIAL_ONLY",
+        "BOTH_SCOPES_NO_MATERIAL_CHANGE",
+        "INSUFFICIENT_FOLDS",
+        "NOT_EVALUABLE"
+      ]
+    },
+    "scientific_status_reason": { "type": ["string", "null"] },
+    "recommendation": { "type": "null" },
+    "executable_edit": { "type": "null" },
+    "executable": { "type": "boolean" },
+    "interpretation_scope": {
+      "const": "MODEL_RESPONSE_TO_COUNTERFACTUAL_SEQUENCE_EDIT"
+    },
+    "causal_effect_claim_authorized": { "const": false },
+    "real_world_action_authorized": { "const": false },
+    "authority_context": { "type": "object" },
+    "execution_evidence": { "type": "object" },
+    "candidate_sets": { "type": "object" },
+    "candidate_results": { "type": "array" },
+    "scope_gate_reasons": { "type": "array", "items": { "type": "string" } },
+    "forward_counts": { "type": "object" },
+    "model_effects_evaluated": { "type": "boolean" },
+    "actual_checkpoint_forward": { "type": "boolean" },
+    "baseline_forward_complete": { "type": "boolean" },
+    "contract_fixture_expected_status": { "type": ["string", "null"] },
+    "contract_validation_status": { "type": ["string", "null"] }
+  }
+}

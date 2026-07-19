@@ -1,0 +1,17 @@
+{
+  "trust_root_id": "CF1S_DEVELOPMENT_TRUST_ROOT_V1",
+  "scope": "DEVELOPMENT_ONLY",
+  "algorithm": "Ed25519",
+  "issuer_allowlist": [
+    "cf1s-development-issuer-v1"
+  ],
+  "keys": {
+    "dev-key-1": {
+      "public_key_hex": "bfa20e3e2f60a028e796f91242cc4f3ab5608abc5493e27cc26d6d7b2d23410b",
+      "algorithm": "Ed25519",
+      "activated_at": "2026-07-19T00:00:00Z",
+      "revoked": false
+    }
+  },
+  "notes": "Development-only trust root. Artifact-embedded public keys are never trusted; verify against this file and CF1S_TRUST_ROOT_SHA256 env."
+}

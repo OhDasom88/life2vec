@@ -1,0 +1,75 @@
+# CF-1S Core smoke — development cohort only. Does not authorize Primary32/Problem20.
+output_root: /home/dasom/life2vec/outputs/cf1s_core
+run_dir: /home/dasom/life2vec/outputs/online2/v2_finetune_v03/runs/cv_repeated_20260715_161945
+repeat: 0
+embeddings_dir: /home/dasom/life2vec/outputs/online2/v2_finetune_v02/event_embeddings
+labels_path: /home/dasom/life2vec/outputs/online2/v2_finetune_v02/labels_example35_problem20.csv
+label_map_path: /home/dasom/life2vec/outputs/online2/v2_finetune/label_map.json
+tokenizer_path: /home/dasom/life2vec/outputs/online2/build-v8-active80-r3/tokenization_registry.json
+feature_schema_path: /home/dasom/life2vec/outputs/online2/v2_build/feature_schema_v2.yaml
+binning_registry_path: /home/dasom/life2vec/outputs/online2/v2_build/binning_registry_v2_transductive.json
+vocabulary_path: /home/dasom/life2vec/outputs/online2/v2_build/life2vec_token_registry_v2.json
+events_path: /home/dasom/life2vec/outputs/online2/v2_build/events_tokenized_v2.parquet
+cells_path: /home/dasom/life2vec/outputs/online2/build-v8-active80-r3/cell_occurrences.parquet
+stage_a_ckpt: /home/dasom/life2vec/outputs/online2/v2_runs/full_event_grain_earlystop/best.ckpt
+abspos_reference_path: /home/dasom/life2vec/outputs/online2/v2_build/abspos_reference.json
+device: cuda
+gpu_memory_fraction: 0.4
+
+edit_policy_path: conf/m1/cf1s_policies/CF1S_EDIT_POLICY_V1.yaml
+search_policy_path: conf/m1/cf1s_policies/CF1S_SEARCH_POLICY_V1.yaml
+saliency_policy_path: conf/m1/cf1s_policies/CF1S_SALIENCY_POLICY_V1.yaml
+acceptance_policy_path: conf/m1/cf1s_policies/CF1S_CORE_ACCEPTANCE_POLICY.yaml
+
+development_manifest_path: conf/m1/cf1s_policies/cohorts/CF1S_DEVELOPMENT3_MANIFEST.json
+primary32_manifest_path: conf/m1/cf1s_policies/cohorts/CF1S_PRIMARY32_MANIFEST.json
+problem20_manifest_path: conf/m1/cf1s_policies/cohorts/CF1S_PROBLEM20_MANIFEST.json
+# Sealed labels must NOT be passed to blind runner argv/env/config.
+problem20_labels_sealed_path: conf/m1/cf1s_policies/cohorts/CF1S_PROBLEM20_LABELS_SEALED.json
+
+critic:
+  search_fold_ids: [0, 1]
+  holdout_fold_ids: [2]
+  risk_metric: abnormal_probability
+
+attribution:
+  method: token_ixg_v03
+  event_preselect_top_k: 8
+
+cf1s_core:
+  enabled: true
+  reencode_mode: FULL_SEQUENCE_COLD_REBUILD
+  primary_feasibility_selector: SALIENCY_TOP_K
+  arm: EDITABLE_CONTROL_LIKE
+  action_authorization: false
+  recommendation_authorization: false
+  cf1b_authorization: false
+  primary32_allowed: false
+  problem20_allowed: false
+  final_primary_lock: false
+  development_smoke_allowed: false
+  contract_execution_allowed: true
+  development_production:
+    execution_allowed: false
+    authorization_artifact_required: true
+    evidence_output_allowed: false
+  primary32:
+    execution_allowed: false
+  problem20:
+    execution_allowed: false
+  recommendation:
+    authorized: false
+  trajectory:
+    authorized: false
+  output_contract_version: cf1s_edit_proposal.v1
+  risk_definition: SIGMOID_ABNORMAL_LOGIT
+  target_head: abnormal_binary
+  probability_transform: SIGMOID
+  pipeline_id: CF1S_COLD_FORWARD_V1
+  candidate_budget_policy: CF1S_DEVELOPMENT_BUDGET_V1
+  max_two_event_families_per_case: 10
+  max_three_event_families_per_case: 5
+  closure_kind: SELECTION_BLIND_REEVALUATION_CLOSURE
+  interpretation_scope: Development3 selection-blind replication evidence
+  causal_effect_claim_authorized: false
+  real_world_action_authorized: false

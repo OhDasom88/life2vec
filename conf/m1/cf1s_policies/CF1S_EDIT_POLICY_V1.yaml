@@ -1,0 +1,84 @@
+policy_id: CF1S_EDIT_POLICY_V1
+policy_role: MODEL_SENSITIVITY_ONLY
+recommendation_eligible: false
+action_authorization: false
+trajectory_authorization: false
+cf1b_authorization: false
+epsilon: 0.01
+epsilon_change_allowed: false
+
+default_record_flags:
+  semantic_confidence: MEDIUM
+  recommendation_eligible: false
+  use_policy: MODEL_SENSITIVITY_ONLY
+  farm_scope_checked: false
+  cross_farm_semantic_assumption: UNVERIFIED
+  direction_inferred_from_saliency: false
+
+edit_classes:
+  EDITABLE_CONTROL_LIKE:
+    description: Actuator-like features allowed for experimental model-sensitivity edits only.
+  OBSERVATIONAL_ONLY:
+    description: Environment/feedback features for separate observational-sensitivity arm.
+  FORBIDDEN_OUTCOME:
+    description: Diagnosis/growth/label/leakage variables. Attribution explanation only.
+  UNRESOLVED:
+    description: Unclear semantics or value transform. Default edit forbidden.
+
+features:
+  circulation_fan:
+    edit_class: EDITABLE_CONTROL_LIKE
+    schema_kind: boolean
+    adjacency: toggle
+  fcu_fan:
+    edit_class: EDITABLE_CONTROL_LIKE
+    schema_kind: boolean
+    adjacency: toggle
+  fcu_pump:
+    edit_class: EDITABLE_CONTROL_LIKE
+    schema_kind: boolean
+    adjacency: toggle
+  co2_supply:
+    edit_class: EDITABLE_CONTROL_LIKE
+    schema_kind: boolean
+    adjacency: toggle
+  shade_screen:
+    edit_class: EDITABLE_CONTROL_LIKE
+    schema_kind: ordinal
+    adjacency: adjacent_lower_upper
+  thermal_curtain:
+    edit_class: EDITABLE_CONTROL_LIKE
+    schema_kind: ordinal
+    adjacency: adjacent_lower_upper
+  inside_temp_c:
+    edit_class: OBSERVATIONAL_ONLY
+    schema_kind: continuous
+    adjacency: adjacent_lower_upper
+  rain_detected:
+    edit_class: OBSERVATIONAL_ONLY
+    schema_kind: boolean
+    adjacency: toggle
+  wind_direction_deg:
+    edit_class: OBSERVATIONAL_ONLY
+    schema_kind: circular_categorical
+    adjacency: compass8_adjacent
+  diagnosis_label:
+    edit_class: FORBIDDEN_OUTCOME
+    schema_kind: unsupported
+    adjacency: none
+  growth_stage:
+    edit_class: FORBIDDEN_OUTCOME
+    schema_kind: unsupported
+    adjacency: none
+
+primary_control_like_whitelist:
+  - circulation_fan
+  - fcu_fan
+  - fcu_pump
+  - co2_supply
+  - shade_screen
+  - thermal_curtain
+
+mlm_substitution_allowed: false
+cross_profile_bundle_count_max: 0
+forbidden_outcome_edit_count_max: 0

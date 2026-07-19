@@ -1,0 +1,165 @@
+policy_id: CF1S_CORE_ACCEPTANCE_POLICY
+locked_before: primary32
+labels:
+  - MULTI_EVENT_MODEL_SENSITIVITY
+  - SEQUENCE_EDIT_FEASIBILITY
+  - NON_CAUSAL
+  - NOT_AN_ACTION
+  - NOT_RECOMMENDATION
+
+delta:
+  expression: edited_risk - baseline_reference_risk
+  acceptance_orientation: ABSOLUTE_MODEL_SENSITIVITY
+
+thresholds:
+  provisional_floor: 0.001
+  identity_noise_multiplier: 3.0
+  locked_min_effect_abs_delta_formula: "max(0.001, 3 * max_development_pure_repeat_risk_noise)"
+  locked_min_incremental_abs_gain_formula: "max(0.001, 3 * max_development_pure_repeat_risk_noise)"
+  max_allowed_pure_repeat_risk_noise: 0.001
+  max_allowed_pure_repeat_logit_noise: 0.001
+  max_allowed_effect_threshold: 0.003
+  max_allowed_incremental_threshold: 0.003
+  max_allowed_forced_identity_risk_tolerance: 0.003
+  max_allowed_forced_identity_logit_tolerance: 0.003
+  noise_above_ceiling_increases_threshold: false
+  noise_above_ceiling_blocks_lock: true
+  threshold_calibration_scope: DEVELOPMENT3_SEARCH_BASELINE_REPEATS_ONLY
+  threshold_locked_before_holdout: true
+  holdout_noise_use: EVALUABILITY_GATE_ONLY
+  holdout_noise_must_not_change_threshold: true
+
+policy_version: CF1S_CORE_ACCEPTANCE_POLICY_V1_1
+threshold_lock_notes: |
+  Thresholds are locked from Development3 Search baseline pure-repeat noise only.
+  Holdout noise is an evaluability gate and must not recalibrate thresholds.
+
+fold_aggregation:
+  statistic: MEDIAN
+  fold_median_definition: ARITHMETIC_MEAN_OF_TWO_CENTRAL_VALUES
+  fold_sort_order: ASCENDING_NUMERIC
+  strict_majority_required_count: "floor(n / 2) + 1"
+  ties_pass: false
+  denominator: ALL_REQUESTED_FOLDS
+  fold_execution_failure_policy: CANDIDATE_NOT_EVALUABLE
+
+stable_effect:
+  require_directional_fold_strict_majority: true
+  require_search_holdout_aggregate_sign_agreement: true
+  magnitude_only_fold_majority_allowed: false
+
+incremental:
+  direction_policy: MAGNITUDE_ONLY
+  require_joint_directional_and_gain_fold_majority: true
+  best_parent_tie_break:
+    - ABS_DELTA_DESC
+    - CANONICAL_PARENT_ID_ASC
+  best_parent_tie_records_all_ids: true
+  tie_tolerance: 0
+  two_event_parents: SINGLES
+  three_event_incremental_parents: COMPLETE_PAIRS
+  three_event_multi_event_only_parents: SINGLES
+
+multi_event_only:
+  require_joint_directional_and_parent_noneffect_fold_majority: true
+  require_aggregate_parent_noneffect: true
+
+baseline_reference_policy: MEDIAN_OF_3_PURE_REPEATS
+pure_repeat_noise_policy: MAX_MINUS_MIN_OVER_REPEATS
+forced_identity:
+  transaction_mode: FORCED_IDENTITY
+  all_requested_folds_must_pass: true
+  counted_as_scientific_candidate: false
+
+family:
+  same_feature_id: true
+  same_edit_direction: true
+  mixed_direction_family_allowed: false
+  parent_payload_source: EXACT_SUBSET_PROJECTION
+  temporal:
+    contiguous_max_gap_seconds: 1800
+    sparse_min_gap_seconds: 3600
+    same_time_group_policy: REJECT
+    missing_event_time_policy: REJECT
+    mixed_temporal_arm_policy: REJECT
+    dead_zone_policy: REJECT_TEMPORAL_GAP_DEAD_ZONE
+
+valid_event:
+  max_sequence_length: 1024
+  special_token_budget_source: FROZEN_TOKENIZER_CONTRACT
+  special_token_budget: 6
+  max_target_token_count: 1018
+  valid_event_cap: 4096
+  valid_event_cap_policy: EARLIEST_EVENT_ORDER
+  independent_of_pretraining_truncation: true
+
+runtime:
+  stage_a_dtype: float32
+  autocast_mode: disabled
+  stage_a_batch_size: 8
+  tensor_equivalence_atol: 1.0e-5
+  tensor_equivalence_rtol: 1.0e-5
+  logit_equivalence_atol: 1.0e-6
+  risk_equivalence_atol: 1.0e-6
+
+cohort:
+  fraction_denominator: LOCKED_COHORT_CASE_COUNT
+  development3:
+    locked_cohort_case_count: 3
+    minimum_evaluable_case_count: 3
+    minimum_evaluable_fraction: 1.0
+  primary32:
+    locked_cohort_case_count: 32
+    minimum_evaluable_case_count: 24
+    minimum_evaluable_fraction: 0.75
+    minimum_supported_case_count: 8
+    minimum_supported_fraction: 0.25
+  problem20:
+    locked_cohort_case_count: 20
+    minimum_evaluable_case_count: 15
+    minimum_evaluable_fraction: 0.75
+    minimum_supported_case_count: 5
+    minimum_supported_fraction: 0.25
+  overall_authority: PROBLEM20_ONLY
+  pooling_allowed: false
+
+candidate_status_precedence:
+  - NOT_EVALUABLE
+  - SUPPORTED
+  - LIMITED
+  - NOT_SUPPORTED
+
+authorization:
+  action_authorization: false
+  recommendation_authorization: false
+  cf1b_authorization: false
+  primary32_allowed: false
+  problem20_allowed: false
+  final_primary_lock: false
+  development_smoke_allowed: false
+  contract_execution_allowed: true
+  development_production:
+    execution_allowed: false
+    authorization_artifact_required: true
+    evidence_output_allowed: false
+  primary32:
+    execution_allowed: false
+  problem20:
+    execution_allowed: false
+  recommendation:
+    authorized: false
+  trajectory:
+    authorized: false
+
+output_contract:
+  proposal_schema_id: cf1s_edit_proposal.v1
+  interpretation_scope: MODEL_RESPONSE_TO_COUNTERFACTUAL_SEQUENCE_EDIT
+  causal_effect_claim_authorized: false
+  real_world_action_authorized: false
+  disposition_requires_baseline_forward_complete: true
+  closure_kind: HOLDOUT_BLIND_EVALUATION_CLOSURE
+  ordering_status_enum:
+    - NOT_ORDERABLE
+    - EVIDENCE_ORDERED
+    - ORDERING_FAILED
+  ranking_status_forbidden: true

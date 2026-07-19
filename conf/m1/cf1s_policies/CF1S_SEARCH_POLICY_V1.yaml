@@ -1,0 +1,83 @@
+policy_id: CF1S_SEARCH_POLICY_V1
+common_universe_unit: DISTINCT_RAW_MG_LOCUS
+mg_dedup_precedes_selector: true
+feature_profile_grouping_precedes_selector_truncation: true
+selector_changes_ranking_only: true
+common_universe_requires_saliency: false
+random_selector_requires_saliency: false
+recency_selector_requires_saliency: false
+saliency_stability_used_only_by_saliency_selector: true
+raw_mg_duplicate_locus_count_max: 0
+
+case_budget_allocation:
+  method: FEATURE_ROUND_ROBIN
+  maximum_single_candidates_per_case: 20
+  maximum_event_loci_per_feature: 8
+  tie_break:
+    - selector_rank
+    - feature_edit_profile_id
+    - event_time
+    - event_id
+    - mg_id
+
+selection:
+  top_event_loci_per_feature: 8
+  primary_mg_loci_per_feature_event: 1
+  secondary_mg_loci_for_diagnostics: 2
+  max_events_per_cf: 3
+  max_features_per_cf: 1
+  minimum_sparse_time_distance_seconds: 3600
+  contiguous_span_max_gap_seconds: 1800
+  require_distinct_event_id: true
+  require_distinct_event_timestamp: true
+  length_preserving_edit_only: true
+
+beam:
+  single_event_budget_per_case: 20
+  beam_width: 8
+  two_event_max: 32
+  three_event_max: 24
+  total_max_per_realization: 100
+
+budget_parity_unit: PER_SELECTOR_REALIZATION
+per_realization_candidate_budget: 100
+total_compute_parity_claimed: false
+parent_family_completion_budget_separate: true
+parent_completion_used_for_beam_ranking: false
+parent_completion_used_for_candidate_selection: false
+
+recency:
+  anchor: PREDICTION_CUTOFF_TIME
+  ordering: EVENT_TIME_DESC
+  same_time_tiebreak: [event_id, mg_id]
+  future_event_allowed: false
+
+random:
+  seed_list: [11, 23, 37, 41, 53]
+  evaluation_budget_per_seed: 100
+  maximum_effect_statistic: MEDIAN_OF_SEED_MAXIMA
+  effect_pass_statistic: MEAN_OF_SEED_CASE_PASS
+  best_seed_selection_allowed: false
+  seeds_as_independent_cases: false
+  matched_budget_applied_per_random_realization: true
+  random_seed_aggregation_after_matching: true
+  matched_budget_selection_uses_holdout: false
+
+selectors:
+  - SALIENCY_TOP_K
+  - RANDOM_EDITABLE_LOCUS
+  - RECENCY_TOP_K
+
+primary_feasibility_selector: SALIENCY_TOP_K
+random_role: BASELINE_ONLY
+recency_role: BASELINE_ONLY
+baseline_success_can_rescue_primary_feasibility: false
+observational_can_rescue_control_like_status: false
+
+development_cases:
+  - F420458_2025-02-16_2025-03-01
+  - F385790_2025-03-20_2025-04-02
+  - F279269_2024-10-17_2024-10-30
+development_case_count: 3
+primary_internal_validation_case_count: 32
+development_cases_excluded_from_primary: true

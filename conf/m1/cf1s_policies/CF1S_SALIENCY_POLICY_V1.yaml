@@ -1,0 +1,39 @@
+policy_id: CF1S_SALIENCY_POLICY_V1
+objective:
+  id: binary_abnormal_logit
+  orientation: HIGHER_MEANS_HIGHER_RISK
+ranking:
+  token_score: ABSOLUTE_SALIENCY
+  locus_score: LOCUS_ABS_MAX
+  feature_event_score: MAX_DISTINCT_EDITABLE_MG_LOCUS
+event_explanation_topk: 2
+signed_value_use: EXPLANATION_ONLY
+ixg:
+  method_version: token_ixg_v03
+  embedding_layer: token_embeddings
+integrated_gradients:
+  steps: 16
+  baseline_type: zero_embedding
+  completeness_tolerance: 0.05
+  role: SECONDARY_CHECK
+fold_partition:
+  search_fold_ids: [0, 1]
+  effect_holdout_fold_ids: [2]
+stability:
+  fold:
+    min_topk_fold_fraction: 0.5
+    max_mean_rank: 8
+    fold_stability_rule: BOTH
+  method:
+    primary_secondary_rank_overlap_min: 0.5
+    top_k: 8
+  perturbation:
+    rank_retention_min: 0.5
+    top_k: 8
+saliency_selector:
+  stability_application: RANKING_TIER
+  stable_loci_priority: 0
+  unstable_loci_priority: 1
+  unstable_loci_fallback_allowed: true
+  changes_common_eligibility: false
+  changes_selector_selected_pool: false

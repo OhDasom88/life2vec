@@ -1,0 +1,43 @@
+{
+  "manifest_id": "CF1S_DEVELOPMENT3_FOLD_ROUTING_V1",
+  "cohort": "development3",
+  "scope_name": "SELECTION_BLIND_FOLD2_REEVALUATION",
+  "default_search_checkpoint_ids": [0, 1],
+  "default_selection_checkpoint_ids": [0, 1],
+  "default_reevaluation_checkpoint_ids": [2],
+  "cases": {
+    "F420458_2025-02-16_2025-03-01": {
+      "training_seen": true,
+      "is_training_holdout": false,
+      "holdout_role": "SELECTION_BLIND_REEVALUATION",
+      "holdout_blind_to_selection": true,
+      "scientifically_independent_holdout": false,
+      "search_checkpoint_ids": [0, 1],
+      "selection_checkpoint_ids": [0, 1],
+      "reevaluation_checkpoint_ids": [2],
+      "forbidden_checkpoint_ids": []
+    },
+    "F385790_2025-03-20_2025-04-02": {
+      "training_seen": true,
+      "is_training_holdout": false,
+      "holdout_role": "SELECTION_BLIND_REEVALUATION",
+      "holdout_blind_to_selection": true,
+      "scientifically_independent_holdout": false,
+      "search_checkpoint_ids": [0, 1],
+      "selection_checkpoint_ids": [0, 1],
+      "reevaluation_checkpoint_ids": [2],
+      "forbidden_checkpoint_ids": []
+    },
+    "F279269_2024-10-17_2024-10-30": {
+      "training_seen": true,
+      "is_training_holdout": false,
+      "holdout_role": "SELECTION_BLIND_REEVALUATION",
+      "holdout_blind_to_selection": true,
+      "scientifically_independent_holdout": false,
+      "search_checkpoint_ids": [0, 1],
+      "selection_checkpoint_ids": [0, 1],
+      "reevaluation_checkpoint_ids": [2],
+      "forbidden_checkpoint_ids": []
+    }
+  }
+}

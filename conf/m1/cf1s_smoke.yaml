@@ -1,0 +1,55 @@
+# CF-1S smoke — development subset only (excluded from primary acceptance)
+output_root: /home/dasom/life2vec/outputs/cf1s
+run_dir: /home/dasom/life2vec/outputs/online2/v2_finetune_v03/runs/cv_repeated_20260715_161945
+repeat: 0
+embeddings_dir: /home/dasom/life2vec/outputs/online2/v2_finetune_v02/event_embeddings
+labels_path: /home/dasom/life2vec/outputs/online2/v2_finetune_v02/labels_example35_problem20.csv
+label_map_path: /home/dasom/life2vec/outputs/online2/v2_finetune/label_map.json
+tokenizer_path: /home/dasom/life2vec/outputs/online2/build-v8-active80-r3/tokenization_registry.json
+feature_schema_path: /home/dasom/life2vec/outputs/online2/v2_build/feature_schema_v2.yaml
+binning_registry_path: /home/dasom/life2vec/outputs/online2/v2_build/binning_registry_v2_transductive.json
+vocabulary_path: /home/dasom/life2vec/outputs/online2/v2_build/life2vec_token_registry_v2.json
+events_path: /home/dasom/life2vec/outputs/online2/v2_build/events_tokenized_v2.parquet
+cells_path: /home/dasom/life2vec/outputs/online2/build-v8-active80-r3/cell_occurrences.parquet
+stage_a_ckpt: /home/dasom/life2vec/outputs/online2/v2_runs/full_event_grain_earlystop/best.ckpt
+abspos_reference_path: /home/dasom/life2vec/outputs/online2/v2_build/abspos_reference.json
+device: cuda
+gpu_memory_fraction: 0.4
+
+edit_policy_path: conf/m1/cf1s_policies/CF1S_EDIT_POLICY_V1.yaml
+search_policy_path: conf/m1/cf1s_policies/CF1S_SEARCH_POLICY_V1.yaml
+saliency_policy_path: conf/m1/cf1s_policies/CF1S_SALIENCY_POLICY_V1.yaml
+acceptance_policy_path: conf/m1/cf1s_policies/CF1S_ACCEPTANCE_POLICY_V1.yaml
+
+parent_cf0r_correction_package: reports/cf0r_schema_recovery/CF0R_GOVERNANCE_CORRECTION_20260718T231902Z
+
+critic:
+  search_fold_ids: [0, 1]
+  holdout_fold_ids: [2]
+  risk_metric: abnormal_probability
+  configured_material_epsilon: 0.01
+
+attribution:
+  method: token_ixg_v03
+  event_preselect_top_k: 8
+
+development_cases:
+  - F420458_2025-02-16_2025-03-01
+  - F385790_2025-03-20_2025-04-02
+  - F279269_2024-10-17_2024-10-30
+
+cf1s:
+  enabled: true
+  length_preserving_edit_only: true
+  primary_feasibility_selector: SALIENCY_TOP_K
+  saliency_stability_application: RANKING_TIER
+  budget_parity_unit: PER_SELECTOR_REALIZATION
+  action_authorization: false
+  recommendation_authorization: false
+  cf1b_authorization: false
+  epsilon: 0.01
+  epsilon_change_allowed: false
+  push_allowed: false
+  primary_32_allowed: false
+  problem20_allowed: false
+  final_primary_lock: false

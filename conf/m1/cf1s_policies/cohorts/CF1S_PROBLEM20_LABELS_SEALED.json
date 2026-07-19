@@ -1,0 +1,126 @@
+{
+  "artifact_id": "CF1S_PROBLEM20_LABELS_SEALED",
+  "sealed": true,
+  "cases": [
+    {
+      "case_id": "F152840_2025-03-01_2025-03-14",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "d0d09d91570d501c87e423c3afff95609a69ba37f8730783b145a64a3c4d6e01"
+    },
+    {
+      "case_id": "F806136_2024-12-19_2025-01-01",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "d8e6d3b26a2944e24fdc1eccd5917da45f86ad94847c2cd1d7e2b5d8fe6919c3"
+    },
+    {
+      "case_id": "F130230_2024-12-08_2024-12-21",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "793e64f760b6dd91d0da74af7a4023b3ac0da851c8ba22f9c3871eb524ec0739"
+    },
+    {
+      "case_id": "F718361_2024-11-15_2024-11-28",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "57be3c4676e62d3e4202bcdcd75befe03000821b4e1b523bac78839e8f02ee69"
+    },
+    {
+      "case_id": "F241573_2025-02-07_2025-02-20",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "2856ef170ea5ec1364b12985abdc0ce96b3121a80ef8ffc0d25e7b32298b57af"
+    },
+    {
+      "case_id": "F346854_2025-03-06_2025-03-19",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "90926174ac83b8d383b3f17c8dc3d27e08fde3eeeff293ed1c839323c8e9d15c"
+    },
+    {
+      "case_id": "F536515_2025-01-15_2025-01-28",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "9e68eb32df62820e80a771f683b4760dbca95523688336edb2e623558c56c26f"
+    },
+    {
+      "case_id": "F421013_2024-12-11_2024-12-24",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "4e2d30d11eb1c784a75eab3f34045e8e2e80002a7c44289cfa6386e8bec3c1a9"
+    },
+    {
+      "case_id": "F356651_2024-12-24_2025-01-06",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "daceea1d85899a48e9d1adbd58cec1a9b017f95740c620cd433a16ab89232fc7"
+    },
+    {
+      "case_id": "F854447_2024-11-04_2024-11-17",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "16911f1b7b00a89794ddc9ddf564a179191ebdefc101dae1d9a0e1513462f691"
+    },
+    {
+      "case_id": "F612614_2024-12-04_2024-12-17",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "f79912171fcf02076a956f251b05649543691b5796d4e6e0bab2598829b0270a"
+    },
+    {
+      "case_id": "F333620_2025-03-21_2025-04-03",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "4529a24a0e2a8eb9bd53a8a7ad556f68e1f02ab01e7db5fe66b8408a876cadc3"
+    },
+    {
+      "case_id": "F826478_2025-03-29_2025-04-11",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "493489143ff4ffdda3f530cf09eee145f084639e27d840c15220ccf76e8a67b2"
+    },
+    {
+      "case_id": "F844403_2025-03-19_2025-04-01",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "80fcd886e4677b36e53093097575a76996e60ea634a324f35f220abb0f776960"
+    },
+    {
+      "case_id": "F188310_2025-01-24_2025-02-06",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "a2d8c3100f1ed5a7339bc5266a86c1b54c05b8582485ce5f8448939277697359"
+    },
+    {
+      "case_id": "F972037_2025-01-25_2025-02-07",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "71dc17c59d04f325b5d1fd5b87d629c73d06bc1d24a357e2181e2aa90c7ee623"
+    },
+    {
+      "case_id": "F973024_2024-11-08_2024-11-21",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "aa9693de1accdfff578fe9c61d2932d8bb559dc357a4bddaf0871cedbad1e156"
+    },
+    {
+      "case_id": "F974023_2024-12-24_2025-01-06",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "7759e0c95da1a8b56a37112955f2e44bed105241e1da06e959d49cf30c7d0117"
+    },
+    {
+      "case_id": "F975071_2025-02-12_2025-02-25",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "ba9f06b8f67dd056cc23d403745eb91e6613d1ff8698589d22663b81fd43cc5d"
+    },
+    {
+      "case_id": "F976048_2025-03-22_2025-04-04",
+      "label": "정상_운영",
+      "diagnosis_normalized": "정상_운영",
+      "source_label_row_identity_sha256": "961e0ca5319fd075320ecd7a7ee4738d7dab642f14e5b1c6b597d5a37fdfb071"
+    }
+  ]
+}

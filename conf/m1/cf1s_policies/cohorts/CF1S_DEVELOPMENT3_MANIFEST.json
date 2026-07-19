@@ -1,0 +1,36 @@
+{
+  "manifest_id": "CF1S_DEVELOPMENT3_MANIFEST",
+  "locked_cohort_case_count": 3,
+  "ordered_case_ids": [
+    "F420458_2025-02-16_2025-03-01",
+    "F385790_2025-03-20_2025-04-02",
+    "F279269_2024-10-17_2024-10-30"
+  ],
+  "cases": [
+    {
+      "case_id": "F420458_2025-02-16_2025-03-01",
+      "source_label_row_identity_sha256": "cc64d7b694a82bdf48512fb9b407b47c98cdd33f13c0c8414f0de70fc78c2161",
+      "input_artifact_sha256": null,
+      "farm_id": "F420458",
+      "period_start": "2025-02-16",
+      "period_end": "2025-03-01"
+    },
+    {
+      "case_id": "F385790_2025-03-20_2025-04-02",
+      "source_label_row_identity_sha256": "087038b40d187a2617d9f98ec8db60fe972c98904cc01d7a32beeab672c9e1c0",
+      "input_artifact_sha256": null,
+      "farm_id": "F385790",
+      "period_start": "2025-03-20",
+      "period_end": "2025-04-02"
+    },
+    {
+      "case_id": "F279269_2024-10-17_2024-10-30",
+      "source_label_row_identity_sha256": "d84757419f3051087c0c7b15fd208bed060547dff57eda6d78d935ee473981d4",
+      "input_artifact_sha256": null,
+      "farm_id": "F279269",
+      "period_start": "2024-10-17",
+      "period_end": "2024-10-30"
+    }
+  ],
+  "ground_truth_value_in_runtime_manifest": null
+}
