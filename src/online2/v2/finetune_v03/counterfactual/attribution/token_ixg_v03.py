@@ -175,6 +175,8 @@ def preselect_events_search_folds(
     gpu_fraction: float = 0.4,
     top_k: int = 8,
     use_binary: bool = True,
+    global_trace=None,
+    trace_context=None,
 ) -> pd.DataFrame:
     """Coarse event IxG using search folds only."""
     from ..attribution.token_attribution import compute_event_attribution_for_case
@@ -188,6 +190,8 @@ def preselect_events_search_folds(
         device=device,
         gpu_fraction=gpu_fraction,
         use_binary=use_binary,
+        global_trace=global_trace,
+        trace_context=trace_context,
     )
     # median across search folds
     g = (

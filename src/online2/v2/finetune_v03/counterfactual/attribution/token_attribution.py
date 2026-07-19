@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -37,6 +37,8 @@ def compute_event_attribution_for_case(
     gpu_fraction: float = 0.4,
     use_binary: bool = True,
     normalization: str = "robust",
+    global_trace: Optional[Any] = None,
+    trace_context: Optional[Mapping[str, Any]] = None,
 ) -> pd.DataFrame:
     _limit_gpu(gpu_fraction)
     dev = torch.device(device if torch.cuda.is_available() else "cpu")
@@ -54,16 +56,118 @@ def compute_event_attribution_for_case(
     eids = [str(x) for x in batch_cpu.get("_event_ids") or side["event_id"].astype(str).tolist()]
     rows = []
     for fold_i, ckpt in enumerate(ckpt_paths):
-        model, meta = load_fold_model_v03(Path(ckpt), device=dev)
+        from ..cf1s.core_contract import sha256_file
+        from ..cf1s.core_trace import TraceKind
+
+        context = dict(trace_context or {})
+        trace_phase = str(context.get("phase") or "ATTRIBUTION")
+        checkpoint_sha = sha256_file(Path(ckpt))
+        load_invocation = f"attribution-load::{case_id}::{fold_i}::{checkpoint_sha[:12]}"
+        if global_trace is not None:
+            global_trace.begin_operation(
+                kind=TraceKind.ATTRIBUTION_MODEL_LOAD,
+                invocation_id=load_invocation,
+                phase=trace_phase,
+                scope="search",
+                allow=True,
+                case_id=case_id,
+                fold_id=fold_i,
+                checkpoint_sha=checkpoint_sha,
+            )
+            global_trace.start(
+                kind=TraceKind.ATTRIBUTION_MODEL_LOAD,
+                invocation_id=load_invocation,
+                phase=trace_phase,
+                scope="search",
+                case_id=case_id,
+                fold_id=fold_i,
+                checkpoint_sha=checkpoint_sha,
+            )
+        try:
+            model, meta = load_fold_model_v03(Path(ckpt), device=dev)
+        except Exception as exc:
+            if global_trace is not None:
+                global_trace.fail(
+                    kind=TraceKind.ATTRIBUTION_MODEL_LOAD,
+                    invocation_id=load_invocation,
+                    phase=trace_phase,
+                    scope="search",
+                    failure_code=type(exc).__name__,
+                    case_id=case_id,
+                    fold_id=fold_i,
+                    checkpoint_sha=checkpoint_sha,
+                )
+            raise
+        if global_trace is not None:
+            global_trace.complete(
+                kind=TraceKind.ATTRIBUTION_MODEL_LOAD,
+                invocation_id=load_invocation,
+                phase=trace_phase,
+                scope="search",
+                case_id=case_id,
+                fold_id=fold_i,
+                checkpoint_sha=checkpoint_sha,
+            )
         if meta.get("normal_class_id") is not None:
             normal_id = int(meta["normal_class_id"])
         batch = {k: v.to(dev) for k, v in tensor_batch_only(batch_cpu).items()}
-        scores = event_ixg_abnormal_margin(
-            model,
-            batch,
-            normal_class_id=normal_id,
-            use_binary=use_binary and hasattr(model, "binary_head"),
+        forward_invocation = (
+            f"attribution-forward::{case_id}::{fold_i}::{checkpoint_sha[:12]}"
         )
+        if global_trace is not None:
+            global_trace.begin_operation(
+                kind=TraceKind.ATTRIBUTION_FORWARD,
+                invocation_id=forward_invocation,
+                phase=trace_phase,
+                scope="search",
+                allow=True,
+                case_id=case_id,
+                fold_id=fold_i,
+                checkpoint_sha=checkpoint_sha,
+                parent_invocation_id=load_invocation,
+            )
+            global_trace.start(
+                kind=TraceKind.ATTRIBUTION_FORWARD,
+                invocation_id=forward_invocation,
+                phase=trace_phase,
+                scope="search",
+                case_id=case_id,
+                fold_id=fold_i,
+                checkpoint_sha=checkpoint_sha,
+                parent_invocation_id=load_invocation,
+            )
+        try:
+            scores = event_ixg_abnormal_margin(
+                model,
+                batch,
+                normal_class_id=normal_id,
+                use_binary=use_binary and hasattr(model, "binary_head"),
+            )
+        except Exception as exc:
+            if global_trace is not None:
+                global_trace.fail(
+                    kind=TraceKind.ATTRIBUTION_FORWARD,
+                    invocation_id=forward_invocation,
+                    phase=trace_phase,
+                    scope="search",
+                    failure_code=type(exc).__name__,
+                    case_id=case_id,
+                    fold_id=fold_i,
+                    checkpoint_sha=checkpoint_sha,
+                    parent_invocation_id=load_invocation,
+                )
+            raise
+        if global_trace is not None:
+            global_trace.complete(
+                kind=TraceKind.ATTRIBUTION_FORWARD,
+                invocation_id=forward_invocation,
+                phase=trace_phase,
+                scope="search",
+                case_id=case_id,
+                fold_id=fold_i,
+                checkpoint_sha=checkpoint_sha,
+                parent_invocation_id=load_invocation,
+            )
         scores_np = scores.detach().float().cpu().numpy()
         mask = batch["padding_mask"][0].detach().cpu().numpy().astype(bool)
         if normalization == "percentile":

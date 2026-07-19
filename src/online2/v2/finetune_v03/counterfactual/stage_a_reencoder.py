@@ -223,6 +223,105 @@ class StageAReencoder:
             batch=out_batch,
         )
 
+    @torch.no_grad()
+    def cold_rebuild_full_sequence(
+        self,
+        events: list,
+        *,
+        batch_size: int = 8,
+        special_token_budget: int = 6,
+        valid_event_cap: int = 4096,
+    ) -> Dict[str, Any]:
+        """FULL_SEQUENCE_COLD_REBUILD: encode every valid target window from scratch.
+
+        Does not read or reuse any prior event embedding cache.
+        Each valid event maps to exactly one target-centered window; event embedding
+        is mean/max over that window's target span only (no cross-window reaggregation).
+        """
+        max_target = int(self.max_length) - int(special_token_budget)
+        pre_cap = list(events)
+        pre_cap_count = len(pre_cap)
+        # EARLIEST_EVENT_ORDER: keep first valid_event_cap events in given order.
+        capped = pre_cap[: int(valid_event_cap)]
+        valid_indices: List[int] = []
+        valid_event_ids: List[str] = []
+        window_ids: List[str] = []
+        target_membership: Dict[str, List[str]] = {}
+        context_membership: Dict[str, List[str]] = {}
+
+        for i, ev in enumerate(capped):
+            tokens = list(getattr(ev, "sentence_tokens", None) or [])
+            tc = int(getattr(ev, "token_count", len(tokens)) or len(tokens))
+            eid = str(getattr(ev, "event_id", f"idx_{i}"))
+            if tc < 1 or tc > max_target:
+                continue
+            if not tokens:
+                continue
+            window = self.stage_a.construct_target_window(
+                capped, i, max_length=self.max_length
+            )
+            wid = f"window_target_{eid}"
+            valid_indices.append(i)
+            valid_event_ids.append(eid)
+            window_ids.append(wid)
+            target_membership[eid] = [wid]
+            for ctx_i in window.event_indices:
+                ctx_id = str(getattr(capped[int(ctx_i)], "event_id", f"idx_{ctx_i}"))
+                context_membership.setdefault(ctx_id, []).append(wid)
+
+        if not valid_indices:
+            raise AssertionError("cold_rebuild_full_sequence: no valid target events")
+
+        # Batched encode_batch_pool — never reuse cache tensors.
+        means: List[torch.Tensor] = []
+        maxes: List[torch.Tensor] = []
+        bs = max(1, int(batch_size))
+        for start in range(0, len(valid_indices), bs):
+            chunk = valid_indices[start : start + bs]
+            xs, masks, spans = self._window_batch(capped, chunk)
+            pooled = self.stage_a.encode_batch_pool(
+                self.encoder, xs, masks, spans, device=self.device
+            )
+            assert len(pooled) == len(chunk), "encode_batch_pool sidecar length mismatch"
+            for j, (mean_np, max_np) in enumerate(pooled):
+                mean_t = torch.as_tensor(mean_np, dtype=torch.float32, device=self.device)
+                max_t = torch.as_tensor(max_np, dtype=torch.float32, device=self.device)
+                assert mean_t.dtype == torch.float32
+                means.append(mean_t)
+                maxes.append(max_t)
+                # Order must match chunk event ids
+                assert str(getattr(capped[chunk[j]], "event_id")) == valid_event_ids[start + j]
+
+        event_mean = torch.stack(means, dim=0)
+        event_max = torch.stack(maxes, dim=0)
+        return {
+            "reencode_mode": "FULL_SEQUENCE_COLD_REBUILD",
+            "affected_window_only_mode": False,
+            "untouched_embedding_cache_reuse_count": 0,
+            "stale_stage_a_cache_read_count": 0,
+            "all_valid_target_windows_reencoded": True,
+            "all_valid_event_embeddings_reconstructed": True,
+            "incremental_reencode_used": False,
+            "parity_status": "NOT_APPLICABLE",
+            "valid_event_ids": valid_event_ids,
+            "window_ids": window_ids,
+            "target_membership": target_membership,
+            "context_membership": context_membership,
+            "event_mean": event_mean,
+            "event_max": event_max,
+            "pre_cap_valid_event_count": pre_cap_count,
+            "post_cap_valid_event_count": len(capped),
+            "valid_event_cap_applied": pre_cap_count > int(valid_event_cap),
+            "excluded_tail_event_count": max(0, pre_cap_count - len(capped)),
+            "max_sequence_length": int(self.max_length),
+            "special_token_budget": int(special_token_budget),
+            "max_target_token_count": int(max_target),
+            "special_token_budget_source": "FROZEN_TOKENIZER_CONTRACT",
+            "stage_a_batch_size": bs,
+            "valid_event_cap": int(valid_event_cap),
+            "valid_event_cap_policy": "EARLIEST_EVENT_ORDER",
+        }
+
 
 def apply_token_string_edit(events: list, event_index: int, new_sentence_tokens: Sequence[str]) -> list:
     events = deepcopy(events)
