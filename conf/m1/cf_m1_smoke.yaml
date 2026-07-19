@@ -1,0 +1,52 @@
+# CF M1 smoke config — GPU memory fraction 40%
+output_root: /home/dasom/life2vec/outputs/m1
+case_id: F385790_2025-03-20_2025-04-02
+run_dir: /home/dasom/life2vec/outputs/online2/v2_finetune_v03/runs/cv_repeated_20260715_161945
+repeat: 0
+embeddings_dir: /home/dasom/life2vec/outputs/online2/v2_finetune_v02/event_embeddings
+labels_path: /home/dasom/life2vec/outputs/online2/v2_finetune/labels_example_score90.csv
+label_map_path: /home/dasom/life2vec/outputs/online2/v2_finetune/label_map.json
+tokenizer_path: /home/dasom/life2vec/outputs/online2/build-v8-active80-r3/tokenization_registry.json
+binning_registry_path: /home/dasom/life2vec/outputs/online2/v2_build/binning_registry_v2_transductive.json
+cells_path: /home/dasom/life2vec/outputs/online2/build-v8-active80-r3/cell_occurrences.parquet
+feature_audit_csv: /home/dasom/life2vec/outputs/online2/v2_audit/feature_semantics_and_units.csv
+device: cuda
+gpu_memory_fraction: 0.4
+attribution_normalization: robust
+path_a_probe_feature: inside_temp_c
+sampling_interval_min: 60
+max_actuator_rows: 3000
+min_fold_agree: 2
+top_k_loci: 15
+actuator_whitelist:
+  - circulation_fan
+  - fcu_fan
+  - fcu_pump
+  - co2_supply
+  - shade_screen
+  - thermal_curtain
+actuator_features:
+  - circulation_fan
+  - fcu_fan
+  - fcu_pump
+  - co2_supply
+  - shade_screen
+  - thermal_curtain
+path_b_thresholds:
+  positive_ratio_truncate: 0.7
+  positive_ratio_clear: 0.9
+  tail_mass_ratio: 0.6
+  min_on_events: 1
+token_role_weights:
+  abs_value: 1.0
+  global_value: 0.5
+  farm_relative_value: 0.5
+  trend: 0.25
+  feature_identity: 0.0
+path_a_max_critic_candidates: 6
+path_b_max_critic_spans: 3
+path_b_max_ops_per_span: 4
+path_a_embed_alpha: 0.35
+wandb: false
+wandb_project: Berry2Vec
+wandb_run_name: cf_m1_smoke
