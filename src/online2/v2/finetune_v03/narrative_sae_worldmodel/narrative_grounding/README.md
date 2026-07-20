@@ -1,7 +1,7 @@
 # narrative_grounding
 
 **근거**: 계획서 §5 (시계열–서사 양방향 Grounding)
-**Phase**: Phase 1 · **범위**: 현재 필수 (§3.1) · **상태**: 부분 구현 — §5.2(시계열→서사)는 어댑터 계층까지 완료, §5.1(서사→시계열)/§5.3/§5.4는 미착수
+**Phase**: Phase 1 · **범위**: 현재 필수 (§3.1) · **상태**: §5.1/§5.2/§5.3/§5.4 전부 최소 구현 완료(아래 "알려진 한계"·"다음 작업" 참조), 실측 라벨 기반 재보정은 아직
 
 ## ⚠ 착수 전 점검 결과 — §5.2와 §6은 이미 대부분 구현되어 있었다
 
@@ -28,35 +28,57 @@
 - `DataWindow.start_timestamp`는 `narrative_center - covered_time_span_hours`로 역산한 근사값이다. `sequence_segments.parquet`(개별 이벤트 timestamp)까지 조인하면 더 정확해진다.
 - `interpretation` 필드는 인스턴스별로 새로 생성한 해석이 아니라 템플릿 저자가 미리 써 둔 `agronomic_interpretation` 텍스트를 그대로 복사한 것이다 — §5.2가 요구하는 "가능한 해석"의 최소 구현이며, 인스턴스 데이터(실제 값 크기 등)를 반영한 해석 생성은 아직 없다.
 
-## 아직 신규로 구현해야 하는 것 (§5.1, §5.3, §5.4)
+## §5.1 서사→시계열 (구현 완료)
 
-`src/online2`가 커버하지 못하는 부분은 실제로 신규다:
+[`text_to_window.py`](text_to_window.py) — 967K건 인스턴스를 전부 임베딩하지 않고 2단계로 처리한다.
 
-- **§5.1 서사→시계열**: 임의의 자연어 서사 문장이 입력으로 들어왔을 때 근거 window를 검색하는 기능. `src/online2`는 반대 방향(카탈로그 규칙 → 매칭)만 하며, 텍스트 질의 기반 검색·랭킹(ontology 규칙, Time-Text 임베딩, 전문가 mapping 결합)은 아직 없다. 임베딩 모델/인덱스 선택 등 별도 설계가 필요한 큰 작업.
-- **§5.3 사람 검토 큐**: 위 "알려진 한계"의 `sequence_recommendation` 휴리스틱을 대체/보강하는 우선순위 큐. 7개 배정 기준(§5.3) 미구현.
-- **§5.4 Grounding 평가**: Recall@K, Precision@K, temporal IoU, cycle consistency, unsupported claim rate 등. 미구현.
+1. **Time-Text 임베딩 단계**: 80개 narrative 템플릿 텍스트(`normalized_catalog.csv`)만 1회 임베딩(`TemplateEmbeddingIndex`)해 질의와 어떤 템플릿이 의미적으로 가까운지 랭킹. 텍스트 임베딩 모델은 새로 고르지 않고 `scripts/online2_v2/generate_external_embeddings.py`가 이미 채택한 `Qwen/Qwen3-Embedding-0.6B`를 `Qwen3EmbeddingProvider`로 재사용(동일 pooling 규칙). torch/transformers는 `embed()` 최초 호출 시에만 지연 import.
+2. **ontology 규칙 단계**: 질의 텍스트에서 `F######` farm_id, `zone N`/`구역 N` 패턴을 정규식으로 추출(`extract_structured_hints`)해, 랭킹된 템플릿의 실제 인스턴스(`sequences.parquet` 행) 중 farm/zone이 일치하는 것을 가점.
+3. 두 점수를 0.7:0.3 가중합(`combined_score`)해 `AUTO_ACCEPT_CANDIDATE|REVIEW|QUARANTINE|REJECT`로 분기(`_classify`).
+
+**한계**: 분기 임계값(0.75/0.5/0.3)과 가중치(0.7/0.3)는 실측 라벨 없이 정한 1차 placeholder다. §5.4 `auto_accept_error_and_review_rate`로 사람 검증 라벨이 쌓이면 재보정해야 한다. `Qwen3EmbeddingProvider`는 실제로 실행해보지 않았다(GPU/모델 다운로드 필요) — 테스트는 결정론적 fake provider로 랭킹·분기 로직만 검증했다.
+
+## §5.3 사람 검토 큐 (구현 완료, 일부는 외부 입력 대기)
+
+[`review_queue.py`](review_queue.py) — 7개 배정 기준(§5.3) 중 지금 계산 가능한 것과 아직 다른 모듈이 없어 값을 주입받아야 하는 것을 구분했다(허위로 채우지 않음).
+
+| 기준 | 상태 |
+|---|---|
+| 모델·규칙·전문가 판정 불일치 | 계산됨 — `confidence["template_expert_confidence"]` vs `sequence_recommendation` 반대 방향 |
+| 신규·저빈도 개념 | 계산됨(단, `template_frequency` 테이블을 호출자가 줘야 함) |
+| 인과·추천 문장 포함 | 계산됨 — `causal_status`/`recommendation_status`가 기본값을 벗어난 경우만 |
+| 근거·반례 동시 존재 | 항상 False — `contradicting_windows`를 채우는 반례 탐지 로직이 아직 없음 |
+| 예측 영향도 큼 | `ReviewContext.prediction_impact` 외부 주입 필요(finetune critic 없음) |
+| concept split/merge 후보 | `ReviewContext.concept_split_merge_candidate` 외부 주입 필요(`../concept_governance/` 없음) |
+| holdout 유사·권한 불명확 | `ReviewContext.split_ambiguous` 외부 주입 필요(split-membership 플러밍 없음) |
+
+우선순위 가중치(`_REASON_WEIGHTS`)도 실측 없이 정한 1차 값이다 — `SPLIT_ACCESS_AMBIGUOUS`만은 계획서 fail-closed 원칙(§0) 때문에 재보정 이후에도 최우선을 유지해야 한다.
+
+## §5.4 Grounding 평가 (지표 함수 구현 완료, 라벨 데이터는 없음)
+
+[`evaluation.py`](evaluation.py) — Recall@K, Precision@K, temporal IoU, feature-set overlap(Jaccard), farm/zone scope accuracy, cycle consistency, unsupported claim rate, expert acceptance rate, auto-accept 오류율/사람 검토율 9개 지표를 순수 함수로 구현. **사람이 라벨링한 정답 grounding pair는 아직 없다** — 이 함수들은 §5.3 검토 큐를 사람이 실제로 처리하기 시작하면 그 결과를 입력으로 소비할 준비가 된 상태이며, 지금은 합성 데이터로만 검증했다.
 
 ## 데이터 계약 (계획서 §4.1)
 
 - `DataWindow`: 시작·종료, 포함 point, 집계·결측·변화점 정보 — `schemas.py`에 구현, `from_online2_corpus.window_from_sequence_row`가 채움
 - `Narrative`: 관측·파생 사실·해석·인과 상태·추천 상태·근거 window — `schemas.py`에 구현, `from_online2_corpus.narrative_from_sequence_row`가 채움
 
-## 다음 구현 순서
+## 남은 작업 (전부 §5.2/§5.1/§5.3/§5.4 최소 구현 이후 단계)
 
-1. (완료) `schemas.py`, `from_online2_corpus.py` — 위 참조
-2. `text_to_window.py` (§5.1, 서사→시계열) — 임의 서사 문장을 입력받아 `DataWindow` 후보를 검색·랭킹. ontology 규칙 + Time-Text 임베딩 + 전문가 mapping 결합, `AUTO_ACCEPT_CANDIDATE|REVIEW|QUARANTINE|REJECT` 분기. SAE feature 랭킹 신호는 `../sae/`가 사전학습 이후에나 존재하므로 1차 구현에서는 제외하고 Phase 4 이후 추가.
-3. `review_queue.py` (§5.3) — 사람 검토 우선순위 규칙 7종. `sequence_recommendation` 휴리스틱을 대체/보강하는 실질적 판정 로직.
-4. `evaluation.py` (§5.4) — Recall@K, Precision@K, temporal IoU, cycle consistency, unsupported claim rate 등.
+1. `Qwen3EmbeddingProvider`를 실제로 `online2-embedding-build` conda 환경에서 돌려 80개 템플릿 임베딩을 캐시하고, `text_to_window`의 임계값(0.75/0.5/0.3)·가중치(0.7/0.3)를 실제 유사도 분포로 재검토.
+2. §5.3 검토 큐를 사람이 실제로 처리하는 최소 UI/CLI 하나 연결(`../ui/data_grounding_curation/`) — 라벨이 나와야 §5.4가 실측 지표를 낼 수 있다.
+3. SAE feature 기반 랭킹 신호는 `../sae/`가 사전학습 이후에나 존재하므로 Phase 4 이후 `text_to_window.py`에 추가.
+4. `contradicting_windows`(반례) 채우는 로직 — 현재는 항상 빈 튜플이라 §5.3의 "근거·반례 동시 존재" 기준이 발동하지 않는다.
 
 ## 의존성
 
-- 기존: `src/online2/materializers.py`, `src/online2/builder.py`, `src/online2/catalog.py`, `outputs/online2/build-v8-active80-r3/`(빌드 산출물)
-- 신규: 없음 (2번부터)
+- 기존: `src/online2/materializers.py`, `src/online2/builder.py`, `src/online2/catalog.py`, `outputs/online2/build-v8-active80-r3/`(빌드 산출물), `scripts/online2_v2/generate_external_embeddings.py`(텍스트 임베딩 모델 선택 재사용)
+- 외부 주입 대기: `../concept_governance/`(concept split/merge 신호), finetune critic(예측 영향도), split-membership 플러밍(holdout 유사도)
 - 하위 소비자: `sequence_curation/`(REVIEW 판정 입력), `multimodal_pretrain/`(pair 소스)
 
 ## Acceptance 연결
 
-B1–B4 (계획서 §17-B)
+B1–B4 (계획서 §17-B) — B1(supporting window/NO_SUPPORT)과 B2(관측·해석·인과 구분)는 `schemas.py`가 코드 레벨로 강제. B3(양방향 retrieval)는 §5.1/§5.2 어댑터로 가능해졌으나 cycle consistency 실측은 아직 없음(§5.4 `cycle_consistency` 함수는 준비됨). B4(자동 승인 오류율·검토율)는 §5.4 `auto_accept_error_and_review_rate`로 계산 가능하나 라벨 데이터 부재로 미실측.
 
 ## 중단 조건 연결
 

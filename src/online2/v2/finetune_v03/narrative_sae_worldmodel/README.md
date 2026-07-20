@@ -12,7 +12,7 @@
 
 | 디렉토리 | 계획서 절 | Phase | 상태 |
 |---|---|---|---|
-| [narrative_grounding/](narrative_grounding/README.md) | §5 | Phase 1 | 부분 구현 — §5.2 어댑터 완료(967K건 실측 검증), §5.1/§5.3/§5.4 남음 |
+| [narrative_grounding/](narrative_grounding/README.md) | §5 | Phase 1 | §5.1/§5.2/§5.3/§5.4 최소 구현 완료(36개 테스트 통과) — 임계값 재보정과 라벨 데이터 수집이 다음 단계 |
 | [sequence_curation/](sequence_curation/README.md) | §6.3 | Phase 2 | 미착수 |
 | [multimodal_pretrain/](multimodal_pretrain/README.md) | §7 | Phase 2 | 미착수 (기존 `pipeline_m2.py`/`stage_a_reencoder.py` 확장) |
 | [representation_tracking/](representation_tracking/README.md) | §8.3 | Phase 3 | 미착수 |
