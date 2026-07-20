@@ -12,7 +12,7 @@
 
 | 디렉토리 | 계획서 절 | Phase | 상태 |
 |---|---|---|---|
-| [narrative_grounding/](narrative_grounding/README.md) | §5 | Phase 1 | 미착수 |
+| [narrative_grounding/](narrative_grounding/README.md) | §5 | Phase 1 | 부분 구현 — §5.2 어댑터 완료(967K건 실측 검증), §5.1/§5.3/§5.4 남음 |
 | [sequence_curation/](sequence_curation/README.md) | §6.3 | Phase 2 | 미착수 |
 | [multimodal_pretrain/](multimodal_pretrain/README.md) | §7 | Phase 2 | 미착수 (기존 `pipeline_m2.py`/`stage_a_reencoder.py` 확장) |
 | [representation_tracking/](representation_tracking/README.md) | §8.3 | Phase 3 | 미착수 |
@@ -41,7 +41,7 @@
 
 ## 착수 전 공통 전제 (Phase 0에서 먼저 확인)
 
-1. **기존 산출물 중복 점검**: `/data/datasets/agrichallenge/online2/narratives/`에 `baseline_inventory_v8.json`, `normalized_catalog_v8.csv`, `online2_pretraining_master_prompt_v8.md`가 이미 존재한다. `narrative_grounding/` 착수 전 이 v8 산출물과의 중복·재사용 가능성을 확인할 것.
+1. **기존 산출물 중복 점검 — 확인 완료, 실제로 겹쳤다**: `narrative_grounding/` 착수 전 `narratives/v8` 산출물을 확인한 결과, §5.2(시계열→서사)와 §6(이벤트·토큰·시퀀스)의 핵심 로직은 `src/online2/`(`materializers.py`, `builder.py`, `catalog.py`)에 이미 구현되어 있었고, `outputs/online2/build-v8-active80-r3/`에 967,012개 sequence가 실제로 빌드까지 끝나 있었다. `narrative_grounding/`은 이를 재사용하는 어댑터로 범위를 좁혀 구현했다 — 자세한 내용은 [narrative_grounding/README.md](narrative_grounding/README.md) 참조.
 2. **데이터 규모 제약**: 원시 데이터 전체 27MB, 학습 케이스 35건 + holdout 20건. `multimodal_pretrain/`(5-loss 멀티모달 사전학습)과 `sae/`(dictionary learning)는 이 규모에서 통계적 유효성이 낮을 수 있으므로 착수 전 최소 데이터 요건을 별도 검토한다.
 3. **신호 부재 실측**: CF1S 55건 검증에서 44건이 `CONSTRUCTIBLE_SELECTED`까지 도달했으나 전부 `CONTROL_WITHIN_LOCKED_THRESHOLD`로 판정 — 현재 2-event 편집 범위에서 임계값을 넘는 인과효과가 관측된 케이스가 0건이다. `world_model/`, `edit_policy_rl/` 착수 여부는 이 실측을 반영해 §12.3 승격 기준으로 게이트한다.
 4. **vocab 변경 비용**: `concept_governance/`에서 vocab 변경을 승인하면 CF1S 기존 55건(Dev3 3 + Primary32 32 + Validation20 20) stable lock 전체가 무효화되어 재인증이 필요하다. 승인 전 재인증 소요시간을 명시적으로 보고한다.
