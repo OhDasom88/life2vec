@@ -1,7 +1,7 @@
 # sae
 
 **근거**: 계획서 §9 (SAE 기반 기계적 해석)
-**Phase**: Phase 4 · **범위**: 현재 필수 (§3.1, "선택 layer 대상 SAE pilot"만) · **상태**: 핵심 구현 완료(상태 머신·모델·평가·dead feature resampling) + 실제 캐시 activation 전체(216,040개)로 5가지 설정 재보정 실행, 34개 테스트 통과. **재보정 후에도 §18 중단 조건이 계속 발동 — 아래 참조**
+**Phase**: Phase 4 · **범위**: 현재 필수 (§3.1, "선택 layer 대상 SAE pilot"만) · **상태**: 핵심 구현 완료(상태 머신·모델·평가·dead feature resampling) + dense/narrative-selected 두 표본 구성으로 총 9가지 설정 실측 비교, 34개 테스트 통과. **원인 진단 완료(데이터의 유효 차원이 근본적으로 낮음, 표본 구성 방식과 무관), §18 중단 조건은 계속 발동 — 아래 참조**
 
 ## 목적
 
@@ -22,11 +22,26 @@ CF1S의 `classify_case_disposition()`과 동일한 설계 원칙을 따른다: �
 
 ### 왜 이런 일이 생기는지 — 근본 원인을 실측으로 특정함
 
-"시퀀스를 만들 때 쓰는 서사(narrative) 카탈로그가 작아서 그런가?"라는 질문을 계기로 인코더 학습 계보를 다시 추적했다. **결론: 부분적으로만 맞다 — 정확한 병목은 다른 데 있었다.**
+"시퀀스를 만들 때 쓰는 서사(narrative) 카탈로그가 작아서 그런가?"라는 질문을 계기로 인코더 학습 계보를 다시 추적했다.
 
-- Stage-A 인코더(이 SAE가 분해하는 activation을 만든 모델)는 §5 `narrative_grounding`이 쓰는 80개 서사 템플릿 코퍼스(v8 build, `sequences.parquet`)로 학습된 게 **아니다**. `outputs/online2/v2_build/build_manifest_v2.json`과 `run_manifest_v2.json`을 직접 확인한 결과, 별도의 훨씬 큰 코퍼스(`v2_build`, 원시 관측 264만 건, vocab 728개, rule 1196개, `training_mode: transductive_public_pretraining`)로 18,600 step 학습됐다. 인코더 자체의 학습 다양성은 narrative 카탈로그 크기에 갇혀 있지 않다.
-- 진짜 병목은 **SAE pilot이 어떤 activation을 봤는가**다. `cache_stage_a_event_embeddings.py`는 인코더가 배울 수 있는 전체 분포가 아니라, CF1S 진단용 55개 case(Dev3 3 + Primary32 32 + Validation20 20)의 activation만 캐시해 둔 것이다 — 이 세션 내내 반복된 "27MB·55케이스 규모" 리스크가 SAE에도 그대로 나타난 것이다.
-- **직접 측정**: 55개 case를 섞은 실제 샘플(16,500개, case당 300개)에 PCA를 돌리면 **384차원 중 단 29개 주성분이 분산의 99%를 설명한다**(50%는 1개, 90%는 7개, 95%는 13개). 한 case 안에서만 봐도 연속된 이벤트의 코사인 유사도가 평균 0.89(무작위 쌍도 0.63)로, 센서값이 천천히 변해 "이벤트"라 부르는 것들이 사실상 서로 거의 같은 값이다. 즉 384차원짜리 벡터를 쓰고 있지만 이 55-case 표본의 **실제 유효 차원은 약 29**다 — dictionary를 768~3072개로 만든 게 데이터가 가진 변화량보다 25~100배 큰 것이었다.
+- **정정**: 처음엔 "Stage-A 인코더가 §5 `narrative_grounding`의 80개 서사 템플릿 코퍼스와 무관한 별도 코퍼스로 학습됐다"고 결론냈으나, 이건 `build_manifest_v2.json`의 요약 통계만 보고 낸 성급한 결론이었다 — 실제 학습 데이터(`outputs/online2/v2_build/training_events_v2.parquet`, 1,500만 행)를 직접 열어보니 `narrative_id` 컬럼이 있고 값이 정확히 그 80개 템플릿(A05, D12, D13, C01...)과 같았다. 사전학습 코퍼스도 **같은 80개 규칙으로 선별된 것**이다(추정 시퀀스 수 약 94만 개, v8의 967,012개와 같은 자릿수). 다만 실제 모델 입력 토큰(`BACKGROUND_TOKENS`)에는 `FARM|...`만 들어가고 `NARRATIVE|...`는 안 들어간다 — 모델이 "이건 C01이다"라고 직접 보고 배우는 건 아니지만, 애초에 어떤 원시 구간이 사전학습 데이터로 뽑히는지 자체는 이 80개 규칙이 정한다.
+- **더 근본적인 발견**: `events_tokenized_v2.parquet`(모든 코퍼스가 파생되는 원시 이벤트 원천)를 확인한 결과 **55개 농장 전부가 정확히 같은 길이(13.96일)의 창을 가지며, 원시 이벤트는 총 222,309건뿐이다.** 사전학습용 94만 "시퀀스"는 새 원시 데이터가 아니라 이 222,309건을 80개 템플릿으로 평균 16번씩 겹쳐 재윈도잉한 결과다. CF1S 55-case 캐시도 각 case가 자기 농장의 14일 전체를 조밀하게 담아, 사실상 이 222,309건을 이미 거의 다 커버한다 — **"더 넓은 코퍼스에서 새로 뽑기"는 실제로는 다양성을 더해주지 않는다**(직접 시도해서 확인함, 아래 참조).
+- **PCA 직접 측정**: 55개 case를 섞은 실제 샘플(16,500개, case당 300개)에서 **384차원 중 단 29개 주성분이 분산의 99%를 설명한다**(50%는 1개, 90%는 7개, 95%는 13개). 한 case 안에서만 봐도 연속된 이벤트의 코사인 유사도가 평균 0.89(무작위 쌍도 0.63)다 — 센서값이 천천히 변해 "이벤트"라 부르는 것들이 사실상 서로 거의 같은 값이다.
+
+### "서사가 선별한 순간만 뽑으면 다양성이 늘지 않을까?" — 직접 검증, 결과는 기각
+
+CF1S의 밀집 캡처(농장의 14일을 이상치든 평온한 구간이든 구분 없이 매시간 전부 포함) 대신, **80개 narrative 템플릿이 실제로 매칭한 "타깃" 이벤트만** 골라 activation을 새로 뽑아 비교했다(`scripts/online2_v2/pilot_sae_narrative_selected_activations.py`, 같은 frozen 인코더·같은 222,309건 원시 풀, 표본 구성 방식만 다름). `training_events_v2.parquet`에서 시퀀스별 마지막(최대 `event_position`) 이벤트를 그 시퀀스의 "타깃"으로 보고, 80개 템플릿당 최대 250개씩 균등 추출했다(80/80 템플릿 커버, 14,544건).
+
+같은 크기(14,544 vs 14,520)로 맞춰 두 표본을 직접 비교하면:
+
+| 표본 | 50% | 80% | 90% | 95% | 99% |
+|---|---|---|---|---|---|
+| Dense(무작위, CF1S 방식) | 1 | 3 | 7 | 13 | 29 |
+| Narrative-selected(80템플릿 타깃) | 1 | 3 | 7 | 12 | 29 |
+
+**유효 차원이 사실상 동일하다.** 같은 설정(dict=64, top_k=8)으로 SAE를 돌려도 dead_feature_ratio가 narrative-selected 쪽이 0.500, dense 쪽이 0.422로 **오히려 narrative 선별이 더 낫지 않았다**(정확히 같은 학습 스텝 수 기준 비교, 차이는 잡음 수준으로 보임).
+
+**결론: 애초 가설("서사 선별이 다양성을 늘려줄 것")은 실측으로 기각된다.** narrative 템플릿으로 "흥미로운 순간"만 골라도, 그냥 매시간 다 뽑아도 근본적으로 같은 ~29차원 구조가 나온다 — 이건 표본 구성 방식의 문제가 아니라, 이 데이터(온도·습도·CO2·EC 등이 서로 강하게 얽혀 움직이는 물리계, 55농장×14일)가 원래 가진 선형 자유도가 그 정도라는 뜻으로 보인다. 사전학습 코퍼스가 80개 규칙으로 선별됐다는 사실(위 "정정" 참조)과 무관하게, 그 선별이 SAE가 보는 activation의 다양성 자체를 늘려주지는 못한다.
 
 ### 그래도 dead ratio는 다 안 없어졌다 — 별도의 학습 역학 문제
 
@@ -49,7 +64,9 @@ dict_size를 PCA 유효 차원(29)에 거의 맞춘 32~64에서도 dead ratio가
 
 **따라서 §18 "SAE feature 대부분이 dead 또는 불안정" 중단 조건은 재보정 후에도 여전히 발동한 상태다** — 다음 Phase(concept_governance, world_model)로 자동 진행하지 않는다. 이건 실패 은폐가 아니라 §18이 명시한 대로 readiness 결과로 기록하는 것이다. `pilot_sae_stage_a_activations.py`의 기본값은 이번 실측을 반영해 `--max-rows 220000`(전체 데이터), `--dict-expansion-factor 4`로 뒀다 — 그래도 dead ratio 자체는 여전히 기준을 넘는다는 걸 기본 실행 결과로 바로 보게 했다. `--dict-size`(신규 옵션)로 expansion factor 배수가 아닌 임의의 dict_size를 직접 지정할 수 있다.
 
-**다음으로 시도해볼 것(아직 안 해본 것, 원인 (2) "TopK 승자독식"을 겨냥)**: (1) 더 공격적인 resampling(지금은 epoch당 1회, threshold=0.0 — 배치 단위로 더 자주 하거나 threshold를 0보다 높여서 "거의 안 쓰이는" feature까지 선제적으로 재초기화), (2) auxiliary loss로 저사용 feature에 보너스를 주는 방식(예: OpenAI TopK SAE 논문의 "AuxK" 손실 — 죽은/저사용 feature가 reconstruction residual을 추가로 설명하도록 강제), (3) 55-case 대신 `v2_build`의 넓은 transductive pretraining 모집단에서 직접 activation을 새로 뽑아 표본 다양성 자체를 키우기(지금은 그런 캐시가 없어 frozen encoder를 새로 돌려야 함 — 원인 (1)에 대한 근본 해결), (4) 초기화 방식(직교 초기화 등)을 바꿔 초반 승자독식을 완화. 지금 갖고 있는 도구(`model.py`의 `sparsity_mode`/`top_k`, `training.py`의 `resample_dead_features`, `pilot_sae_stage_a_activations.py`의 `--dict-size`)로 (1)(2)(4)는 바로 시도 가능하다 — 시간 제약으로 이번 세션에서는 여기까지만 했다.
+**시도했지만 효과 없었던 것**: 55-case 대신 더 넓은 표본(narrative-template 선별, 또는 v2_build 전체)에서 activation을 새로 뽑는 것 — 위 "직접 검증" 참조. 효과 없음이 명확히 확인됐으므로 더 이상 이 방향은 시도할 필요 없다.
+
+**다음으로 시도해볼 것(아직 안 해본 것, 원인 (2) "TopK 승자독식"을 겨냥 — 데이터가 아니라 SAE 학습 알고리즘 쪽 문제이므로 이쪽이 남은 유일한 레버다)**: (1) 더 공격적인 resampling(지금은 epoch당 1회, threshold=0.0 — 배치 단위로 더 자주 하거나 threshold를 0보다 높여서 "거의 안 쓰이는" feature까지 선제적으로 재초기화), (2) auxiliary loss로 저사용 feature에 보너스를 주는 방식(예: OpenAI TopK SAE 논문의 "AuxK" 손실 — 죽은/저사용 feature가 reconstruction residual을 추가로 설명하도록 강제), (3) 초기화 방식(직교 초기화 등)을 바꿔 초반 승자독식을 완화, (4) 더 이른/다른 transformer layer의 activation(지금은 최종 pooled output만 썼다 — PCA는 선형 구조만 보므로, pooling 이전의 토큰별 hidden state나 중간 layer에는 비선형적으로 더 많은 구조가 남아있을 가능성이 있다). 지금 갖고 있는 도구(`model.py`의 `sparsity_mode`/`top_k`, `training.py`의 `resample_dead_features`, `pilot_sae_stage_a_activations.py`의 `--dict-size`)로 (1)(2)(3)은 바로 시도 가능하다 — 시간 제약으로 이번 세션에서는 여기까지만 했다.
 
 ## 구현한 것
 
@@ -57,7 +74,8 @@ dict_size를 PCA 유효 차원(29)에 거의 맞춘 32~64에서도 dead ratio가
 - [`model.py`](model.py) — `SparseAutoencoder`(표준 SAE 구성: pre-encoder bias 차감, encoder+decoder, L1 또는 Top-K sparsity, tied/untied weight 선택 가능) + `sae_loss`. 실제 torch forward/backward로 검증(합성 데이터에서 30 step 학습 시 reconstruction loss가 실제로 줄어드는 것까지 테스트).
 - [`evaluation.py`](evaluation.py) — §9.4 6영역 중 라벨 없이 계산 가능한 두 영역만: `reconstruction_metrics`(MSE, explained variance), `sparsity_metrics`(평균 L0, activation frequency, dead feature ratio). `downstream_fidelity`는 `../representation_tracking/attribution.py`의 modality ablation과 같은 패턴 — 이미 계산된 두 출력(원본 activation 기반 vs SAE 재구성 기반)의 차이만 계산, 실제 downstream 모델 순전파는 호출자 책임.
 - [`training.py`](training.py) — `resample_dead_features`: activation frequency가 threshold 이하인 feature의 encoder/decoder 가중치만 골라 재초기화(다른 feature는 안 건드림, 테스트로 확인). 표준 기법 그대로 씀 — "재구성 오차가 큰 방향으로 재초기화"하는 더 정교한 변형은 안 함(아래 "아직 없는 것").
-- [`scripts/online2_v2/pilot_sae_stage_a_activations.py`](../../../../../../scripts/online2_v2/pilot_sae_stage_a_activations.py) — 위 결과를 만든 실제 실행 스크립트. 재현 가능.
+- [`scripts/online2_v2/pilot_sae_stage_a_activations.py`](../../../../../../scripts/online2_v2/pilot_sae_stage_a_activations.py) — dense(CF1S) 표본 pilot. 재현 가능.
+- [`scripts/online2_v2/pilot_sae_narrative_selected_activations.py`](../../../../../../scripts/online2_v2/pilot_sae_narrative_selected_activations.py) — narrative-template 타깃 표본 pilot. `training_events_v2.parquet`(1,500만 행)에서 시퀀스별 타깃 이벤트를 스트리밍 집계(전체를 메모리에 안 올림, 청크 단위로 처리), 80개 템플릿당 균등 샘플링한 뒤 `cache_stage_a_event_embeddings.py`의 인코딩 함수를 그대로 import해 재사용한다(활성화 계산 로직 중복 없음).
 
 ## 아직 없는 것
 
@@ -78,4 +96,4 @@ D1(복원), D2(dead feature ratio 일부) 계산 가능. D3–D6(개념 매핑, 
 
 ## 중단 조건 연결
 
-§18 "SAE feature 대부분이 dead 또는 불안정" — **실측으로 발동, 전체 데이터 재보정(216,040개 벡터, 8개 설정 비교) 이후에도 해소 안 됨**(위 pilot 결과 표 참조). 근본 원인 두 가지를 특정했다: (1) 55-case 표본의 낮은 유효 차원(PCA로 384차원 중 29개가 99% 분산 설명 — **원인 특정 완료**), (2) dict_size를 그 차원(29)에 맞춰도 남는 TopK "승자독식" 학습 역학(dict=32~64에서도 dead ratio가 0.40~0.42 바닥 — **미해결**). concept_governance/world_model 등 이 SAE의 feature를 입력으로 쓰는 다음 단계로 넘어가기 전에, 위 "다음으로 시도해볼 것" 목록(AuxK loss, 더 공격적인 resampling, 또는 55-case를 넘어선 넓은 표본 확보)을 마저 시도할 것.
+§18 "SAE feature 대부분이 dead 또는 불안정" — **실측으로 발동, dense/narrative-selected 두 표본 구성 방식(총 9개 설정) 비교 이후에도 해소 안 됨**(위 pilot 결과 표 참조). 근본 원인을 특정했다: (1) 이 데이터셋(55농장×14일, 원시 이벤트 222,309건) 자체의 낮은 유효 차원(PCA로 384차원 중 29개가 99% 분산 설명 — **원인 특정 완료, 표본을 dense/narrative-selected 어느 쪽으로 구성해도 동일함을 직접 검증**), (2) dict_size를 그 차원(29)에 맞춰도 남는 TopK "승자독식" 학습 역학(dict=32~64에서도 dead ratio가 0.40~0.50 바닥 — **미해결**). (1)은 "더 넓거나 더 잘 고른 표본"으로 해결되는 문제가 아님이 확인됐으므로, concept_governance/world_model 등 다음 단계로 넘어가려면 (2)를 겨냥한 남은 방향(AuxK loss, 더 공격적인 resampling, 다른 layer의 activation)을 시도하거나, 이 데이터셋 규모에서 SAE pilot 자체의 기대 수준을 재설정해야 한다.
