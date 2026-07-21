@@ -91,6 +91,16 @@ def test_extract_structured_hints_parses_farm_and_zone() -> None:
     assert hints.zone_ids == ("1",)
 
 
+def test_extract_structured_hints_parses_equals_form() -> None:
+    # from_online2_corpus.narrative_from_sequence_row가 만드는 observation 텍스트는
+    # "farm=F130230 zone=1" 형식을 쓴다 - self-retrieval 질의로 그대로 재사용될 때
+    # 이 형식이 파싱되지 않으면 farm만 잡히고 zone은 항상 비어 구조적 점수가
+    # 왜곡된다.
+    hints = extract_structured_hints("farm=F130230 zone=1 구간에서 관측됨")
+    assert hints.farm_ids == ("F130230",)
+    assert hints.zone_ids == ("1",)
+
+
 def test_extract_structured_hints_empty_when_absent() -> None:
     hints = extract_structured_hints("온도가 급격히 점프했다")
     assert hints == StructuredHints(farm_ids=(), zone_ids=())

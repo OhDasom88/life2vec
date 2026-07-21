@@ -32,7 +32,7 @@ GROUNDING_DECISIONS = frozenset(
 )
 
 _FARM_ID_RE = re.compile(r"F\d{5,6}")
-_ZONE_RE = re.compile(r"(?:zone|구역)\s*[:#]?\s*(\d+)", re.IGNORECASE)
+_ZONE_RE = re.compile(r"(?:zone|구역)\s*[:=#]?\s*(\d+)", re.IGNORECASE)
 
 _TEMPLATE_TEXT_FIELDS = (
     "narrative_name_ko",
