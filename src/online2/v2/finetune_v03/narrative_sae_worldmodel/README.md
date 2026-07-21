@@ -15,7 +15,7 @@
 | [narrative_grounding/](narrative_grounding/README.md) | §5 | Phase 1 | §5.1/§5.2/§5.3/§5.4 구현 + 실측 재보정 + 반례 탐지 + [ui/data_grounding_curation/](ui/data_grounding_curation/README.md) 3탭(검색→검토 큐→리포트)이 하나의 루프로 연결됨(66개 테스트 통과). 남은 건 `auto_accept_error_and_review_rate`의 전체 모집단 로깅(부분 연결) |
 | [sequence_curation/](sequence_curation/README.md) | §6.2/§6.3 | Phase 2 | 구현 완료(절단 알고리즘·편집 트랜잭션·§5.3 연결, 실행 배치는 아직) |
 | [multimodal_pretrain/](multimodal_pretrain/README.md) | §7 | Phase 2 | MLM/SOP는 `src/tasks/grouped_mlm.py`+`run_v2_pretrain_loop.py`에 이미 구현·학습 중임을 확인(재구현 안 함) — 진짜 신규였던 time reconstruction/time-text contrastive/cross-modal matching 3개 손실 + 결합 로직 + pair 품질 등급 구현 완료(33개 테스트). 실제 학습 루프 연결은 아직 |
-| [representation_tracking/](representation_tracking/README.md) | §8.3 | Phase 3 | 미착수 |
+| [representation_tracking/](representation_tracking/README.md) | §8.3 | Phase 3 | 구현 완료 — activation 캡처·event/token attribution은 이미 존재함을 확인(재사용), 없던 ActivationRef 타입 + modality ablation만 신규 구현(22개 테스트) |
 | [sae/](sae/README.md) | §9 | Phase 4 | 미착수 |
 | [representation_explorer/](representation_explorer/README.md) | §10 | Phase 4 | 미착수 |
 | [concept_governance/](concept_governance/README.md) | §11 | Phase 5 | 미착수 (기존 `cf1s/core_locks.py` 원칙 확장) |
