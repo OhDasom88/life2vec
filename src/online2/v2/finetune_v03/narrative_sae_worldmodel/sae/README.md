@@ -16,25 +16,40 @@ SAE_LATENT → CANDIDATE_SEMANTIC_FEATURE → EVALUATED_SEMANTIC_FEATURE
 
 CF1S의 `classify_case_disposition()`과 동일한 설계 원칙을 따른다: 상태는 저장된 라벨이 아니라 매번 재계산한다(자기선언 금지).
 
-## ⚠ 실제 pilot 결과 — 전체 데이터 재보정 완료, §18 중단 조건은 여전히 발동
+## ⚠ 실제 pilot 결과 — 재보정 완료, 근본 원인 특정, §18 중단 조건은 여전히 발동
 
 이번 세션에서 실제로 학습된 SAE를 여러 설정으로 돌렸다(`scripts/online2_v2/pilot_sae_stage_a_activations.py`). 입력은 새로 계산한 게 아니라 `../representation_tracking/`가 감싸는 것과 같은 소스 — `cache_stage_a_event_embeddings.py`가 이미 캐시해 둔 실제 Stage-A pooled activation(`event_mean`, 384차원, `outputs/online2/v2_finetune_v02/event_embeddings/`, 전체 216,040개 벡터).
 
-첫 pilot(샘플 14,960개, dict_size=3072)에서 `dead_feature_ratio=0.928`이 나와 §18 중단 조건에 걸린 뒤, "전체 데이터로 재보정" 요청에 따라 데이터 규모와 dictionary 크기·sparsity 모드를 바꿔가며 4가지 설정을 **실제로 전부 돌려봤다**(전체 216,040개 벡터, 15 epoch, held-out 21,604개 기준):
+### 왜 이런 일이 생기는지 — 근본 원인을 실측으로 특정함
+
+"시퀀스를 만들 때 쓰는 서사(narrative) 카탈로그가 작아서 그런가?"라는 질문을 계기로 인코더 학습 계보를 다시 추적했다. **결론: 부분적으로만 맞다 — 정확한 병목은 다른 데 있었다.**
+
+- Stage-A 인코더(이 SAE가 분해하는 activation을 만든 모델)는 §5 `narrative_grounding`이 쓰는 80개 서사 템플릿 코퍼스(v8 build, `sequences.parquet`)로 학습된 게 **아니다**. `outputs/online2/v2_build/build_manifest_v2.json`과 `run_manifest_v2.json`을 직접 확인한 결과, 별도의 훨씬 큰 코퍼스(`v2_build`, 원시 관측 264만 건, vocab 728개, rule 1196개, `training_mode: transductive_public_pretraining`)로 18,600 step 학습됐다. 인코더 자체의 학습 다양성은 narrative 카탈로그 크기에 갇혀 있지 않다.
+- 진짜 병목은 **SAE pilot이 어떤 activation을 봤는가**다. `cache_stage_a_event_embeddings.py`는 인코더가 배울 수 있는 전체 분포가 아니라, CF1S 진단용 55개 case(Dev3 3 + Primary32 32 + Validation20 20)의 activation만 캐시해 둔 것이다 — 이 세션 내내 반복된 "27MB·55케이스 규모" 리스크가 SAE에도 그대로 나타난 것이다.
+- **직접 측정**: 55개 case를 섞은 실제 샘플(16,500개, case당 300개)에 PCA를 돌리면 **384차원 중 단 29개 주성분이 분산의 99%를 설명한다**(50%는 1개, 90%는 7개, 95%는 13개). 한 case 안에서만 봐도 연속된 이벤트의 코사인 유사도가 평균 0.89(무작위 쌍도 0.63)로, 센서값이 천천히 변해 "이벤트"라 부르는 것들이 사실상 서로 거의 같은 값이다. 즉 384차원짜리 벡터를 쓰고 있지만 이 55-case 표본의 **실제 유효 차원은 약 29**다 — dictionary를 768~3072개로 만든 게 데이터가 가진 변화량보다 25~100배 큰 것이었다.
+
+### 그래도 dead ratio는 다 안 없어졌다 — 별도의 학습 역학 문제
+
+유효 차원(~29)에 맞춰 dict_size를 직접 낮춰 봤다(`--dict-size` 옵션 추가):
 
 | 설정 | dict_size | sparsity | mean_l0 | explained_variance | dead_feature_ratio |
 |---|---|---|---|---|---|
-| 원래 pilot(샘플 15K) | 3072 (8x) | Top-K(k=16) | 16.0 | 0.950 | **0.928** |
+| 원래 pilot(샘플 15K) | 3072 (8x) | Top-K(k=16) | 16.0 | 0.950 | 0.928 |
 | 전체 데이터, 동일 dict | 3072 (8x) | Top-K(k=16) | 16.0 | 0.965 | 0.742 |
-| 전체 데이터, dict 축소 | 1536 (4x) | Top-K(k=16) | 16.0 | **0.970** | 0.641 |
+| 전체 데이터, dict 축소 | 1536 (4x) | Top-K(k=16) | 16.0 | 0.970 | 0.641 |
 | 전체 데이터, dict 더 축소 | 768 (2x) | Top-K(k=16) | 16.0 | 0.965 | 0.577 |
-| 전체 데이터, L1 모드 | 768 (2x) | L1 | 161.1 | 0.950 | **0.405**(최저) |
+| 전체 데이터, L1 모드 | 768 (2x) | L1 | 161.1 | 0.950 | 0.405 |
+| 전체 데이터, 1x(입력과 동일) | 384 | Top-K(k=8) | 8.0 | 0.952 | 0.536 |
+| 전체 데이터, 유효차원 근접 | 64 | Top-K(k=8) | 8.0 | 0.915 | 0.422 |
+| 전체 데이터, 유효차원 근접 | 32 | Top-K(k=4) | 4.0 | 0.913 | **0.406**(dict 32에서) |
 
-**결론**: 전체 데이터 사용은 확실히 도움이 됐다(0.928 → 0.742, 같은 dict_size에서). dict_size를 줄이면 더 개선된다(0.742 → 0.577). L1 모드가 dead ratio는 가장 낮지만(0.405) 그 대가로 sparsity 자체가 무너진다(mean_l0=161/768 ≈ 21% 활성 — SAE의 핵심 목적인 "희소함"이 사실상 없어짐). **어떤 설정도 "낮은 dead ratio"와 "진짜 희소함"을 동시에 만족하지 못했다** — 이건 dictionary 크기나 학습 데이터양을 조정하는 것만으로는 안 풀리는, 이 activation 공간(384차원 Stage-A pooled output, 55농장 규모) 자체의 독립적인 변화 방향이 수백 개의 개별 feature를 정당화할 만큼 많지 않다는 신호로 보인다.
+dict_size를 PCA 유효 차원(29)에 거의 맞춘 32~64에서도 dead ratio가 **0.40~0.42 선에서 더 안 내려간다** — L1+dict768 조합(0.405)과 거의 같은 바닥이다. `mean_activation_frequency`(예: dict=32에서 0.125 = 4/32)는 평균적으로 각 feature가 21,604개 검증 샘플 중 12.5%는 활성화될 만큼 충분한데도 40%가 정확히 0번 활성화됐다는 건, 사용량이 **극단적으로 쏠려 있다**는 뜻이다 — 소수의 "만능" feature가 Top-K 선택을 거의 독점하고 나머지는 구조적으로 밀려난다(TopK SAE의 전형적인 "승자독식" 현상으로 보이며, 매 epoch 사후에 완전히 죽은 feature만 재초기화하는 지금의 resample 정책으로는 이 쏠림 자체를 못 막는다).
 
-**따라서 §18 "SAE feature 대부분이 dead 또는 불안정" 중단 조건은 재보정 후에도 여전히 발동한 상태다** — 다음 Phase(concept_governance, world_model)로 자동 진행하지 않는다. 이건 실패 은폐가 아니라 §18이 명시한 대로 readiness 결과로 기록하는 것이다. `pilot_sae_stage_a_activations.py`의 기본값은 이번 실측을 반영해 `--max-rows 220000`(전체 데이터), `--dict-expansion-factor 4`(실측 중 explained_variance가 가장 높았던 설정)로 바꿔뒀다 — 그래도 dead ratio 자체는 여전히 기준을 넘는다는 걸 기본 실행 결과로 바로 보게 했다.
+**결론**: dead feature 문제는 두 겹이다 — (1) 55-case 표본의 낮은 유효 차원(~29, **원인 특정 완료**), (2) dict_size를 그 차원에 맞춰도 남는 TopK 학습 역학 문제(**미해결**). (1)은 이번에 명확히 설명됐지만 (2)는 이번 세션에서 풀지 못했다.
 
-**다음으로 시도해볼 것(아직 안 해본 것)**: (1) dict_size를 2x보다 더 줄이기(예: 1x=384, 입력 차원과 동일 — "확장"이 아예 없는 지점까지), (2) resampling을 epoch당이 아니라 더 자주/드물게 하는 스케줄 비교, (3) 여러 layer/pooling(event_max, 또는 `../representation_explorer/`의 3D projection으로 먼저 활성화 공간의 실제 유효 차원을 추정) 확인, (4) L1 계수를 sparsity와 dead ratio 사이 다른 지점으로 sweep. 지금 갖고 있는 도구(`model.py`의 `sparsity_mode`/`top_k`, `pilot_sae_stage_a_activations.py`의 CLI 인자)로 전부 시도 가능하다 — 시간 제약으로 이번 세션에서는 여기까지만 했다.
+**따라서 §18 "SAE feature 대부분이 dead 또는 불안정" 중단 조건은 재보정 후에도 여전히 발동한 상태다** — 다음 Phase(concept_governance, world_model)로 자동 진행하지 않는다. 이건 실패 은폐가 아니라 §18이 명시한 대로 readiness 결과로 기록하는 것이다. `pilot_sae_stage_a_activations.py`의 기본값은 이번 실측을 반영해 `--max-rows 220000`(전체 데이터), `--dict-expansion-factor 4`로 뒀다 — 그래도 dead ratio 자체는 여전히 기준을 넘는다는 걸 기본 실행 결과로 바로 보게 했다. `--dict-size`(신규 옵션)로 expansion factor 배수가 아닌 임의의 dict_size를 직접 지정할 수 있다.
+
+**다음으로 시도해볼 것(아직 안 해본 것, 원인 (2) "TopK 승자독식"을 겨냥)**: (1) 더 공격적인 resampling(지금은 epoch당 1회, threshold=0.0 — 배치 단위로 더 자주 하거나 threshold를 0보다 높여서 "거의 안 쓰이는" feature까지 선제적으로 재초기화), (2) auxiliary loss로 저사용 feature에 보너스를 주는 방식(예: OpenAI TopK SAE 논문의 "AuxK" 손실 — 죽은/저사용 feature가 reconstruction residual을 추가로 설명하도록 강제), (3) 55-case 대신 `v2_build`의 넓은 transductive pretraining 모집단에서 직접 activation을 새로 뽑아 표본 다양성 자체를 키우기(지금은 그런 캐시가 없어 frozen encoder를 새로 돌려야 함 — 원인 (1)에 대한 근본 해결), (4) 초기화 방식(직교 초기화 등)을 바꿔 초반 승자독식을 완화. 지금 갖고 있는 도구(`model.py`의 `sparsity_mode`/`top_k`, `training.py`의 `resample_dead_features`, `pilot_sae_stage_a_activations.py`의 `--dict-size`)로 (1)(2)(4)는 바로 시도 가능하다 — 시간 제약으로 이번 세션에서는 여기까지만 했다.
 
 ## 구현한 것
 
@@ -63,4 +78,4 @@ D1(복원), D2(dead feature ratio 일부) 계산 가능. D3–D6(개념 매핑, 
 
 ## 중단 조건 연결
 
-§18 "SAE feature 대부분이 dead 또는 불안정" — **실측으로 발동, 전체 데이터 재보정(216,040개 벡터, 5개 설정 비교) 이후에도 해소 안 됨**(위 pilot 결과 표 참조). 최선 설정(dict 2x + L1)도 dead ratio 0.405는 확보했지만 그 대가로 sparsity 자체를 잃었다(mean_l0 21%). concept_governance/world_model 등 이 SAE의 feature를 입력으로 쓰는 다음 단계로 넘어가기 전에, 위 "다음으로 시도해볼 것" 목록을 마저 시도하거나, 이 activation 공간의 유효 차원이 SAE pilot에 적합한 규모인지부터 재검토할 것.
+§18 "SAE feature 대부분이 dead 또는 불안정" — **실측으로 발동, 전체 데이터 재보정(216,040개 벡터, 8개 설정 비교) 이후에도 해소 안 됨**(위 pilot 결과 표 참조). 근본 원인 두 가지를 특정했다: (1) 55-case 표본의 낮은 유효 차원(PCA로 384차원 중 29개가 99% 분산 설명 — **원인 특정 완료**), (2) dict_size를 그 차원(29)에 맞춰도 남는 TopK "승자독식" 학습 역학(dict=32~64에서도 dead ratio가 0.40~0.42 바닥 — **미해결**). concept_governance/world_model 등 이 SAE의 feature를 입력으로 쓰는 다음 단계로 넘어가기 전에, 위 "다음으로 시도해볼 것" 목록(AuxK loss, 더 공격적인 resampling, 또는 55-case를 넘어선 넓은 표본 확보)을 마저 시도할 것.

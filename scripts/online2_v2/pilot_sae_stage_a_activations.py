@@ -74,6 +74,13 @@ def main() -> None:
         # 지금까지 실제로 돌려본 것 중 explained_variance가 가장 높았다(0.970) -
         # dead ratio 자체는 여전히 §18 기준을 넘지만(0.641), 8x보다는 명백히 낫다.
     )
+    parser.add_argument(
+        "--dict-size",
+        type=int,
+        default=None,
+        help="주면 --dict-expansion-factor를 무시하고 이 값을 그대로 dict_size로 쓴다 "
+        "(effective rank 실측치에 정확히 맞춰 시도할 때 씀, expansion factor는 384의 배수만 가능해서 부족함)",
+    )
     parser.add_argument("--sparsity-mode", choices=["L1", "TOPK"], default="TOPK")
     parser.add_argument("--top-k", type=int, default=16)
     parser.add_argument("--l1-coefficient", type=float, default=1e-3)
@@ -97,7 +104,7 @@ def main() -> None:
     x_train, x_val = x_all[:-n_val], x_all[-n_val:]
 
     input_dim = x_all.shape[1]
-    dict_size = input_dim * args.dict_expansion_factor
+    dict_size = args.dict_size if args.dict_size is not None else input_dim * args.dict_expansion_factor
     model = SparseAutoencoder(
         input_dim=input_dim,
         dict_size=dict_size,

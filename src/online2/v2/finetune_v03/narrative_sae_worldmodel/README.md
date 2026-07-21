@@ -16,7 +16,7 @@
 | [sequence_curation/](sequence_curation/README.md) | §6.2/§6.3 | Phase 2 | 구현 완료(절단 알고리즘·편집 트랜잭션·§5.3 연결, 실행 배치는 아직) |
 | [multimodal_pretrain/](multimodal_pretrain/README.md) | §7 | Phase 2 | MLM/SOP는 `src/tasks/grouped_mlm.py`+`run_v2_pretrain_loop.py`에 이미 구현·학습 중임을 확인(재구현 안 함) — 진짜 신규였던 time reconstruction/time-text contrastive/cross-modal matching 3개 손실 + 결합 로직 + pair 품질 등급 구현 완료(33개 테스트). 실제 학습 루프 연결은 아직 |
 | [representation_tracking/](representation_tracking/README.md) | §8.3 | Phase 3 | 구현 완료 — activation 캡처·event/token attribution은 이미 존재함을 확인(재사용), 없던 ActivationRef 타입 + modality ablation만 신규 구현(22개 테스트) |
-| [sae/](sae/README.md) | §9 | Phase 4 | 핵심 구현 완료(상태 머신·모델·평가·dead feature resampling, 34개 테스트) + 실제 캐시 activation 전체(216,040개)로 5개 설정 재보정 실행 — **dead ratio 0.93→0.41까지 개선했지만 sparsity와 맞바꾼 것뿐, §18 중단 조건은 여전히 발동**(어떤 설정도 낮은 dead ratio와 진짜 희소함을 동시에 만족 못함) |
+| [sae/](sae/README.md) | §9 | Phase 4 | 핵심 구현 완료(상태 머신·모델·평가·dead feature resampling, 34개 테스트) + 실제 캐시 activation 전체(216,040개)로 8개 설정 재보정 — **근본 원인 특정**: 55-case 표본의 PCA 유효 차원이 384 중 29에 불과함(원인 1, 확인됨) + dict를 그 차원에 맞춰도 남는 TopK 승자독식 학습 역학(원인 2, 미해결) → §18 중단 조건 여전히 발동 |
 | [representation_explorer/](representation_explorer/README.md) | §10 | Phase 4 | 구현 완료 — 진짜 신규(기존 코드는 1회성 노트북뿐)였음을 확인, 실제 scikit-learn/umap-learn으로 PCA/UMAP+trustworthiness+split overlap 구현(29개 테스트) |
 | [concept_governance/](concept_governance/README.md) | §11 | Phase 5 | 미착수 (기존 `cf1s/core_locks.py` 원칙 확장) |
 | [world_model/](world_model/README.md) | §12 | Phase 6 | 미착수 — §14 실측 리스크 있음 |
