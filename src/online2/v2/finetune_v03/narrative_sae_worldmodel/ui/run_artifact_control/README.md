@@ -1,6 +1,6 @@
 # run_artifact_control
 
-**근거**: 계획서 §15 · **백엔드**: W&B run/sweep, 기존 `outputs/cf1s_core/` 아티팩트 구조 · **상태**: 미착수
+**근거**: 계획서 §15 · **백엔드**: W&B run/sweep, 기존 `outputs/cf1s_core/` 아티팩트 구조 · **상태**: 로컬 run(`run_manifest_v2.json`) 목록·config diff·지표 비교는 [`../pipeline_explorer/`](../pipeline_explorer/README.md) 4번 탭으로 구현됨(이번 세션 run들이 전부 `--no-wandb`로 실행돼 W&B 자체가 없음). **W&B 연동, §4.2 추적 키 체인 트리 뷰(아래 "구현 계획")는 미착수.**
 
 ## 기능
 

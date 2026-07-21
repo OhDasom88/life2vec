@@ -1,6 +1,6 @@
 # sequence_composer_ui
 
-**근거**: 계획서 §15 · **백엔드**: 기존 `cf1s/core_raw_transaction.py` + `../../sequence_curation/` · **상태**: 미착수
+**근거**: 계획서 §15 · **백엔드**: 기존 `cf1s/core_raw_transaction.py` + `../../sequence_curation/` · **상태**: 조회(원시↔토큰↔시퀀스 추적)는 [`../pipeline_explorer/`](../pipeline_explorer/README.md) 1번 탭으로 구현됨. **편집 액션(아래 "기능")은 미착수** — `curation_actions` 트리거는 이 디렉토리가 계속 담당한다.
 
 ## 기능
 

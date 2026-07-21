@@ -1,6 +1,6 @@
 # sae_feature_dashboard
 
-**근거**: 계획서 §15 · **백엔드**: `../../sae/` · **상태**: 미착수
+**근거**: 계획서 §15 · **백엔드**: `../../sae/` · **상태**: encoding trace(6 layer + MLM/SOP 변환별 activation norm·dead_feature_ratio) + 근사적 개념/시퀀스 유사도(raw activation·SAE 코드 코사인 유사도, 공통 활성 feature)는 [`../pipeline_explorer/`](../pipeline_explorer/README.md) 2·3번 탭으로 구현됨. **아래 "기능"의 나머지(상태 머신 뷰, `concept_mapping` N:M 뷰, `feature_alignment` 뷰, 개입 실험 트리거)는 미착수** — 그 백엔드 모듈(`sae/concept_mapping.py`, `sae/feature_alignment.py`) 자체가 아직 없다(`../../sae/README.md`의 "아직 없는 것" 참조).
 
 ## 기능
 
