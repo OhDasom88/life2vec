@@ -1,7 +1,7 @@
 # sae
 
 **근거**: 계획서 §9 (SAE 기반 기계적 해석)
-**Phase**: Phase 4 · **범위**: 현재 필수 (§3.1, "선택 layer 대상 SAE pilot"만) · **상태**: 핵심 구현 완료(상태 머신·모델·평가·dead feature resampling) + 표본 구성 9종 + 6개 encoder layer 비교 + 랜덤 초기화·MLM/SOP 디코더 헤드 비교 실측, 34개 테스트 통과. **원인 진단 완료(데이터의 유효 차원이 근본적으로 낮음, 표본 구성과 무관) + 압축이 학습으로 생긴 것임을 랜덤 초기화 대조로 확인 + 개선 방향 하나 발견(최종 layer 대신 layer 2/4), §18 중단 조건은 계속 발동 — 아래 참조**
+**Phase**: Phase 4 · **범위**: 현재 필수 (§3.1, "선택 layer 대상 SAE pilot"만) · **상태**: 핵심 구현 완료(상태 머신·모델·평가·dead feature resampling) + 표본 구성 9종 + 6개 encoder layer 비교 + 랜덤 초기화·MLM/SOP 디코더 헤드 비교 + **SOP 재조정·서사 다양성 6-arm 실제 재학습 비교** 실측, 34개 테스트 통과. **원인 진단 완료(데이터의 유효 차원이 근본적으로 낮음, 표본 구성과 무관) + 압축이 학습으로 생긴 것임을 랜덤 초기화 대조로 확인 + 개선 방향 두 개 발견(최종 layer 대신 layer 2/4, SOP를 더 균형 있게), §18 중단 조건은 계속 발동 — 아래 참조**
 
 ## 목적
 
@@ -127,6 +127,45 @@ dict_size를 PCA 유효 차원(29)에 거의 맞춘 32~64에서도 dead ratio가
 
 **요약**: (1) 초기 layer가 100%가 안 되는 건 데이터의 물리적 상한 때문이며 task 재설계로 해결할 문제가 아니다. (2) 학습이 만드는 추가 압축(118→15~35)에 대해서는 SOP 클래스 불균형이 구체적 근거가 있는 유력 후보이고, masking 방식은 그럴듯하지만 미검증인 후보다 — 둘 다 실제로 검증하려면 재학습이 필요하므로, 착수 전 사용자 확인이 필요하다.
 
+### 재학습 실측 — SOP 재조정 + 서사 다양성 6-arm 비교
+
+사용자 확인 후 실제로 6개 조건을 재학습했다(`scripts/online2_v2/run_narrative_ablation_pretrain_sweep.sh`, 전부 batch_size=40·max_length=1024·**동일 5000 step**, `--skip-vram-calibrate`로 배치 크기 자동조정 끔, `--no-early-stop`으로 조건 간 학습량을 강제로 동일하게 고정). 비교는 `scripts/online2_v2/compare_narrative_ablation_checkpoints.py`로, 앞서와 같은 14,544개 narrative-selected 타깃에 대해 layer5(최종)·mlm_transform·sop_transform 3개 지점의 PCA 유효 차원 + SAE(dict=64, top_k=8, 15 epoch) dead_feature_ratio를 측정했다.
+
+**중요한 실행상 함정 두 가지, 실측 전에 발견해서 고쳤다**: (1) `best.ckpt`는 최고 val loss 시점을 저장하므로 조건마다 다른 step(4200~5500)에 해당했다 — "서사 내용 차이"와 "학습량 차이"가 섞일 뻔했다. 6개 조건 전부 정확히 `checkpoint_step_5000.pt`로 통일해서 비교했다. (2) `single_table_only` arm은 세션이 한 번 끊겨서 step 1200에서 재개했는데, `run_v2_pretrain_loop.py`의 `--resume`은 `--steps`를 누적으로 처리한다(`while step < start_step + steps`, `run_v2_pretrain_loop.py:687`) — 그래서 최종적으로 6200 step까지 갔다. 위와 같은 이유로 `checkpoint_step_5000.pt`를 써서 우회했다.
+
+| arm | 코퍼스 | 행 수 | SOP 비율 | layer5 rank99 | layer5 dead | sop_transform rank99 | sop_transform dead |
+|---|---|---|---|---|---|---|---|
+| control | 전체 80개 서사 | 15.0M | 0.2/0.2(원본과 동일) | 9 | 0.734 | 6 | 0.781 |
+| sop_balanced | 전체 80개 서사 | 15.0M | **0.33/0.33** | **17** | **0.391** | 7 | 0.547 |
+| narrow_subset | 최빈 8개 서사만 | 8.7M | 0.2/0.2 | 13 | 0.672 | 5 | 0.875 |
+| single_table_only | 단일 테이블 서사 34개 | 3.6M | 0.2/0.2 | **31** | 0.547 | 10 | 0.844 |
+| multi_table_only | 복수 테이블 서사 46개 | 11.4M | 0.2/0.2 | 18 | 0.594 | 6 | 0.625 |
+| dedup_reduced | (농장,타깃이벤트)당 1개로 중복 제거 | 4.4M | 0.2/0.2 | 12 | **0.312**(전체 중 최저) | 6 | 0.812 |
+
+(전체 결과는 `outputs/online2/sae_pilot/report_narrative_ablation.json`.)
+
+**결과 1 — SOP 재조정은 실제로 효과가 있다(재현된 긍정적 결과).** control(0.2/0.2)과 sop_balanced(0.33/0.33)는 서사 구성이 완전히 같고 SOP 비율만 다른 순수 대조 실험이다. 더 균형 잡힌 쪽이 layer5 rank99를 9→17로 거의 두 배 올리고, dead_feature_ratio를 0.734→0.391로 거의 절반으로 낮췄다 — 두 지표가 같은 방향으로 함께 움직였다는 점에서 잡음이 아니라 실제 효과로 보인다. 앞서 정정한 대로 원본 체크포인트는 이미 0.2/0.2로 어느 정도 균형(60/20/20)이었는데도, **거기서 한 번 더 균형을 주면 여전히 남은 여지가 있었다.**
+
+**결과 2 — 서사 다양성의 영향은 직관과 반대이고, 명백한 교란변수가 있다(정직하게 기록).** 전체 80개 서사(control, rank9)보다 **더 좁은** 서사 구성(narrow_subset 13, single_table_only **31**, multi_table_only 18)이 전부 layer5 유효 차원이 더 높게 나왔다 — "서사가 다양할수록 표현이 풍부해진다"는 직관과 정반대다. 하지만 이건 그대로 믿을 수 없다: **행 수가 조건마다 크게 다른데(3.6M~15.0M) step 수는 전부 5000으로 고정했다** — 즉 코퍼스가 작을수록 같은 step 안에서 데이터를 상대적으로 더 많이 반복해서 봤다(single_table_only는 전체 코퍼스의 24%밖에 안 되는 행 수로 같은 step을 돌았다). 그래서 지금 관측된 "서사가 좁을수록 rank가 높다"는 "서사 내용 자체의 효과"인지 "같은 step 안에서 상대적으로 더 많이 epoch를 돈 효과"인지 이 실험만으로는 분리가 안 된다 — **다음에 검증하려면 step 수가 아니라 epoch 수(또는 unique row 노출량)를 조건마다 맞춰야 한다.**
+
+**결과 3 — 서사 기반 중복(재윈도잉)을 제거하면 dead ratio가 가장 낮아진다.** `dedup_reduced`(같은 (농장, 타깃이벤트)에 대해 여러 서사가 중복 생성한 시퀀스 중 하나만 남김, 942,727→178,142 시퀀스)는 rank 자체는 중간(12)이지만 **dead_feature_ratio는 6개 조건 중 가장 낮다(0.312)**. 이건 이 세션 초반에 다른 방식(다운스트림 activation 표본 구성만 바꾼 것)으로 확인했던 "서사 기반 재윈도잉이 실질적 다양성을 늘려주지 않는다"는 결론과 같은 방향이지만, 이번엔 **사전학습 자체를 그 중복 제거된 데이터로 다시 돌려서** 얻은 직접적인 인과 증거라는 점이 다르다 — 다운스트림 표본 선택보다 사전학습 데이터 구성 자체를 바꾸는 쪽이 dead ratio에 측정 가능한 영향을 준다.
+
+**결과 4 — 학습량과 압축의 관계가 단조롭지 않다(기존 서술을 복잡하게 만드는 새 발견).** control(SOP 0.2/0.2, 5000 step)의 layer5 rank99는 9인데, 똑같이 SOP 0.2/0.2로 학습했지만 **18600 step까지 돈 원본 체크포인트는 rank99=29**였다(위 "랜덤 초기화와 직접 비교" 절 참조). 랜덤 초기화(0 step, rank118) → 5000 step(rank9, 급격한 붕괴) → 18600 step(rank29, 부분 회복)이라는 그림이 된다. 즉 "학습이 진행될수록 다양성이 단조롭게 줄어든다"는 이전까지의 단순한 서술은 **정정이 필요하다** — 초반에 빠르게 collapse했다가 이후 다시 어느 정도 diversify하는, 비단조적인 동역학으로 보인다. 이건 아직 두 지점(5000, 18600)만 찍어본 것이라 궤적의 정확한 모양은 모른다 — 중간 step들을 더 찍어봐야 확정할 수 있다.
+
+**결과 5 — sop_transform은 조건과 무관하게 항상 가장 압축된 지점이다.** 6개 조건 전부에서 sop_transform의 rank99(5~10)가 layer5(9~31)나 mlm_transform보다 낮다 — SOP 재조정이나 서사 구성을 바꿔도 이 상대적 순서 자체는 안 바뀐다. SOP 헤드의 구조(`CLS_Decoder`의 `ScaleNorm`이 모든 벡터를 같은 노름의 shell로 강제) 자체가 이 위치를 다른 지점보다 더 압축시키는 경향이 있어 보인다.
+
+**결론**: 재학습 전 세웠던 두 가설 중 SOP 불균형 쪽은 **긍정적으로 검증됐다**(더 균형 잡을수록 더 좋아짐, 재현 가능한 대조 실험). 서사 다양성 쪽은 **효과가 있는 건 분명해 보이지만 방향과 원인이 예상과 다르고 행 수(epoch 노출량) 교란변수가 있어 이 실험만으로 확정할 수 없다** — narrative_id 필터가 아니라 epoch 수를 통제 변수로 고정한 후속 실험이 필요하다. dedup(중복 제거)은 dead ratio 쪽에서 뚜렷한 개선을 보였다.
+
+### 서사 유형이 앞으로 늘어난다면 — 자동 매칭 vs 사람이 직접 검토하는 것의 차이
+
+오늘 결과를 근거로 이 질문에 답한다: 서사 템플릿을 지금(80개)보다 늘리고 그에 따라 학습에 쓰이는 이벤트 시퀀스 구성이 자동으로 달라진다면, 자동 규칙 매칭(`src/online2/materializers.py`/`builder.py`/`catalog.py`)과 사람이 서사-원시데이터 관계를 직접 검토하는 것(`ui/data_grounding_curation/`의 §5.3 검토 큐가 이미 이 역할을 하는 화면이다)은 구조적으로 다른 실패 모드를 갖는다 — 오늘 실측이 그 차이를 구체적으로 보여준다.
+
+- **자동 매칭은 "중복인지 아닌지"를 모른다.** 80개 템플릿이 같은 222,309건의 원시 이벤트 위에서 각자 독립적으로 매칭하기 때문에, 서사 유형이 늘수록 같은 원시 구간을 여러 템플릿이 중복으로 잡아내는 문제(현재도 942,727 시퀀스가 사실상 222,309건의 ~16배 재윈도잉)는 늘면 늘었지 저절로 줄지 않는다. **결과 3**(dedup_reduced가 dead ratio를 가장 크게 낮춤)이 보여주듯 이 중복은 실제로 학습된 표현의 품질에 측정 가능한 악영향을 준다 — 서사 유형이 늘어날수록 이 문제를 자동으로 잡아줄 장치(예: 지금의 `dedup_reduced`처럼 "같은 타깃 이벤트는 하나만" 같은 규칙)가 **더**, 아니라 인간이 "이 두 서사 매칭이 사실 같은 사건을 가리키는가"를 판단하는 것과 같은 종류의 일이 필요해진다. 지금 스크립트는 임의로 첫 번째 것만 남기지만, 사람이라면 여러 후보 중 어느 매칭이 더 정확한 서술인지 판단해서 남길 수 있다 — 자동 규칙은 이 판단을 못 한다.
+- **서사 내용(구성) 자체가 학습에 영향을 주는 것으로 보인다(결과 2), 그런데 그 방향이 직관과 다르고 아직 깨끗이 검증되지 않았다.** "서사 유형을 늘리면 데이터가 더 다양해져서 좋다"는 암묵적 전제가 이 계획 전체에 깔려 있었는데, 오늘 결과(좁은 서사 구성이 오히려 더 높은 유효 차원을 보임)는 적어도 지금 실험 설계로는 그 전제가 자명하지 않다는 걸 보여준다 — 다만 위에서 밝힌 대로 행 수/epoch 교란변수 때문에 "서사 유형을 늘리는 것 자체가 나쁘다"고 결론 내릴 수도 없다. 사람이 서사-원시데이터 관계를 직접 보면 최소한 "이 서사가 원시 데이터의 어떤 부분을 실제로 잘 설명하는가"를 판단할 수 있지만, 그 판단이 SAE가 측정하는 "표현의 유효 차원"과 어떻게 연결되는지는 이번 실험으로는 아직 모른다 — 사람이 보기에 "좋은" 서사 매칭이 반드시 SAE 관점에서 "다양성을 늘리는" 매칭인지는 별도로 검증해야 하는 질문이다.
+- **하지만 사람이 검토해도 넘을 수 없는 상한이 있다.** 이 세션 초반에 확인한 대로 원시 데이터 자체의 선형 유효 차원은 384차원 중 29차원뿐이다(55농장×14일, 물리적으로 강하게 얽힌 센서값). 서사 유형을 아무리 늘리고 사람이 아무리 정교하게 매칭을 골라도, 원시 데이터에 없는 정보를 만들어낼 수는 없다 — 사람의 검토가 할 수 있는 일은 **이미 있는 제한된 정보를 더 효율적으로(중복 없이, 더 정확하게) 학습 데이터로 포장하는 것**이지, 정보량 자체를 늘리는 게 아니다. `ui/data_grounding_curation/`이 실제로 하는 일도 이 범위 안에 있다 — §5.4 리포트가 측정하는 grounding 정확도는 "서사 서술이 실제 raw window와 얼마나 정합하는가"이지 "그 raw window가 얼마나 정보가 풍부한가"가 아니다.
+
+**요약**: 서사 유형이 늘어날수록 (1) 자동 매칭만으로는 중복 문제가 구조적으로 악화되므로 사람의 검토(또는 그에 준하는 명시적 중복 제거 규칙)가 점점 더 필요해지고, (2) 서사 구성 자체가 학습 결과에 영향을 준다는 것 자체는 오늘 실측으로 뒷받침되지만 그 방향은 아직 깨끗하게 분리되지 않았으며, (3) 그럼에도 사람의 검토든 자동 규칙이든 원시 데이터의 물리적 정보량(~29차원) 자체를 늘려주지는 못한다 — 할 수 있는 건 그 안에서 더 잘 고르는 것뿐이다.
+
 ## 구현한 것
 
 - [`schemas.py`](schemas.py) — `FeatureState`(5단계 상태 머신, 한 단계씩만 승격 가능하도록 `assert_valid_promotion`이 강제) + `CausalGrade`(E0~E5) + `assert_causal_claim_allowed`(**E3 미만이면 실행 시점에 예외** — "인과적"이라는 주장을 코드 레벨에서 막는다, 조용한 문서 문구가 아니다) + `SAEFeatureRef`(`INTERVENTION_SUPPORTED_FEATURE` 상태인데 `causal_grade < E3`이면 생성 자체가 막힘).
@@ -136,6 +175,11 @@ dict_size를 PCA 유효 차원(29)에 거의 맞춘 32~64에서도 dead ratio가
 - [`scripts/online2_v2/pilot_sae_stage_a_activations.py`](../../../../../../scripts/online2_v2/pilot_sae_stage_a_activations.py) — dense(CF1S) 표본 pilot. 재현 가능.
 - [`scripts/online2_v2/pilot_sae_narrative_selected_activations.py`](../../../../../../scripts/online2_v2/pilot_sae_narrative_selected_activations.py) — narrative-template 타깃 표본 pilot. `training_events_v2.parquet`(1,500만 행)에서 시퀀스별 타깃 이벤트를 스트리밍 집계(전체를 메모리에 안 올림, 청크 단위로 처리), 80개 템플릿당 균등 샘플링한 뒤 `cache_stage_a_event_embeddings.py`의 인코딩 함수를 그대로 import해 재사용한다(활성화 계산 로직 중복 없음).
 - [`scripts/online2_v2/pilot_sae_layer_sweep.py`](../../../../../../scripts/online2_v2/pilot_sae_layer_sweep.py) — 6개 encoder layer 전부의 pooled activation을 한 번의 순전파로 동시에 캡처해 비교(`Transformer.forward_finetuning`의 embedding+layer 루프를 그대로 복제, 원본 모델 클래스는 안 건드림). 위 narrative-selected 스크립트의 타깃 선택 함수를 그대로 import해 재사용.
+- [`scripts/online2_v2/pilot_sae_layer_decoder_random_comparison.py`](../../../../../../scripts/online2_v2/pilot_sae_layer_decoder_random_comparison.py) — 학습된 인코더 vs 랜덤 초기화 인코더(`load_untrained_encoder`) + MLM/SOP 디코더 변환까지 8개 지점 비교.
+- [`scripts/online2_v2/check_token_bag_diversity.py`](../../../../../../scripts/online2_v2/check_token_bag_diversity.py) — bag-of-tokens 대조 실험(학습 파라미터 없이 토큰 co-occurrence만으로 만든 벡터의 PCA 유효 차원).
+- [`scripts/online2_v2/build_pretrain_narrative_ablation_subsets.py`](../../../../../../scripts/online2_v2/build_pretrain_narrative_ablation_subsets.py) — `training_events_v2.parquet`를 `narrative_id`로 스트리밍 필터링해 narrow_subset/single_table_only/multi_table_only/dedup_reduced 4종 부분 코퍼스 생성(원시 빌드 재실행 없음, 필터링만).
+- [`scripts/online2_v2/run_narrative_ablation_pretrain_sweep.sh`](../../../../../../scripts/online2_v2/run_narrative_ablation_pretrain_sweep.sh) — SOP 재조정 + 서사 다양성 6-arm 재학습 드라이버. 이미 끝난 arm은 건너뛰고 중단된 arm은 `last.ckpt`에서 자동 resume하는 멱등 스크립트(세션 중단에도 안전하게 재실행 가능하도록 설계, 실제로 한 번 중단됐다가 이 덕분에 재개함).
+- [`scripts/online2_v2/compare_narrative_ablation_checkpoints.py`](../../../../../../scripts/online2_v2/compare_narrative_ablation_checkpoints.py) — 6개 재학습 체크포인트의 layer5/mlm_transform/sop_transform PCA 유효 차원 + SAE dead_feature_ratio 비교.
 
 ## 아직 없는 것
 
@@ -156,4 +200,4 @@ D1(복원), D2(dead feature ratio 일부) 계산 가능. D3–D6(개념 매핑, 
 
 ## 중단 조건 연결
 
-§18 "SAE feature 대부분이 dead 또는 불안정" — **실측으로 발동, 표본 구성 9종 비교 이후에도 해소 안 됨**(위 pilot 결과 표 참조). 근본 원인을 특정했다: (1) 이 데이터셋(55농장×14일, 원시 이벤트 222,309건) 자체의 낮은 유효 차원(PCA로 384차원 중 29개가 99% 분산 설명 — **원인 특정 완료, 표본을 dense/narrative-selected 어느 쪽으로 구성해도 동일함을 직접 검증**), (2) dict_size를 그 차원(29)에 맞춰도 남는 TopK "승자독식" 학습 역학(dict=32~64에서도 dead ratio가 0.40~0.50 바닥). (1)은 "더 넓거나 더 잘 고른 표본"으로 해결되는 문제가 아님이 확인됐지만, **6개 encoder layer를 비교한 결과 최종 layer(지금까지 모든 pilot이 쓴 것) 대신 layer 2를 쓰면 dead ratio가 0.500→0.391로 개선됐다**(seed 1개 결과, 재현성 확인 전) — §18 해소를 위한 다음 시도는 layer 2/4 기준으로 dict_size·sparsity를 재sweep하는 것부터 시작할 것.
+§18 "SAE feature 대부분이 dead 또는 불안정" — **실측으로 발동, 표본 구성 9종 비교 + 6-arm 재학습 이후에도 해소 안 됨**(위 pilot 결과 표 참조). 근본 원인을 특정했다: (1) 이 데이터셋(55농장×14일, 원시 이벤트 222,309건) 자체의 낮은 유효 차원(PCA로 384차원 중 29개가 99% 분산 설명 — **원인 특정 완료, 표본을 dense/narrative-selected 어느 쪽으로 구성해도 동일함을 직접 검증**), (2) dict_size를 그 차원(29)에 맞춰도 남는 TopK "승자독식" 학습 역학(dict=32~64에서도 dead ratio가 0.40~0.50 바닥). (1)은 "더 넓거나 더 잘 고른 표본"으로 해결되는 문제가 아님이 확인됐지만, 개선 방향을 두 개 더 실측으로 찾았다: **6개 encoder layer를 비교한 결과 최종 layer(지금까지 모든 pilot이 쓴 것) 대신 layer 2를 쓰면 dead ratio가 0.500→0.391로 개선**(seed 1개 결과, 재현성 확인 전), **SOP 비율을 더 균형 있게(0.2/0.2→0.33/0.33) 재학습하면 dead ratio가 0.734→0.391로 개선**(control vs sop_balanced 순수 대조 실험, 재현됨). §18 해소를 위한 다음 시도는 (a) layer 2/4 기준 dict_size·sparsity 재sweep, (b) SOP 0.33/0.33 이상으로 재학습한 체크포인트 기준 재sweep, (c) 서사 다양성의 실제 효과를 확인하려면 narrative_id가 아니라 epoch 수를 통제 변수로 고정한 후속 재학습 — 이 순서로 시작할 것.
