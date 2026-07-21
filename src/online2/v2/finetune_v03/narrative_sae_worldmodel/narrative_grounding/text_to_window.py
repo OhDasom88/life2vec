@@ -45,11 +45,24 @@ _TEMPLATE_TEXT_FIELDS = (
     "agronomic_interpretation",
 )
 
-# 1차 임계값 — 실측 라벨(§5.4 평가) 없이 정한 튜닝 전 수치. review_queue/evaluation
-# 단계에서 실제 데이터로 재보정하기 전까지는 placeholder로 취급한다.
-_ACCEPT_THRESHOLD = 0.75
-_REVIEW_THRESHOLD = 0.5
-_QUARANTINE_THRESHOLD = 0.3
+# 임계값 — Qwen3-Embedding-0.6B로 실제 GPU에서 재보정했다(사람 라벨은 없어서
+# self-retrieval 신호로 대신함: narrative 자신의 observation 텍스트를 질의로
+# 재사용해 "자신을 만든 템플릿+farm+zone을 다시 찾는가" 측정, 320개 샘플
+# 80템플릿 전수 커버). 결과: scripts/online2_v2/calibrate_narrative_grounding_thresholds.py
+# 실행 산출물 outputs/online2/narrative_grounding_calibration/calibration_report.json.
+#   - 정답(맞는 템플릿+맞는 farm+맞는 zone) combined_score: mean=0.932, p10=0.913, min=0.896
+#   - farm만 틀린 경우(템플릿·zone은 맞음) combined_score: mean=0.784, p10=0.763, p90=0.796
+# 두 분포가 0.796~0.913 사이에서 거의 안 겹친다. AUTO_ACCEPT는 정답 분포의
+# p10보다 낮게(0.90) 잡아 대부분의 정답을 자동 승인하되, REVIEW 경계(0.75)는
+# farm-only-mismatch 분포 전체를 REVIEW로 떨어뜨리도록 잡았다(위치가 틀린
+# 후보를 자동 승인하지 않는 것이 목적). top1_accuracy가 0.597로 낮다는 것은
+# 템플릿 텍스트 유사도 단독으로는 애매하다는 뜻이므로 top_k_templates로 후보를
+# 넉넉히 뽑고 structured_score(farm/zone)가 최종 분기를 사실상 좌우하게 설계돼
+# 있다 — 가중치(0.7/0.3) 자체는 이번 보정에서 바꾸지 않았다(바꿀 근거가 되는
+# "틀린 템플릿" 부정 클래스는 아직 측정하지 않음, README 참조).
+_ACCEPT_THRESHOLD = 0.90
+_REVIEW_THRESHOLD = 0.75
+_QUARANTINE_THRESHOLD = 0.55
 _TEMPLATE_SIMILARITY_WEIGHT = 0.7
 _STRUCTURED_SCORE_WEIGHT = 0.3
 
