@@ -106,6 +106,23 @@ dict_size를 PCA 유효 차원(29)에 거의 맞춘 32~64에서도 dead ratio가
 
 - [`scripts/online2_v2/pilot_sae_layer_decoder_random_comparison.py`](../../../../../../scripts/online2_v2/pilot_sae_layer_decoder_random_comparison.py) — 랜덤 초기화 인코더(`load_untrained_encoder`, hparams는 체크포인트와 동일하되 `load_state_dict` 생략) + `model.mlm_decoder`/`model.cls_decoder`의 예측 직전 변환까지 포함해 8개 지점(6 layer + MLM/SOP 변환)을 학습된 모델과 나란히 비교. 위 layer sweep 스크립트의 타깃 선택·pooling 패턴을 그대로 재사용.
 
+### 왜 랜덤 초기화조차 384차원을 다 못 채우는가(rank99=118) — task 재설계가 검토할 만한지
+
+두 가지를 코드/데이터로 직접 확인했다.
+
+**(A) 랜덤 초기화에서는 위치/시간 정보가 아예 꺼져 있다.** `Embeddings.forward`(`src/transformer/embeddings.py:53-69`)를 보면 `age`, `abspos`, `segment` 임베딩이 전부 `self.res_age`/`self.res_abs`/`self.res_seg`라는 별도의 `ReZero` 게이트를 거쳐 residual로 더해진다 — 이 게이트들도 encoder layer의 ReZero와 똑같이 `torch.zeros(1)`로 초기화된다. 즉 **학습 전에는 `self.token(tokens)` 토큰 정체성 임베딩만 남고 위치·시간·segment 정보는 전부 0으로 지워진다.** 랜덤 초기화 모델이 측정한 "다양성"은 사실 순수 토큰 lookup만의 다양성이다.
+
+**(B) 그 토큰 lookup의 다양성 자체가 이미 데이터 쪽에서 제한돼 있다 — 직접 대조 실험으로 확인.** 같은 14,544개 target span에서 학습된 임베딩을 아예 빼고, 토큰 id의 등장 여부만으로 만든 **bag-of-tokens**(정규화된 728차원 one-hot 평균, 학습 가능한 파라미터 전혀 없음) 벡터의 PCA 유효 차원을 재봤다: 50%→1, 90%→40, 95%→76, **99%→135**. 랜덤 초기화 인코더가 보인 rank99=118과 거의 같은 자릿수다(등장한 distinct token id는 728개 중 530개로, vocab 용량이 병목이 아니다). **즉 랜덤 임베딩이라 해도 어떤 토큰들이 같이 등장하는지(co-occurrence)의 다양성 자체가 이미 ~120~135차원어치밖에 안 되고, 랜덤 embedding table은 그 구조를 R^384에 선형으로 옮겨 담을 뿐 새 독립 방향을 만들어내지 않는다.**
+
+**결론 — "초기 layer가 100%가 안 되는 것"은 버그도 아니고 task 설계 문제도 아니다.** 이건 55농장×14일, 물리적으로 강하게 얽힌 센서값을 728개 구간(bin) 토큰으로 양자화한 이 데이터셋 자체가 가진 상한이다(앞서 raw 센서값 PCA로 확인한 384차원 중 29차원이라는 숫자와 같은 계열의 사실 — bag-of-tokens 단계에서는 아직 "값 자체"가 아니라 "어떤 토큰들이 같이 나타나는가"만 보므로 135로 더 높게 나오지만, 방향은 같다). architecture를 바꾸거나 masking/SOP 설계를 바꿔도 이 상한 자체는 못 올린다 — 원시 데이터가 더 다양해지지 않는 한 100%는 애초에 도달 불가능한 목표다. 여기까지는 "고칠 수 없는 것"이다.
+
+**반면 학습이 118→15~35로 만드는 추가 압축(위 "이 압축이 학습으로 생긴 것인지" 절)은 별개 문제이고, 이쪽은 task 설계와 관련이 있어 보인다 — 실제로 구체적인 근거가 있다.** 실행에 쓰인 실제 설정(`conf/task/online2_v2_grouped_mlm.yaml`)을 확인하면:
+
+- **SOP 라벨 분포가 90/5/5로 심하게 불균형하다**(`sop_reverse_probability: 0.05`, `sop_shuffle_probability: 0.05`, `src/tasks/mlm.py:38-39` 기본값과 동일하게 설정됨). "정상 순서"만 90%라 모델이 거의 항상 label=0을 찍기만 해도 90% 정확도가 나온다 — CLS 표현을 세밀하게 구분할 유인이 약하다. 실측과도 정확히 들어맞는다: 학습된 sop_transform은 rank99=15, explained_variance=0.973으로 8개 지점 중 가장 "뾰족한"(=한 방향으로 몰린) 분포다. **이건 검증된 사실이지 추측이 아니다 — SOP를 더 균형 잡힌 비율(예: reverse/shuffle을 각각 0.15~0.2 근처로)로 재설정하면 CLS 표현의 유효 차원이 올라가는지는 재학습으로 직접 검증 가능한 다음 실험이다.**
+- **mask_ratio=0.30에 measurement-group 단위 masking**(`GroupedMLMMasker`, `src/online2/v2/masking.py`)이 걸려 있다 — 개별 토큰이 아니라 한 measurement group 전체를 30% 확률로 통째로 가린다. 이미 알고 있듯 이 데이터는 변수 간 상관이 매우 높다(연속 이벤트 코사인 유사도 평균 0.89, raw PCA 유효 차원 29). 상관이 이렇게 높으면 가려진 group도 남은 group들로부터 거의 선형 보간하듯 복원 가능해서, MLM이 "29차원짜리 충분통계량만 잘 압축해서 들고 있으면 풀리는" 얕은 지름길이 될 수 있다 — 이건 SOP 건과 달리 **현재 설정과 결과를 잇는 그럴듯한 메커니즘이지 확정된 인과관계는 아니다.** 검증하려면 실제 재학습(예: mask_ratio를 낮추거나, "쉽게 보간되는" group과 "안 되는" group에 다른 masking 확률을 주는 방식)이 필요하고, 지금까지의 실험(전부 기존 체크포인트 재사용)과 달리 **GPU-시간 단위의 새 사전학습 실행**이라는 뚜렷이 더 큰 비용이 든다.
+
+**요약**: (1) 초기 layer가 100%가 안 되는 건 데이터의 물리적 상한 때문이며 task 재설계로 해결할 문제가 아니다. (2) 학습이 만드는 추가 압축(118→15~35)에 대해서는 SOP 클래스 불균형이 구체적 근거가 있는 유력 후보이고, masking 방식은 그럴듯하지만 미검증인 후보다 — 둘 다 실제로 검증하려면 재학습이 필요하므로, 착수 전 사용자 확인이 필요하다.
+
 ## 구현한 것
 
 - [`schemas.py`](schemas.py) — `FeatureState`(5단계 상태 머신, 한 단계씩만 승격 가능하도록 `assert_valid_promotion`이 강제) + `CausalGrade`(E0~E5) + `assert_causal_claim_allowed`(**E3 미만이면 실행 시점에 예외** — "인과적"이라는 주장을 코드 레벨에서 막는다, 조용한 문서 문구가 아니다) + `SAEFeatureRef`(`INTERVENTION_SUPPORTED_FEATURE` 상태인데 `causal_grade < E3`이면 생성 자체가 막힘).
