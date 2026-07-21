@@ -1,7 +1,7 @@
 # ui
 
 **근거**: 계획서 §15 (UI 구성)
-**상태**: 미착수, 현재 저장소에 UI 프레임워크 흔적 없음(신규 스택 선정 필요 — Streamlit/Gradio 등, 미결정)
+**상태**: `data_grounding_curation/`만 구현. 스택은 Streamlit으로 확정(`requirements.txt`에 추가) — 나머지 7개 서브앱도 이 스택을 따른다.
 
 ## 공통 원칙
 
@@ -11,7 +11,7 @@ UI 화면 상태는 정본(source of truth)으로 사용하지 않는다. 모든
 
 | 서브앱 | 근거 백엔드 | 생성 artifact |
 |---|---|---|
-| [data_grounding_curation/](data_grounding_curation/README.md) | `../narrative_grounding/` | grounding decision |
+| [data_grounding_curation/](data_grounding_curation/README.md) | `../narrative_grounding/` | grounding decision — **구현 완료**(§5.3 검토 큐, §5.1 검색 화면은 아직) |
 | [sequence_composer_ui/](sequence_composer_ui/README.md) | 기존 `cf1s/core_raw_transaction.py` + `../sequence_curation/` | sequence transaction |
 | [explorer_3d/](explorer_3d/README.md) | `../representation_explorer/` | projection artifact |
 | [sae_feature_dashboard/](sae_feature_dashboard/README.md) | `../sae/` | feature evaluation |
