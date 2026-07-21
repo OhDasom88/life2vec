@@ -23,6 +23,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[7]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from src.online2.v2.finetune_v03.narrative_sae_worldmodel.narrative_grounding.decision_metrics import (  # noqa: E402
+    summarize_decisions,
+)
 from src.online2.v2.finetune_v03.narrative_sae_worldmodel.narrative_grounding.text_to_window import (  # noqa: E402
     Qwen3EmbeddingProvider,
     TemplateEmbeddingIndex,
@@ -222,6 +225,51 @@ def _render_search_tab(catalog, table) -> None:
             st.write(f"{window.start_timestamp} ~ {window.end_timestamp}")
 
 
+def _render_report_tab() -> None:
+    st.caption(
+        "decisions.jsonl(§5.3 탭에서 쌓인 사람 결정)을 §5.4 evaluation.expert_acceptance_rate에 "
+        "실시간으로 연결한 리포트입니다. ACCEPT/REJECT를 누를 때마다 이 탭도 즉시 갱신됩니다."
+    )
+
+    decisions = load_decisions(DECISIONS_PATH)
+    report = summarize_decisions(decisions)
+
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("전체 결정", report["n_total"])
+    metric_cols[1].metric("ACCEPT", report["n_accept"])
+    metric_cols[2].metric("REJECT", report["n_reject"])
+    metric_cols[3].metric("SKIP(분모 제외)", report["n_skipped"])
+
+    if report["n_decided"] == 0:
+        st.info("아직 ACCEPT/REJECT 결정이 없습니다 — §5.3 탭에서 검토를 진행하면 여기 반영됩니다.")
+        return
+
+    st.metric("overall_expert_acceptance_rate", f"{report['overall_expert_acceptance_rate']:.3f}")
+
+    st.markdown("**검토 사유 코드별 승인율** — `review_queue._REASON_WEIGHTS` 재보정 근거")
+    st.caption(
+        "승인율이 높은 사유는 사람이 대체로 '문제 없다'고 판단했다는 뜻(과잉 플래그 가능성, "
+        "가중치를 낮출 후보). 승인율이 낮은 사유는 대체로 '문제 있다'는 뜻(가중치 유지·강화 후보)."
+    )
+    by_reason = report["by_reason_code"]
+    if by_reason:
+        rows = sorted(by_reason.items(), key=lambda item: item[1]["acceptance_rate"])
+        st.dataframe(
+            {
+                "reason_code": [code for code, _ in rows],
+                "acceptance_rate": [round(v["acceptance_rate"], 3) for _, v in rows],
+                "n": [v["n"] for _, v in rows],
+            },
+            hide_index=True,
+        )
+    else:
+        st.write("검토 사유가 기록된 결정이 없습니다.")
+
+    with st.expander("연결되지 않은 §5.4 지표"):
+        for metric_name, reason in report["not_connected"].items():
+            st.write(f"**{metric_name}**: {reason}")
+
+
 def main() -> None:
     st.set_page_config(page_title="narrative_grounding — Data Grounding & Curation", layout="wide")
     st.title("Data Grounding & Curation")
@@ -237,11 +285,15 @@ def main() -> None:
     catalog, table = _cached_corpus()
     farms = _cached_farms(table)
 
-    review_tab, search_tab = st.tabs(["§5.3 사람 검토 큐", "§5.1 텍스트 → window 검색"])
+    review_tab, search_tab, report_tab = st.tabs(
+        ["§5.3 사람 검토 큐", "§5.1 텍스트 → window 검색", "§5.4 리포트"]
+    )
     with review_tab:
         _render_review_queue_tab(catalog, table, farms)
     with search_tab:
         _render_search_tab(catalog, table)
+    with report_tab:
+        _render_report_tab()
 
 
 if __name__ == "__main__":

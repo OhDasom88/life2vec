@@ -79,8 +79,9 @@
 2. ~~§5.3 검토 큐를 사람이 실제로 처리하는 UI 연결~~ — 완료 (`../ui/data_grounding_curation/`, §5.1 검색 탭도 함께).
 3. ~~`contradicting_windows`(반례) 채우는 로직~~ — 완료 (`contradictions.py`).
 4. SAE feature 기반 랭킹 신호는 `../sae/`가 사전학습 이후에나 존재하므로 Phase 4 이후 `text_to_window.py`에 추가.
-5. `decisions.jsonl`(§5.3 UI가 쌓는 사람 결정 로그) -> `evaluation.py`의 `expert_acceptance_rate`/`auto_accept_error_and_review_rate` 실제 계산 파이프라인 연결. 지금은 라벨이 있어도 자동으로 지표까지 이어지지 않는다.
-6. `../ui/data_grounding_curation/README.md`에 정리된 성능 한계(§5.3 배치 로드 ~40초, §5.1 최초 검색 ~15초, 과매칭 반례) 개선.
+5. ~~`decisions.jsonl` -> `evaluation.py` 실제 계산 파이프라인 연결~~ — `expert_acceptance_rate` 부분은 완료(`decision_metrics.py`, UI §5.4 탭에서 실시간 반영). `auto_accept_error_and_review_rate`는 의도적으로 미연결 — §5.1 판정 라벨이 `decisions.jsonl`에 없기 때문(6번과 연결됨).
+6. **§5.1 검색 결과를 §5.3 검토 큐로 보내는 연결이 없다** — 다음 우선순위 1순위. 이게 있어야 `auto_accept_error_and_review_rate`도 §5.4 리포트에 붙는다.
+7. `../ui/data_grounding_curation/README.md`에 정리된 성능 한계(§5.3 배치 로드 ~40초, §5.1 최초 검색 ~15초, 과매칭 반례) 개선.
 
 ## 의존성
 

@@ -12,7 +12,7 @@
 
 | 디렉토리 | 계획서 절 | Phase | 상태 |
 |---|---|---|---|
-| [narrative_grounding/](narrative_grounding/README.md) | §5 | Phase 1 | §5.1/§5.2/§5.3/§5.4 구현 완료, §5.1 임계값을 실제 Qwen3 임베딩으로 재보정, 반례(contradicting_windows) 탐지 구현, [ui/data_grounding_curation/](ui/data_grounding_curation/README.md) §5.1(검색)·§5.3(검토 큐) 두 탭 모두 실제 GPU·실제 967K 코퍼스로 연결 완료(52개 테스트 통과) |
+| [narrative_grounding/](narrative_grounding/README.md) | §5 | Phase 1 | §5.1/§5.2/§5.3/§5.4 구현 완료, §5.1 임계값 실측 재보정, 반례 탐지, [ui/data_grounding_curation/](ui/data_grounding_curation/README.md) §5.1(검색)·§5.3(검토 큐)·§5.4(decisions.jsonl 실시간 리포트) 세 탭 실제 GPU·967K 코퍼스로 연결(58개 테스트 통과). 남은 1순위: §5.1→§5.3 결과 연결(있어야 auto_accept_error_and_review_rate도 붙음) |
 | [sequence_curation/](sequence_curation/README.md) | §6.3 | Phase 2 | 미착수 |
 | [multimodal_pretrain/](multimodal_pretrain/README.md) | §7 | Phase 2 | 미착수 (기존 `pipeline_m2.py`/`stage_a_reencoder.py` 확장) |
 | [representation_tracking/](representation_tracking/README.md) | §8.3 | Phase 3 | 미착수 |
