@@ -6,14 +6,16 @@
 모듈은 그 딕셔너리를 받아 계산만 한다(파일 I/O를 다시 하지 않는다, UI
 모듈에 대한 의존성도 만들지 않는다 — 딕셔너리 shape만 맞으면 된다).
 
-``auto_accept_error_and_review_rate``(evaluation.py)는 여기서 연결하지
-않는다. 그 지표는 §5.1 검색이 내린 4분기 판정
-(``AUTO_ACCEPT_CANDIDATE|REVIEW|QUARANTINE|REJECT``)과 "그 판정이 맞았는가"라는
-정답 라벨을 요구한다. 그런데 지금 §5.3 검토 큐는 §5.1 검색 결과가 아니라
-``review_queue``의 검토 사유(모델·전문가 불일치, 저빈도 개념 등)로 채워지고,
-decisions.jsonl에는 §5.1 판정 라벨 자체가 기록되지 않는다 — 두 파이프라인이
-아직 연결돼 있지 않다. 없는 데이터를 있는 척 채우지 않고
-``summarize_decisions``의 ``not_connected`` 필드에 이유를 명시한다.
+§5.1 검색 결과가 ``search_to_review.py``를 통해 §5.3 큐로 들어오게 된 뒤로는
+``grounding_search_decision``(REVIEW|QUARANTINE) 필드가 실린 레코드가
+생긴다 — 이 모듈이 그 서브셋의 "사람 확인율"을 ``grounding_search_confirmation``으로
+계산한다. 다만 ``evaluation.auto_accept_error_and_review_rate``는 **여전히
+연결하지 않는다**: 그 지표는 AUTO_ACCEPT_CANDIDATE·REJECT까지 포함한 전체
+후보 모집단 위에서 계산해야 ``human_review_rate``가 의미를 가지는데,
+``search_to_review.py``는 애초에 REVIEW/QUARANTINE만 큐에 올리도록 설계돼
+있어(AUTO_ACCEPT는 이미 확신, REJECT는 이미 배제) 그 두 등급의 라벨만
+생긴다. 전체 모집단을 로깅하는 별도 파이프라인(모든 §5.1 검색 결과 기록)
+없이는 이 지표를 정직하게 채울 수 없다 — ``not_connected``에 이유를 명시한다.
 """
 
 from __future__ import annotations
@@ -34,6 +36,10 @@ def summarize_decisions(decisions: Mapping[str, Mapping[str, Any]]) -> dict[str,
       승인율이 높은 사유(사람이 대체로 "문제 없다"고 판단)는 가중치를 낮추고,
       승인율이 낮은 사유(사람이 대체로 "문제 있다"고 판단)는 유지·강화하는 식으로
       쓴다.
+    - ``grounding_search_confirmation``: ``grounding_search_decision``이 채워진
+      레코드(§5.1에서 넘어온 것)만 골라 REVIEW/QUARANTINE 등급별 사람 확인율.
+      "§5.1이 애매하다고 판단한 후보 중 사람이 실제로 몇 %를 승인했는가"이며,
+      §5.1 임계값(text_to_window._REVIEW_THRESHOLD 등) 재보정의 실측 근거가 된다.
     """
     records = list(decisions.values())
     decided = [record for record in records if record.get("decision") in _DECIDED_VALUES]
@@ -55,6 +61,19 @@ def summarize_decisions(decisions: Mapping[str, Mapping[str, Any]]) -> dict[str,
         for code, flags in flags_by_reason.items()
     }
 
+    flags_by_search_decision: dict[str, list[bool]] = {}
+    for record in decided:
+        search_decision = record.get("grounding_search_decision")
+        if not search_decision:
+            continue
+        flags_by_search_decision.setdefault(search_decision, []).append(
+            record["decision"] == "ACCEPT"
+        )
+    grounding_search_confirmation = {
+        search_decision: {"confirmation_rate": expert_acceptance_rate(flags), "n": len(flags)}
+        for search_decision, flags in flags_by_search_decision.items()
+    }
+
     return {
         "n_total": len(records),
         "n_decided": len(decided),
@@ -63,11 +82,14 @@ def summarize_decisions(decisions: Mapping[str, Mapping[str, Any]]) -> dict[str,
         "n_skipped": len(skipped),
         "overall_expert_acceptance_rate": overall_rate,
         "by_reason_code": by_reason_code,
+        "grounding_search_confirmation": grounding_search_confirmation,
         "not_connected": {
             "auto_accept_error_and_review_rate": (
-                "decisions.jsonl에 §5.1 4분기 판정 라벨(AUTO_ACCEPT_CANDIDATE 등)이 "
-                "없어 계산할 수 없음 — §5.1 검색 결과를 §5.3 검토 큐로 보내는 연결이 "
-                "아직 없기 때문(README 참조)."
+                "REVIEW/QUARANTINE 서브셋의 사람 확인율은 grounding_search_confirmation으로 "
+                "계산되지만, 이 지표는 AUTO_ACCEPT_CANDIDATE·REJECT까지 포함한 전체 후보 "
+                "모집단이 있어야 human_review_rate가 의미를 가진다 — search_to_review.py는 "
+                "그 두 등급을 애초에 큐에 올리지 않으므로(설계상 의도) 전체 모집단 로깅 "
+                "없이는 여기서 계산할 수 없다."
             )
         },
     }

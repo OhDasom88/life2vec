@@ -78,10 +78,11 @@
 1. ~~`Qwen3EmbeddingProvider`를 실제로 돌려 임계값 재보정~~ — 완료 (`scripts/online2_v2/calibrate_narrative_grounding_thresholds.py`, 0.90/0.75/0.55).
 2. ~~§5.3 검토 큐를 사람이 실제로 처리하는 UI 연결~~ — 완료 (`../ui/data_grounding_curation/`, §5.1 검색 탭도 함께).
 3. ~~`contradicting_windows`(반례) 채우는 로직~~ — 완료 (`contradictions.py`).
-4. SAE feature 기반 랭킹 신호는 `../sae/`가 사전학습 이후에나 존재하므로 Phase 4 이후 `text_to_window.py`에 추가.
-5. ~~`decisions.jsonl` -> `evaluation.py` 실제 계산 파이프라인 연결~~ — `expert_acceptance_rate` 부분은 완료(`decision_metrics.py`, UI §5.4 탭에서 실시간 반영). `auto_accept_error_and_review_rate`는 의도적으로 미연결 — §5.1 판정 라벨이 `decisions.jsonl`에 없기 때문(6번과 연결됨).
-6. **§5.1 검색 결과를 §5.3 검토 큐로 보내는 연결이 없다** — 다음 우선순위 1순위. 이게 있어야 `auto_accept_error_and_review_rate`도 §5.4 리포트에 붙는다.
-7. `../ui/data_grounding_curation/README.md`에 정리된 성능 한계(§5.3 배치 로드 ~40초, §5.1 최초 검색 ~15초, 과매칭 반례) 개선.
+4. ~~`decisions.jsonl` -> `evaluation.py` 실제 계산 파이프라인 연결~~ — `expert_acceptance_rate` 부분은 완료(`decision_metrics.py`, UI §5.4 탭에서 실시간 반영).
+5. ~~§5.1 검색 결과를 §5.3 검토 큐로 보내는 연결~~ — 완료 (`search_to_review.py`, §5.1 탭의 "REVIEW/QUARANTINE을 §5.3 큐로 보내기" 버튼). `decision_metrics.summarize_decisions`가 `grounding_search_confirmation`으로 §5.1 판정 등급별 사람 확인율을 실시간 계산한다.
+6. **`evaluation.auto_accept_error_and_review_rate`는 여전히 완전히 연결되지 않았다** — 의도적. 이 지표는 AUTO_ACCEPT_CANDIDATE·REJECT까지 포함한 전체 후보 모집단이 있어야 `human_review_rate`가 의미를 가지는데, `search_to_review.py`는 REVIEW/QUARANTINE만 큐에 올리도록 설계돼 있다(AUTO_ACCEPT는 이미 확신, REJECT는 이미 배제 — §5.1 자체의 존재 이유). 전체 검색 결과를 매번 로깅하는 별도 파이프라인이 있어야 완전히 채워진다 — 다음 우선순위.
+7. SAE feature 기반 랭킹 신호는 `../sae/`가 사전학습 이후에나 존재하므로 Phase 4 이후 `text_to_window.py`에 추가.
+8. `../ui/data_grounding_curation/README.md`에 정리된 성능 한계(§5.3 배치 로드 ~40초, §5.1 최초 검색 ~15초, 과매칭 반례) 개선.
 
 ## 의존성
 

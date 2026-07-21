@@ -60,6 +60,12 @@ class ReviewQueueEntry:
     narrative: Narrative
     reasons: tuple[ReviewReason, ...]
     priority_score: float
+    # §5.1 search_text_to_window(_over_table)이 이 항목에 내린 4분기 판정
+    # (AUTO_ACCEPT_CANDIDATE|REVIEW|QUARANTINE|REJECT). None이면 이 항목은
+    # §5.1 검색이 아니라 §5.3 배치 샘플링에서 왔다는 뜻 — search_to_review.py가
+    # §5.1 후보를 이 타입으로 감쌀 때만 채운다. decisions.jsonl에 그대로
+    # 실려 decision_metrics.py가 §5.1 판정별 사람 확인율을 계산하는 데 쓴다.
+    grounding_search_decision: str | None = None
 
     @property
     def requires_review(self) -> bool:

@@ -1,4 +1,4 @@
-"""Data Grounding & Curation UI (Streamlit) — narrative_grounding의 §5.1/§5.3 화면.
+"""Data Grounding & Curation UI (Streamlit) — narrative_grounding의 §5.1/§5.3/§5.4 화면.
 
 실행:
   conda run -n life2vec streamlit run \
@@ -7,9 +7,12 @@
 UI 화면 상태는 정본이 아니다(계획서 §15). §5.3 탭의 모든 결정은
 ``outputs/online2/narrative_grounding_review/decisions.jsonl``에 append-only로
 기록된다 — 이 파일을 지우지 않는 한 재실행해도 이미 검토한 항목은 다시
-큐에 뜨지 않는다(마지막 결정 기준). §5.1 탭은 조회 전용이라 아무것도 기록하지
-않는다. 렌더링 외 로직은 전부 ``review_batch.py``/``narrative_grounding.text_to_window``에
-있다.
+큐에 뜨지 않는다(마지막 결정 기준). §5.1 탭은 그 자체로는 아무것도 디스크에
+기록하지 않지만, "REVIEW/QUARANTINE을 §5.3 큐로 보내기" 버튼을 누르면
+``narrative_grounding.search_to_review``를 거쳐 §5.3 탭의 세션 내 큐에
+편입된다 — 실제 기록(append)은 그 항목을 §5.3 탭에서 ACCEPT/REJECT/SKIP할
+때 일어난다. §5.4 탭은 그 decisions.jsonl을 읽기만 하는 조회 전용이다.
+렌더링 외 로직은 전부 ``review_batch.py``/``narrative_grounding.*``에 있다.
 """
 
 from __future__ import annotations
@@ -25,6 +28,9 @@ if str(_REPO_ROOT) not in sys.path:
 
 from src.online2.v2.finetune_v03.narrative_sae_worldmodel.narrative_grounding.decision_metrics import (  # noqa: E402
     summarize_decisions,
+)
+from src.online2.v2.finetune_v03.narrative_sae_worldmodel.narrative_grounding.search_to_review import (  # noqa: E402
+    queue_from_candidates,
 )
 from src.online2.v2.finetune_v03.narrative_sae_worldmodel.narrative_grounding.text_to_window import (  # noqa: E402
     Qwen3EmbeddingProvider,
@@ -95,24 +101,38 @@ def _render_review_queue_tab(catalog, table, farms: list[str]) -> None:
 
     queue = st.session_state["queue"]
     stats = st.session_state["stats"]
-    decisions = load_decisions(DECISIONS_PATH)
-    pending = [entry for entry in queue if entry.narrative.narrative_instance_id not in decisions]
+    # §5.1 탭에서 "검토 큐로 보내기"를 누른 항목(narrative_instance_id로 중복 제거).
+    # 배치를 새로 불러와도 사라지지 않는다 — 독립적인 큐다.
+    search_queue = st.session_state.setdefault("search_queue_entries", {})
+    combined_by_id = {entry.narrative.narrative_instance_id: entry for entry in queue}
+    combined_by_id.update(search_queue)  # 같은 항목이 양쪽에 있으면 §5.1 기원 쪽을 우선 표시
+    all_entries = sorted(combined_by_id.values(), key=lambda entry: entry.priority_score, reverse=True)
 
-    metric_cols = st.columns(4)
+    decisions = load_decisions(DECISIONS_PATH)
+    pending = [entry for entry in all_entries if entry.narrative.narrative_instance_id not in decisions]
+
+    metric_cols = st.columns(5)
     metric_cols[0].metric("farm 전체 인스턴스", stats["farm_row_count"])
     metric_cols[1].metric("이번 배치 샘플", stats["sampled_count"])
-    metric_cols[2].metric("검토 큐(기준에 걸린 것)", stats["queue_length"])
-    metric_cols[3].metric("검토 대기", len(pending))
+    metric_cols[2].metric("배치 큐(기준에 걸린 것)", stats["queue_length"])
+    metric_cols[3].metric("§5.1에서 보낸 큐", len(search_queue))
+    metric_cols[4].metric("검토 대기(합산)", len(pending))
 
     if not pending:
-        st.success("이 배치의 검토 큐가 비었습니다 — 전부 검토했거나 걸린 항목이 없습니다.")
+        st.success("검토 큐가 비었습니다 — 전부 검토했거나 걸린 항목이 없습니다.")
         return
 
     entry = pending[0]
     narrative = entry.narrative
     window = narrative.supporting_windows[0] if narrative.supporting_windows else None
 
+    origin = (
+        f"§5.1 검색 (판정: {entry.grounding_search_decision})"
+        if entry.grounding_search_decision is not None
+        else "§5.3 배치 샘플링"
+    )
     st.subheader(f"[{narrative.narrative_instance_id}]  priority_score={entry.priority_score:.1f}")
+    st.caption(f"출처: {origin}")
     st.warning(
         "검토 사유: "
         + " / ".join(f"**{reason.code}** ({reason.detail})" for reason in entry.reasons)
@@ -205,7 +225,35 @@ def _render_search_tab(catalog, table) -> None:
         st.info("후보를 찾지 못했습니다 (질의와 매칭되는 템플릿·farm 조합이 없음).")
         return
 
-    st.write(f"{len(candidates)}개 후보 (결합 점수 내림차순)")
+    sendable = [c for c in candidates if c.decision in {"REVIEW", "QUARANTINE"}]
+    header_cols = st.columns([3, 2])
+    header_cols[0].write(f"{len(candidates)}개 후보 (결합 점수 내림차순)")
+    if header_cols[1].button(
+        f"REVIEW/QUARANTINE {len(sendable)}건을 §5.3 큐로 보내기",
+        disabled=not sendable,
+    ):
+        new_entries = queue_from_candidates(candidates)
+        search_queue = st.session_state.setdefault("search_queue_entries", {})
+        added = sum(
+            1
+            for e in new_entries
+            if e.narrative.narrative_instance_id not in search_queue
+        )
+        search_queue.update({e.narrative.narrative_instance_id: e for e in new_entries})
+        # main()이 검토 큐 탭을 검색 탭보다 먼저 렌더링하므로, 이 rerun 없이는
+        # 검토 큐 탭이 "이번 실행에서 막 갱신된" search_queue_entries를 반영하지
+        # 못하고 한 번의 rerun만큼 지연된 상태를 보여준다(관찰로 확인한 버그).
+        # st.success는 rerun 이후에도 보이도록 세션에 잠깐 남겨 다음 렌더에서 띄운다.
+        st.session_state["search_queue_flash"] = (
+            f"{len(new_entries)}건 중 신규 {added}건을 §5.3 큐에 추가했습니다 "
+            f"(AUTO_ACCEPT_CANDIDATE/REJECT {len(candidates) - len(new_entries)}건은 "
+            "설계상 사람 검토 없이 제외). '§5.3 사람 검토 큐' 탭에서 확인하세요."
+        )
+        st.rerun()
+
+    if st.session_state.get("search_queue_flash"):
+        st.success(st.session_state.pop("search_queue_flash"))
+
     for candidate in candidates:
         window = candidate.narrative.supporting_windows[0]
         badge = _DECISION_BADGE.get(candidate.decision, "")

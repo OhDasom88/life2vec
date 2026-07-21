@@ -150,6 +150,9 @@ def make_decision_record(
         "reviewer": reviewer or "anonymous",
         "reasons_at_review_time": [asdict(reason) for reason in entry.reasons],
         "priority_score": entry.priority_score,
+        # §5.1 검색에서 온 항목이면 그 4분기 판정(REVIEW|QUARANTINE), 아니면 None.
+        # decision_metrics.py가 §5.1 판정별 사람 확인율을 계산하는 데 쓴다.
+        "grounding_search_decision": entry.grounding_search_decision,
         "reviewed_at_utc": datetime.now(timezone.utc).isoformat(),
     }
 
