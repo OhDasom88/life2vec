@@ -12,12 +12,15 @@ import json
 import numpy as np
 import pytest
 
+import pyarrow as pa
+
 from src.online2.v2.finetune_v03.narrative_sae_worldmodel.narrative_grounding.text_to_window import (
     GROUNDING_DECISIONS,
     StructuredHints,
     TemplateEmbeddingIndex,
     extract_structured_hints,
     search_text_to_window,
+    search_text_to_window_over_table,
 )
 
 _CATALOG = {
@@ -176,3 +179,86 @@ def test_grounding_candidate_rejects_invalid_decision() -> None:
             decision="MAYBE",
             decision_reason="bad",
         )
+
+
+def _table(rows: list[dict]) -> pa.Table:
+    return pa.table(
+        {
+            "sequence_id": [r["sequence_id"] for r in rows],
+            "narrative_id": [r["narrative_id"] for r in rows],
+            "narrative_center": [r["narrative_center"] for r in rows],
+            "background_tokens": [r["background_tokens"] for r in rows],
+            "segment_ids": [r["segment_ids"] for r in rows],
+            "event_views": [r["event_views"] for r in rows],
+            "covered_time_span_hours": [r["covered_time_span_hours"] for r in rows],
+            "quality_flags": [r["quality_flags"] for r in rows],
+            "op_eligible": [r["op_eligible"] for r in rows],
+            "distinct_time_group_count": [r["distinct_time_group_count"] for r in rows],
+        }
+    )
+
+
+def test_search_over_table_uses_farm_hint_to_prefilter() -> None:
+    provider = FakeEmbeddingProvider()
+    index = TemplateEmbeddingIndex(_CATALOG, provider)
+    rows = [
+        _sequence_row("A01", "seq_1", "F130230", "1"),
+        _sequence_row("A01", "seq_2", "F999999", "9"),
+        _sequence_row("B01", "seq_3", "F130230", "1"),
+    ]
+    table = _table(rows)
+
+    candidates = search_text_to_window_over_table(
+        "F130230 zone 1 온도 점프",
+        catalog=_CATALOG,
+        template_index=index,
+        provider=provider,
+        table=table,
+        top_k_templates=2,
+    )
+    ids = {c.narrative.narrative_instance_id for c in candidates}
+    # farm 힌트가 F130230이므로 farm이 다른 seq_2는 애초에 후보 풀에서 제외돼야 한다.
+    assert "seq_2" not in ids
+    assert "seq_1" in ids
+    assert all(c.decision in GROUNDING_DECISIONS for c in candidates)
+
+
+def test_search_over_table_without_farm_hint_falls_back_to_template_filter() -> None:
+    provider = FakeEmbeddingProvider()
+    index = TemplateEmbeddingIndex(_CATALOG, provider)
+    rows = [
+        _sequence_row("A01", "seq_1", "F130230", "1"),
+        _sequence_row("A01", "seq_2", "F999999", "9"),
+    ]
+    table = _table(rows)
+
+    candidates = search_text_to_window_over_table(
+        "온도 점프 센서 이상",
+        catalog=_CATALOG,
+        template_index=index,
+        provider=provider,
+        table=table,
+        top_k_templates=1,
+    )
+    ids = {c.narrative.narrative_instance_id for c in candidates}
+    # farm 힌트가 없으면 템플릿(A01)만으로 필터하므로 둘 다 후보 풀에 들어온다.
+    assert ids == {"seq_1", "seq_2"}
+
+
+def test_search_over_table_respects_max_candidate_rows() -> None:
+    provider = FakeEmbeddingProvider()
+    index = TemplateEmbeddingIndex(_CATALOG, provider)
+    rows = [_sequence_row("A01", f"seq_{i}", "F130230", "1") for i in range(20)]
+    table = _table(rows)
+
+    candidates = search_text_to_window_over_table(
+        "온도 점프",
+        catalog=_CATALOG,
+        template_index=index,
+        provider=provider,
+        table=table,
+        top_k_templates=1,
+        max_windows_per_template=100,
+        max_candidate_rows=5,
+    )
+    assert len(candidates) <= 5

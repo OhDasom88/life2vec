@@ -253,3 +253,65 @@ def search_text_to_window(
 
     candidates.sort(key=lambda candidate: candidate.combined_score, reverse=True)
     return candidates
+
+
+def search_text_to_window_over_table(
+    query: str,
+    *,
+    catalog: Mapping[str, Mapping[str, str]],
+    template_index: TemplateEmbeddingIndex,
+    provider: EmbeddingProvider,
+    table: "object",
+    top_k_templates: int = 3,
+    max_windows_per_template: int = 20,
+    max_candidate_rows: int = 5000,
+) -> list[GroundingCandidate]:
+    """farm을 미리 알지 못하는 자유 텍스트 질의로 전체 코퍼스를 검색하는 편의 함수.
+
+    ``search_text_to_window``는 호출자가 이미 좁혀 놓은 ``corpus_rows``를
+    요구한다(967K행 전체를 매 질의마다 스캔하지 않기 위해서다). 이 함수는 그
+    좁히는 과정을 자동화한다: 질의에서 뽑은 구조적 힌트(farm)가 있으면 그걸로
+    먼저 컬럼 필터를 걸고, 없으면 랭킹된 ``top_k_templates``만으로 필터한다.
+    ``pyarrow`` 컬럼 필터는 967K행에서도 1초 안팎이라 인터랙티브 검색에
+    쓸 수 있다.
+
+    쿼리 임베딩·템플릿 랭킹을 여기서 한 번, ``search_text_to_window`` 내부에서
+    한 번 — 총 두 번 계산한다(약간의 낭비지만 기존 함수의 계약을 바꾸지 않기
+    위한 선택). 배치 처리(다수 질의)에는 이 함수 대신 ``search_text_to_window``를
+    직접 쓰고 ``corpus_rows``를 한 번만 준비할 것.
+
+    ``max_candidate_rows``를 넘는 필터 결과는 앞에서부터 잘라 응답 시간을
+    지킨다 — farm 힌트 없이 아주 큰 템플릿(예: 5만 건대)이 랭킹 상위에 걸리면
+    정확도보다 응답성을 우선한다. farm 단위로 정밀하게 훑으려면
+    ``review_batch.rows_for_farm`` + ``search_text_to_window``를 직접 쓸 것.
+    """
+    import pyarrow as pa
+    import pyarrow.compute as pc
+
+    hints = extract_structured_hints(query)
+    query_vector = provider.embed([query])[0]
+    ranked = template_index.rank(query_vector)[:top_k_templates]
+    top_ids = [narrative_id for narrative_id, _similarity in ranked]
+
+    mask = pc.is_in(table.column("narrative_id"), pa.array(top_ids))
+    if hints.farm_ids:
+        farm_mask = None
+        for farm_id in hints.farm_ids:
+            candidate_mask = pc.match_substring(table.column("background_tokens"), f"FARM|{farm_id}")
+            farm_mask = candidate_mask if farm_mask is None else pc.or_(farm_mask, candidate_mask)
+        mask = pc.and_(mask, farm_mask)
+
+    filtered = table.filter(mask)
+    if filtered.num_rows > max_candidate_rows:
+        filtered = filtered.slice(0, max_candidate_rows)
+    corpus_rows = filtered.to_pylist()
+
+    return search_text_to_window(
+        query,
+        catalog=catalog,
+        template_index=template_index,
+        provider=provider,
+        corpus_rows=corpus_rows,
+        top_k_templates=top_k_templates,
+        max_windows_per_template=max_windows_per_template,
+    )

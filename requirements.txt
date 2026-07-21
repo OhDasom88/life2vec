@@ -95,3 +95,6 @@ psutil==7.2.2
 
 # narrative_grounding review queue UI (ui/data_grounding_curation/app.py)
 streamlit==1.59.2
+# narrative_grounding §5.1 text-to-window search (Qwen3-Embedding-0.6B), same
+# version as the online2-embedding-build conda env for consistency
+transformers==4.57.6

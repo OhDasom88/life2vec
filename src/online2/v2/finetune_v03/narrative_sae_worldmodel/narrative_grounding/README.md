@@ -1,7 +1,7 @@
 # narrative_grounding
 
 **근거**: 계획서 §5 (시계열–서사 양방향 Grounding)
-**Phase**: Phase 1 · **범위**: 현재 필수 (§3.1) · **상태**: §5.1/§5.2/§5.3/§5.4 전부 최소 구현 완료(아래 "알려진 한계"·"다음 작업" 참조), 실측 라벨 기반 재보정은 아직
+**Phase**: Phase 1 · **범위**: 현재 필수 (§3.1) · **상태**: §5.1/§5.2/§5.3/§5.4 구현 완료 + §5.1 임계값 실측 재보정 완료 + `../ui/data_grounding_curation/`(§5.1/§5.3 두 탭) 실제 GPU·실제 코퍼스로 연결 완료. 남은 건 아래 "알려진 한계"·"남은 작업" 참조
 
 ## ⚠ 착수 전 점검 결과 — §5.2와 §6은 이미 대부분 구현되어 있었다
 
@@ -73,12 +73,14 @@
 - `DataWindow`: 시작·종료, 포함 point, 집계·결측·변화점 정보 — `schemas.py`에 구현, `from_online2_corpus.window_from_sequence_row`가 채움
 - `Narrative`: 관측·파생 사실·해석·인과 상태·추천 상태·근거 window — `schemas.py`에 구현, `from_online2_corpus.narrative_from_sequence_row`가 채움
 
-## 남은 작업 (전부 §5.2/§5.1/§5.3/§5.4 최소 구현 이후 단계)
+## 남은 작업
 
-1. `Qwen3EmbeddingProvider`를 실제로 `online2-embedding-build` conda 환경에서 돌려 80개 템플릿 임베딩을 캐시하고, `text_to_window`의 임계값(0.75/0.5/0.3)·가중치(0.7/0.3)를 실제 유사도 분포로 재검토.
-2. §5.3 검토 큐를 사람이 실제로 처리하는 최소 UI/CLI 하나 연결(`../ui/data_grounding_curation/`) — 라벨이 나와야 §5.4가 실측 지표를 낼 수 있다.
-3. SAE feature 기반 랭킹 신호는 `../sae/`가 사전학습 이후에나 존재하므로 Phase 4 이후 `text_to_window.py`에 추가.
-4. `contradicting_windows`(반례) 채우는 로직 — 현재는 항상 빈 튜플이라 §5.3의 "근거·반례 동시 존재" 기준이 발동하지 않는다.
+1. ~~`Qwen3EmbeddingProvider`를 실제로 돌려 임계값 재보정~~ — 완료 (`scripts/online2_v2/calibrate_narrative_grounding_thresholds.py`, 0.90/0.75/0.55).
+2. ~~§5.3 검토 큐를 사람이 실제로 처리하는 UI 연결~~ — 완료 (`../ui/data_grounding_curation/`, §5.1 검색 탭도 함께).
+3. ~~`contradicting_windows`(반례) 채우는 로직~~ — 완료 (`contradictions.py`).
+4. SAE feature 기반 랭킹 신호는 `../sae/`가 사전학습 이후에나 존재하므로 Phase 4 이후 `text_to_window.py`에 추가.
+5. `decisions.jsonl`(§5.3 UI가 쌓는 사람 결정 로그) -> `evaluation.py`의 `expert_acceptance_rate`/`auto_accept_error_and_review_rate` 실제 계산 파이프라인 연결. 지금은 라벨이 있어도 자동으로 지표까지 이어지지 않는다.
+6. `../ui/data_grounding_curation/README.md`에 정리된 성능 한계(§5.3 배치 로드 ~40초, §5.1 최초 검색 ~15초, 과매칭 반례) 개선.
 
 ## 의존성
 
