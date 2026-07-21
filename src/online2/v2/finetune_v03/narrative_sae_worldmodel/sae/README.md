@@ -1,7 +1,7 @@
 # sae
 
 **근거**: 계획서 §9 (SAE 기반 기계적 해석)
-**Phase**: Phase 4 · **범위**: 현재 필수 (§3.1, "선택 layer 대상 SAE pilot"만) · **상태**: 핵심 구현 완료(상태 머신·모델·평가·dead feature resampling) + dense/narrative-selected 두 표본 구성으로 총 9가지 설정 실측 비교, 34개 테스트 통과. **원인 진단 완료(데이터의 유효 차원이 근본적으로 낮음, 표본 구성 방식과 무관), §18 중단 조건은 계속 발동 — 아래 참조**
+**Phase**: Phase 4 · **범위**: 현재 필수 (§3.1, "선택 layer 대상 SAE pilot"만) · **상태**: 핵심 구현 완료(상태 머신·모델·평가·dead feature resampling) + 표본 구성 9종 + 6개 encoder layer 비교 실측, 34개 테스트 통과. **원인 진단 완료(데이터의 유효 차원이 근본적으로 낮음, 표본 구성과 무관) + 개선 방향 하나 발견(최종 layer 대신 layer 2/4), §18 중단 조건은 계속 발동 — 아래 참조**
 
 ## 목적
 
@@ -66,7 +66,22 @@ dict_size를 PCA 유효 차원(29)에 거의 맞춘 32~64에서도 dead ratio가
 
 **시도했지만 효과 없었던 것**: 55-case 대신 더 넓은 표본(narrative-template 선별, 또는 v2_build 전체)에서 activation을 새로 뽑는 것 — 위 "직접 검증" 참조. 효과 없음이 명확히 확인됐으므로 더 이상 이 방향은 시도할 필요 없다.
 
-**다음으로 시도해볼 것(아직 안 해본 것, 원인 (2) "TopK 승자독식"을 겨냥 — 데이터가 아니라 SAE 학습 알고리즘 쪽 문제이므로 이쪽이 남은 유일한 레버다)**: (1) 더 공격적인 resampling(지금은 epoch당 1회, threshold=0.0 — 배치 단위로 더 자주 하거나 threshold를 0보다 높여서 "거의 안 쓰이는" feature까지 선제적으로 재초기화), (2) auxiliary loss로 저사용 feature에 보너스를 주는 방식(예: OpenAI TopK SAE 논문의 "AuxK" 손실 — 죽은/저사용 feature가 reconstruction residual을 추가로 설명하도록 강제), (3) 초기화 방식(직교 초기화 등)을 바꿔 초반 승자독식을 완화, (4) 더 이른/다른 transformer layer의 activation(지금은 최종 pooled output만 썼다 — PCA는 선형 구조만 보므로, pooling 이전의 토큰별 hidden state나 중간 layer에는 비선형적으로 더 많은 구조가 남아있을 가능성이 있다). 지금 갖고 있는 도구(`model.py`의 `sparsity_mode`/`top_k`, `training.py`의 `resample_dead_features`, `pilot_sae_stage_a_activations.py`의 `--dict-size`)로 (1)(2)(3)은 바로 시도 가능하다 — 시간 제약으로 이번 세션에서는 여기까지만 했다.
+### 효과가 있었던 방향 — 최종 layer 대신 중간 layer
+
+앞서 "SAE 학습 알고리즘 쪽만 남은 레버"라고 썼는데, 이건 **틀렸다** — activation을 어느 layer에서 뽑느냐도 실제로 유의미한 차이를 만든다. `scripts/online2_v2/pilot_sae_layer_sweep.py`로 6개 encoder layer 전부의 pooled activation을 (`Transformer.forward_finetuning`을 고치지 않고 같은 루프를 복제해) 한 번의 순전파로 동시에 캡처해 비교했다(같은 14,544개 narrative-selected 타깃, dict=64, top_k=8, 15 epoch):
+
+| layer | 유효차원(rank99) | explained_variance | dead_feature_ratio |
+|---|---|---|---|
+| 0 | 18 | 0.946 | 0.469 |
+| 1 | 20 | 0.951 | 0.438 |
+| **2** | 29 | 0.941 | **0.391**(6개 layer 중 최저) |
+| 3 | 30 | 0.927 | 0.438 |
+| 4 | **35**(6개 layer 중 최고) | 0.889 | 0.406 |
+| 5(최종 layer — **지금까지 모든 pilot이 이걸 썼다**) | 29 | 0.923 | **0.500**(6개 layer 중 최악) |
+
+**지금까지의 모든 실험(위 표 전부)이 6개 layer 중 dead_feature_ratio가 가장 나쁜 최종 layer만 썼다.** MLM/SOP 예측 헤드 바로 앞이라 과제에 맞춰 표현이 "눌린" 것으로 보인다 — layer 4는 유효 차원이 가장 높고(35), layer 2는 dead ratio가 가장 낮다(0.391, 지금까지 나온 모든 설정 중 최저값). 다만 이건 seed 1개짜리 결과이므로 재현성 확인 전까지는 "유력한 다음 후보"로만 취급한다.
+
+**다음으로 시도해볼 것**: (1) layer 2/4를 기본으로 놓고 dict_size·sparsity를 다시 sweep(지금까지의 dict/L1 실험은 전부 최종 layer 기준이었다 — 최적 조합이 layer마다 다를 수 있음), (2) 여러 seed로 layer 2/4 결과 재현성 확인, (3) TopK 승자독식 자체를 겨냥한 것들(AuxK류 loss, 더 공격적인 resampling, 다른 초기화) — 여전히 유효한 방향이지만 이번엔 layer 2/4 위에서 시도해야 함.
 
 ## 구현한 것
 
@@ -76,6 +91,7 @@ dict_size를 PCA 유효 차원(29)에 거의 맞춘 32~64에서도 dead ratio가
 - [`training.py`](training.py) — `resample_dead_features`: activation frequency가 threshold 이하인 feature의 encoder/decoder 가중치만 골라 재초기화(다른 feature는 안 건드림, 테스트로 확인). 표준 기법 그대로 씀 — "재구성 오차가 큰 방향으로 재초기화"하는 더 정교한 변형은 안 함(아래 "아직 없는 것").
 - [`scripts/online2_v2/pilot_sae_stage_a_activations.py`](../../../../../../scripts/online2_v2/pilot_sae_stage_a_activations.py) — dense(CF1S) 표본 pilot. 재현 가능.
 - [`scripts/online2_v2/pilot_sae_narrative_selected_activations.py`](../../../../../../scripts/online2_v2/pilot_sae_narrative_selected_activations.py) — narrative-template 타깃 표본 pilot. `training_events_v2.parquet`(1,500만 행)에서 시퀀스별 타깃 이벤트를 스트리밍 집계(전체를 메모리에 안 올림, 청크 단위로 처리), 80개 템플릿당 균등 샘플링한 뒤 `cache_stage_a_event_embeddings.py`의 인코딩 함수를 그대로 import해 재사용한다(활성화 계산 로직 중복 없음).
+- [`scripts/online2_v2/pilot_sae_layer_sweep.py`](../../../../../../scripts/online2_v2/pilot_sae_layer_sweep.py) — 6개 encoder layer 전부의 pooled activation을 한 번의 순전파로 동시에 캡처해 비교(`Transformer.forward_finetuning`의 embedding+layer 루프를 그대로 복제, 원본 모델 클래스는 안 건드림). 위 narrative-selected 스크립트의 타깃 선택 함수를 그대로 import해 재사용.
 
 ## 아직 없는 것
 
@@ -96,4 +112,4 @@ D1(복원), D2(dead feature ratio 일부) 계산 가능. D3–D6(개념 매핑, 
 
 ## 중단 조건 연결
 
-§18 "SAE feature 대부분이 dead 또는 불안정" — **실측으로 발동, dense/narrative-selected 두 표본 구성 방식(총 9개 설정) 비교 이후에도 해소 안 됨**(위 pilot 결과 표 참조). 근본 원인을 특정했다: (1) 이 데이터셋(55농장×14일, 원시 이벤트 222,309건) 자체의 낮은 유효 차원(PCA로 384차원 중 29개가 99% 분산 설명 — **원인 특정 완료, 표본을 dense/narrative-selected 어느 쪽으로 구성해도 동일함을 직접 검증**), (2) dict_size를 그 차원(29)에 맞춰도 남는 TopK "승자독식" 학습 역학(dict=32~64에서도 dead ratio가 0.40~0.50 바닥 — **미해결**). (1)은 "더 넓거나 더 잘 고른 표본"으로 해결되는 문제가 아님이 확인됐으므로, concept_governance/world_model 등 다음 단계로 넘어가려면 (2)를 겨냥한 남은 방향(AuxK loss, 더 공격적인 resampling, 다른 layer의 activation)을 시도하거나, 이 데이터셋 규모에서 SAE pilot 자체의 기대 수준을 재설정해야 한다.
+§18 "SAE feature 대부분이 dead 또는 불안정" — **실측으로 발동, 표본 구성 9종 비교 이후에도 해소 안 됨**(위 pilot 결과 표 참조). 근본 원인을 특정했다: (1) 이 데이터셋(55농장×14일, 원시 이벤트 222,309건) 자체의 낮은 유효 차원(PCA로 384차원 중 29개가 99% 분산 설명 — **원인 특정 완료, 표본을 dense/narrative-selected 어느 쪽으로 구성해도 동일함을 직접 검증**), (2) dict_size를 그 차원(29)에 맞춰도 남는 TopK "승자독식" 학습 역학(dict=32~64에서도 dead ratio가 0.40~0.50 바닥). (1)은 "더 넓거나 더 잘 고른 표본"으로 해결되는 문제가 아님이 확인됐지만, **6개 encoder layer를 비교한 결과 최종 layer(지금까지 모든 pilot이 쓴 것) 대신 layer 2를 쓰면 dead ratio가 0.500→0.391로 개선됐다**(seed 1개 결과, 재현성 확인 전) — §18 해소를 위한 다음 시도는 layer 2/4 기준으로 dict_size·sparsity를 재sweep하는 것부터 시작할 것.
