@@ -1,7 +1,7 @@
 # sae
 
 **근거**: 계획서 §9 (SAE 기반 기계적 해석)
-**Phase**: Phase 4 · **범위**: 현재 필수 (§3.1, "선택 layer 대상 SAE pilot"만) · **상태**: 핵심 구현 완료(상태 머신·모델·평가·dead feature resampling) + 표본 구성 9종 + 6개 encoder layer 비교 실측, 34개 테스트 통과. **원인 진단 완료(데이터의 유효 차원이 근본적으로 낮음, 표본 구성과 무관) + 개선 방향 하나 발견(최종 layer 대신 layer 2/4), §18 중단 조건은 계속 발동 — 아래 참조**
+**Phase**: Phase 4 · **범위**: 현재 필수 (§3.1, "선택 layer 대상 SAE pilot"만) · **상태**: 핵심 구현 완료(상태 머신·모델·평가·dead feature resampling) + 표본 구성 9종 + 6개 encoder layer 비교 + 랜덤 초기화·MLM/SOP 디코더 헤드 비교 실측, 34개 테스트 통과. **원인 진단 완료(데이터의 유효 차원이 근본적으로 낮음, 표본 구성과 무관) + 압축이 학습으로 생긴 것임을 랜덤 초기화 대조로 확인 + 개선 방향 하나 발견(최종 layer 대신 layer 2/4), §18 중단 조건은 계속 발동 — 아래 참조**
 
 ## 목적
 
@@ -82,6 +82,29 @@ dict_size를 PCA 유효 차원(29)에 거의 맞춘 32~64에서도 dead ratio가
 **지금까지의 모든 실험(위 표 전부)이 6개 layer 중 dead_feature_ratio가 가장 나쁜 최종 layer만 썼다.** MLM/SOP 예측 헤드 바로 앞이라 과제에 맞춰 표현이 "눌린" 것으로 보인다 — layer 4는 유효 차원이 가장 높고(35), layer 2는 dead ratio가 가장 낮다(0.391, 지금까지 나온 모든 설정 중 최저값). 다만 이건 seed 1개짜리 결과이므로 재현성 확인 전까지는 "유력한 다음 후보"로만 취급한다.
 
 **다음으로 시도해볼 것**: (1) layer 2/4를 기본으로 놓고 dict_size·sparsity를 다시 sweep(지금까지의 dict/L1 실험은 전부 최종 layer 기준이었다 — 최적 조합이 layer마다 다를 수 있음), (2) 여러 seed로 layer 2/4 결과 재현성 확인, (3) TopK 승자독식 자체를 겨냥한 것들(AuxK류 loss, 더 공격적인 resampling, 다른 초기화) — 여전히 유효한 방향이지만 이번엔 layer 2/4 위에서 시도해야 함.
+
+### 이 압축이 "학습으로 생긴 것"인지 "구조 자체의 특성"인지 — 랜덤 초기화와 직접 비교
+
+"사전학습이 빈칸 맞추기·순서 맞추기라는 과제를 익히면서 표현의 다양성을 없앤다고 봐도 되는가?"라는 질문을 검증하려면, 같은 구조를 **학습 안 시킨 채로** 같은 실험을 돌려 비교해야 한다. `scripts/online2_v2/pilot_sae_layer_decoder_random_comparison.py`로 (1) 체크포인트와 동일한 hparams로 architecture만 만들고 `load_state_dict`를 생략한 랜덤 초기화 인코더, (2) 그 최종 layer 출력을 실제 `MaskedLanguageModel`/`CLS_Decoder`의 예측 직전 변환(`V`+`tanh`+`l2_norm`, `in_layer`+`swish`+`ScaleNorm`)에 통과시킨 표현까지 — 같은 14,544개 narrative-selected 타깃, 같은 dict=64/top_k=8/15 epoch로 학습된 모델과 나란히 측정했다.
+
+| position | 학습된 인코더 rank99 | 학습된 dead | 랜덤 초기화 rank99 | 랜덤 초기화 dead |
+|---|---|---|---|---|
+| layer0 | 18 | 0.469 | 118 | 0.406 |
+| layer1 | 20 | 0.438 | 118 | 0.406 |
+| layer2 | 29 | 0.391 | 118 | 0.406 |
+| layer3 | 30 | 0.438 | 118 | 0.406 |
+| layer4 | 35 | 0.406 | 118 | 0.406 |
+| layer5(최종) | 29 | 0.500 | 118 | 0.406 |
+| mlm_transform | 52 | 0.516 | 103 | 0.875 |
+| sop_transform | 15 | 0.547 | 1 | 0.875 |
+
+**랜덤 초기화 6개 layer가 전부 bit-for-bit 동일하다(rank99=118, EV=0.434528 소수 6자리까지 일치) — 이건 버그가 아니라 이 체크포인트의 `norm_type="rezero"` 설정 때문에 생기는 정확한 항등식이다.** `ReZero.forward(x, y) = x + y * self.weights`이고 `self.weights`는 `torch.zeros(1)`로 초기화된다(`src/transformer/transformer_utils.py:275`) — 즉 학습 전에는 **모든 encoder layer가 수학적으로 정확히 항등함수**다(residual 게이트가 정확히 0이라 sublayer 출력이 전부 지워짐). 그래서 layer 0~5 사이에서 관측되는 "상승 후 하강" 패턴은 전부 학습이 만든 것이다 — 학습을 안 시키면 깊이가 몇이든 표현이 전혀 안 바뀐다.
+
+**결론 1 — 사용자 가설이 실측으로 뒷받침된다.** 랜덤 초기화 상태의 유효 차원(6개 layer 전부 118)은 학습된 모델의 어느 layer보다도 훨씬 높다(학습된 쪽은 15~35). MLM/SOP라는 좁은 과제로 학습을 시키자 표현의 선형 자유도가 384차원 중 100차원대에서 15~35차원대로, **3~7배 줄어들었다.** 이건 architecture/depth 자체의 부산물이 아니라(랜덤 초기화에서는 깊이가 전혀 영향을 안 준다는 걸 위에서 확인했다), 학습이 직접 만든 압축이다.
+
+**결론 2 — 다만 "디코더 헤드로 갈수록 계속 줄어든다"는 아니다(단순하지 않음, 정직하게 기록).** 학습된 모델 기준으로 SOP 변환(rank99=15)은 layer5(29)보다 더 압축됐지만, **MLM 변환(rank99=52)은 오히려 layer5보다 유효 차원이 더 높다** — PCA 기준으로는 "더 다양해졌다." 반면 SAE dead_feature_ratio는 두 디코더 변환(0.516, 0.547) 모두 layer5(0.500)보다 나쁘다 — PCA 유효 차원과 SAE dead ratio가 항상 같은 방향으로 움직이지는 않는다는 뜻이다. 랜덤 초기화 쪽에서는 두 디코더 변환 모두(특히 SOP는 rank99=1로 완전히 붕괴) 원본 encoder layer(118)보다 훨씬 나쁘다 — 디코더 헤드는 ReZero 항등식 보호를 안 받는 별도의 랜덤 초기화 Linear라서, 학습 여부와 무관하게 그 자체로 표현을 강하게 재구성한다는 뜻으로 보인다.
+
+- [`scripts/online2_v2/pilot_sae_layer_decoder_random_comparison.py`](../../../../../../scripts/online2_v2/pilot_sae_layer_decoder_random_comparison.py) — 랜덤 초기화 인코더(`load_untrained_encoder`, hparams는 체크포인트와 동일하되 `load_state_dict` 생략) + `model.mlm_decoder`/`model.cls_decoder`의 예측 직전 변환까지 포함해 8개 지점(6 layer + MLM/SOP 변환)을 학습된 모델과 나란히 비교. 위 layer sweep 스크립트의 타깃 선택·pooling 패턴을 그대로 재사용.
 
 ## 구현한 것
 
