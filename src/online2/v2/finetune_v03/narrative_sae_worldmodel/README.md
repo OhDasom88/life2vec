@@ -13,7 +13,7 @@
 | 디렉토리 | 계획서 절 | Phase | 상태 |
 |---|---|---|---|
 | [narrative_grounding/](narrative_grounding/README.md) | §5 | Phase 1 | §5.1/§5.2/§5.3/§5.4 구현 + 실측 재보정 + 반례 탐지 + [ui/data_grounding_curation/](ui/data_grounding_curation/README.md) 3탭(검색→검토 큐→리포트)이 하나의 루프로 연결됨(66개 테스트 통과). 남은 건 `auto_accept_error_and_review_rate`의 전체 모집단 로깅(부분 연결) |
-| [sequence_curation/](sequence_curation/README.md) | §6.3 | Phase 2 | 미착수 |
+| [sequence_curation/](sequence_curation/README.md) | §6.2/§6.3 | Phase 2 | 구현 완료(절단 알고리즘·편집 트랜잭션·§5.3 연결, 실행 배치는 아직) |
 | [multimodal_pretrain/](multimodal_pretrain/README.md) | §7 | Phase 2 | 미착수 (기존 `pipeline_m2.py`/`stage_a_reencoder.py` 확장) |
 | [representation_tracking/](representation_tracking/README.md) | §8.3 | Phase 3 | 미착수 |
 | [sae/](sae/README.md) | §9 | Phase 4 | 미착수 |
