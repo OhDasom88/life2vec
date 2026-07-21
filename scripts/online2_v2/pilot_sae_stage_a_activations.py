@@ -60,8 +60,20 @@ def main() -> None:
         type=Path,
         default=Path("outputs/online2/v2_finetune_v02/event_embeddings"),
     )
-    parser.add_argument("--max-rows", type=int, default=20000)
-    parser.add_argument("--dict-expansion-factor", type=int, default=8)
+    parser.add_argument(
+        "--max-rows",
+        type=int,
+        default=220000,  # 전체 216,040개 캐시 벡터를 다 쓴다(2분 남짓). 15,000개
+        # 샘플만 쓰면 dead_feature_ratio가 눈에 띄게 나빠진다(README 실측 참조) -
+        # 데이터를 줄이는 게 기본값이면 안 된다.
+    )
+    parser.add_argument(
+        "--dict-expansion-factor",
+        type=int,
+        default=4,  # 8x는 실측(README 참조)에서 dead_feature_ratio가 과도했다. 4x가
+        # 지금까지 실제로 돌려본 것 중 explained_variance가 가장 높았다(0.970) -
+        # dead ratio 자체는 여전히 §18 기준을 넘지만(0.641), 8x보다는 명백히 낫다.
+    )
     parser.add_argument("--sparsity-mode", choices=["L1", "TOPK"], default="TOPK")
     parser.add_argument("--top-k", type=int, default=16)
     parser.add_argument("--l1-coefficient", type=float, default=1e-3)
