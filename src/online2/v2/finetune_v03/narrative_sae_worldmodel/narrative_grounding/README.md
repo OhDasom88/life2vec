@@ -54,6 +54,16 @@
 
 우선순위 가중치(`_REASON_WEIGHTS`)도 실측 없이 정한 1차 값이다 — `SPLIT_ACCESS_AMBIGUOUS`만은 계획서 fail-closed 원칙(§0) 때문에 재보정 이후에도 최우선을 유지해야 한다.
 
+## 반례(contradicting_windows) 탐지 (구현 완료)
+
+[`contradictions.py`](contradictions.py) — `contradicting_windows`가 항상 빈 튜플이라던 이전 한계를 해소했다. 새 매칭 규칙을 발명하지 않고 전문가가 이미 각 템플릿에 붙여 둔 `confounders` 텍스트(`normalized_catalog.csv`, 80개 템플릿 전부 비어있지 않음)를 근거로 쓴다: narrative_id가 다른 템플릿의 window가 (a) 같은 farm, (b) 시간 겹침(`temporal_iou > 0`), (c) 그 템플릿 설명 텍스트에 이 narrative의 confounders 키워드가 부분 문자열로 등장 — 세 조건을 모두 만족하면 "경쟁 설명"으로 `contradicting_windows` 후보에 올린다.
+
+실제 데이터(farm F130230, 16,573개 인스턴스)로 검증: A01("실내온도 급격한 점프", confounders="실제 급변;환기")이 같은 시간대의 C01/C02("환기" 관련 원인반응 템플릿)와 매칭되는 것을 확인했다 — 온도 점프가 센서 이상이 아니라 실제 환기 작동 때문일 수 있다는, 전문가가 이미 알고 있던 경쟁 설명이 자동으로 표면화된다.
+
+`augment_with_contradictions(narrative, catalog, candidate_rows)`는 `Narrative`가 frozen이라 원본을 바꾸지 않고 `contradicting_windows`가 채워진 사본을 반환한다. 이제 `../review_queue.py`의 "근거·반례 동시 존재" 기준이 실제로 발동할 수 있다(이전에는 `contradicting_windows`가 항상 비어 있어 죽은 코드였음).
+
+**한계**: 부분 문자열 매칭이라 오탐/누락이 있다(예: "환기"가 category 텍스트에 우연히 등장하면 실제로 무관해도 매칭됨). 그 자체로 "이 narrative는 틀렸다"는 결론이 아니라 사람 검토로 넘기는 신호다. 같은 경쟁 템플릿의 여러 인스턴스가 겹치면 중복 매칭이 그대로 반환된다(템플릿 단위 dedup은 아직 없음, UI 표시 단계에서 그룹핑 필요).
+
 ## §5.4 Grounding 평가 (지표 함수 구현 완료, 라벨 데이터는 없음)
 
 [`evaluation.py`](evaluation.py) — Recall@K, Precision@K, temporal IoU, feature-set overlap(Jaccard), farm/zone scope accuracy, cycle consistency, unsupported claim rate, expert acceptance rate, auto-accept 오류율/사람 검토율 9개 지표를 순수 함수로 구현. **사람이 라벨링한 정답 grounding pair는 아직 없다** — 이 함수들은 §5.3 검토 큐를 사람이 실제로 처리하기 시작하면 그 결과를 입력으로 소비할 준비가 된 상태이며, 지금은 합성 데이터로만 검증했다.
