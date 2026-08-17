@@ -1,7 +1,14 @@
 # world_model
 
 **근거**: 계획서 §12 (월드모델 준비)
-**Phase**: Phase 6 · **범위**: 조건부 확장 (§3.2, acceptance 통과 시에만) · **상태**: 미착수 — **착수 전 리스크 검토 필수**
+**Phase**: Phase 6 · **범위**: 조건부 확장 (§3.2, acceptance 통과 시에만) · **상태**: **부분 구현(2026-07-24)** — bounded-edit 보조 scorer 역할만, RL 승격은 `promotion_gate.py`로 코드 레벨 차단됨
+
+## 범위 결정 (2026-07-24)
+
+사용자에게 세 옵션(① 지금 항목만 진행 ② action coverage 확장까지 포함 ③ world_model 전체 보류)을 물었고, **①(권장)을 선택**했다 — dynamics/plausibility/action-conditioned/uncertainty 모델과 3+ event 편집(action coverage 확장)은 **이번 범위에서 명시적으로 제외**한다. 대신 아래 최소 구현만 한다:
+
+1. [`bounded_edit_scorer.py`](bounded_edit_scorer.py) — 이미 완성된 `counterfactual/evaluation/diagnosis_critic.py`(fold-ensembled risk_before/after)를 이 트리에서도 찾을 수 있게 얇게 재노출. 새 계산 없음 — §12.1 role table의 "Outcome model" 역할이 사실 이미 구현돼 있었다는 걸 명시적으로 드러낸 것뿐이다.
+2. [`promotion_gate.py`](promotion_gate.py) — §12.3 7개 승격 기준을 실제 코드로 강제. `PromotionDecision.__post_init__`가 기준 미충족 상태에서 `promoted=True`를 만들 수 없게 막고(생성 자체가 실패), `current_known_status()`는 **지금 실제 상태**(7개 전부 미통과, 근거: 아래 §14 실측)를 반환한다. dynamics/plausibility/uncertainty 모델을 나중에 만들더라도, 이 게이트에 진짜 증거를 넣기 전까지는 promoted=True를 구성할 수 없다.
 
 ## ⚠ 착수 전 필독 — §14 실측 신호 부재
 
@@ -28,9 +35,9 @@ encoder 공유는 허용하되 각 head의 loss·검증지표·사용권한은 �
 
 ## 구현 계획
 
-1. `action_dataset.py` — A_actuator 원시 CSV에서 난방/냉방/환기창/차광/관수(시작·종료·양)/양액 EC·pH/농작업 이벤트 추출, 행동 시각과 반응 지연 페어링, 행동 전후 상태 기록.
-2. `plausibility_model.py`, `dynamics_model.py`, `action_conditioned_model.py`, `uncertainty_model.py` — 각 head 별도 파일, loss·검증지표·사용권한 분리된 config.
-3. `promotion_gate.py` — §12.3 승격 기준 7개 항목 자동 체크리스트: next-state가 persistence/seasonal baseline보다 우수 / multi-step rollout horizon별 오류 보고 / action conditioning이 실제 반응 차이 학습 / uncertainty calibration 통과 / OOD action·state 탐지 / 실제 trajectory와 rollout의 물리·시간 일관성 / development acceptance 고정 후 holdout(Validation20) blind 평가. 미충족 시 RL 환경 승격을 코드 레벨에서 차단.
+1. `action_dataset.py` — A_actuator 원시 CSV에서 난방/냉방/환기창/차광/관수(시작·종료·양)/양액 EC·pH/농작업 이벤트 추출, 행동 시각과 반응 지연 페어링, 행동 전후 상태 기록. **이번 범위에서 제외** — action coverage 확장(3+ event 편집) 작업의 일부라 2026-07-24 범위 결정으로 다음 세션으로 미뤘다.
+2. `plausibility_model.py`, `dynamics_model.py`, `action_conditioned_model.py`, `uncertainty_model.py` — **이번 범위에서 제외**, 같은 이유. 이 4개 없이는 `promotion_gate.py`의 7개 기준 중 5개(next_state_beats_baseline, multistep_rollout_error_reported, action_conditioning_learns_real_effect, uncertainty_calibration_passes, ood_detection_works, rollout_physically_consistent)에 진짜 증거를 채울 수 없다 — 게이트가 왜 지금 전부 FALSE인지의 직접적 이유다.
+3. `promotion_gate.py` — **완료**. §12.3 승격 기준 7개 항목을 `evaluate_promotion_gate()`로 구현, `current_known_status()`가 실제 현재 상태(전부 미통과)를 반환. 합성 데이터로 fail-closed 강제(모든 기준 통과 없이는 `promoted=True` 구성 자체가 `ValueError`)와 all-pass 정상 경로 둘 다 실측 검증했다.
 
 ## 의존성
 
