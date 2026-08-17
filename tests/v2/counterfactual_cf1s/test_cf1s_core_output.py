@@ -189,6 +189,40 @@ def test_envelope_recommendation_always_null():
     assert env["executable_edit"] is None
     assert env["causal_effect_claim_authorized"] is False
 
+
+def test_envelope_nests_extra_not_flattens_it():
+    # Regression: the verifier reads threshold/closure/selection_manifest/
+    # scientific_detail via proposal.get("extra").get(...) — flattening extra
+    # into the top level (the original bug) orphans those fields and fails
+    # G6-G9 with "missing" errors on real (non-mocked) production output.
+    authority = AuthorityContext(
+        evaluation_stage=EvaluationStage.DEVELOPMENT_PRODUCTION,
+        execution_authorized=True,
+        evidence_output_authorized=True,
+    )
+    evidence = ExecutionEvidenceFlags(
+        production_input_verified=True,
+        pipeline_integrity_verified=True,
+        baseline_forward_complete=True,
+    )
+    env = build_case_edit_proposal_envelope(
+        case_id="c",
+        authority=authority,
+        evidence=evidence,
+        evidence_kind=EvidenceKind.ACTUAL_MODEL_FORWARD,
+        construction_status=ConstructionStatus.COMPLETE,
+        scientific_status=ScientificStatus.NOT_EVALUATED,
+        ordering_status=OrderingStatus.NOT_ORDERABLE,
+        candidate_sets=build_candidate_set_manifest(
+            constructed_candidate_ids=[],
+            evaluable_candidate_ids=[],
+            selected_candidate_ids=[],
+        ),
+        extra={"threshold": {"locked_min_effect_abs_delta": 0.001}},
+    )
+    assert "threshold" not in env
+    assert env["extra"]["threshold"]["locked_min_effect_abs_delta"] == 0.001
+
     summary = build_runner_summary(
         case_envelopes=[env],
         execution_readiness=ExecutionReadiness.READY,

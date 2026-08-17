@@ -1,0 +1,297 @@
+{
+  "manifest_id": "CF1S_PRIMARY32_MANIFEST",
+  "locked_cohort_case_count": 32,
+  "ordered_case_ids": [
+    "F662255_2025-02-05_2025-02-18",
+    "F393975_2024-10-21_2024-11-03",
+    "F538612_2025-01-05_2025-01-18",
+    "F705994_2025-01-05_2025-01-18",
+    "F194265_2024-10-23_2024-11-05",
+    "F773675_2024-10-29_2024-11-11",
+    "F814133_2025-03-24_2025-04-06",
+    "F332196_2025-03-08_2025-03-21",
+    "F605134_2025-02-18_2025-03-03",
+    "F882016_2024-09-16_2024-09-29",
+    "F541562_2024-12-07_2024-12-20",
+    "F354848_2025-03-25_2025-04-07",
+    "F155481_2024-12-24_2025-01-06",
+    "F584775_2024-11-08_2024-11-21",
+    "F551358_2024-09-21_2024-10-04",
+    "F188026_2025-02-08_2025-02-21",
+    "F760592_2025-01-15_2025-01-28",
+    "F209570_2025-03-01_2025-03-14",
+    "F302129_2024-10-15_2024-10-28",
+    "F596090_2025-01-18_2025-01-31",
+    "F257178_2024-12-21_2025-01-03",
+    "F541027_2025-03-07_2025-03-20",
+    "F396544_2025-01-25_2025-02-07",
+    "F944488_2024-09-21_2024-10-04",
+    "F854780_2024-09-23_2024-10-06",
+    "F135380_2024-12-24_2025-01-06",
+    "F451640_2025-03-22_2025-04-04",
+    "F295998_2024-12-08_2024-12-21",
+    "F968401_2025-03-24_2025-04-06",
+    "F972654_2024-10-01_2024-10-14",
+    "F981237_2024-12-18_2024-12-31",
+    "F995842_2025-02-12_2025-02-25"
+  ],
+  "cases": [
+    {
+      "case_id": "F662255_2025-02-05_2025-02-18",
+      "source_label_row_identity_sha256": "46a93e598b286267026831da2f0c22b9311196574b5854b319f729a208529975",
+      "input_artifact_sha256": null,
+      "farm_id": "F662255",
+      "period_start": "2025-02-05",
+      "period_end": "2025-02-18"
+    },
+    {
+      "case_id": "F393975_2024-10-21_2024-11-03",
+      "source_label_row_identity_sha256": "58fef17a8d7fecb5c696f252355f5d09b9126dfea3986ecc4325e2cdc1c568ae",
+      "input_artifact_sha256": null,
+      "farm_id": "F393975",
+      "period_start": "2024-10-21",
+      "period_end": "2024-11-03"
+    },
+    {
+      "case_id": "F538612_2025-01-05_2025-01-18",
+      "source_label_row_identity_sha256": "112daabf2553a5e8569fe5dd574a65ba61afe3d6679a2c8b061050aa18ab119c",
+      "input_artifact_sha256": null,
+      "farm_id": "F538612",
+      "period_start": "2025-01-05",
+      "period_end": "2025-01-18"
+    },
+    {
+      "case_id": "F705994_2025-01-05_2025-01-18",
+      "source_label_row_identity_sha256": "60db6e0c45c5c99b8c8214e659338e845d6093a2dfe4a341963cd9b954bae2c4",
+      "input_artifact_sha256": null,
+      "farm_id": "F705994",
+      "period_start": "2025-01-05",
+      "period_end": "2025-01-18"
+    },
+    {
+      "case_id": "F194265_2024-10-23_2024-11-05",
+      "source_label_row_identity_sha256": "64e0d22d9333a5f2ca4c608283c229034afa94a03bb39d5519735b56321b869d",
+      "input_artifact_sha256": null,
+      "farm_id": "F194265",
+      "period_start": "2024-10-23",
+      "period_end": "2024-11-05"
+    },
+    {
+      "case_id": "F773675_2024-10-29_2024-11-11",
+      "source_label_row_identity_sha256": "d04f1a8ffb5fa6d0465848cf5def1df15b4cf4cc8122ea22059a0145c273a2a6",
+      "input_artifact_sha256": null,
+      "farm_id": "F773675",
+      "period_start": "2024-10-29",
+      "period_end": "2024-11-11"
+    },
+    {
+      "case_id": "F814133_2025-03-24_2025-04-06",
+      "source_label_row_identity_sha256": "e9b7fbdc10015eba56b68aabadddd666493a6ea8c18b0095f38322cd419fcd52",
+      "input_artifact_sha256": null,
+      "farm_id": "F814133",
+      "period_start": "2025-03-24",
+      "period_end": "2025-04-06"
+    },
+    {
+      "case_id": "F332196_2025-03-08_2025-03-21",
+      "source_label_row_identity_sha256": "f8c362b1b50fa26148c582257faf8d5d3ff515a9a51c3c8bd3423382dee37fcb",
+      "input_artifact_sha256": null,
+      "farm_id": "F332196",
+      "period_start": "2025-03-08",
+      "period_end": "2025-03-21"
+    },
+    {
+      "case_id": "F605134_2025-02-18_2025-03-03",
+      "source_label_row_identity_sha256": "fdaf852e9373c95b0b6792149eb5f10fcd2610fca2edbcde1dbc64ede3448542",
+      "input_artifact_sha256": null,
+      "farm_id": "F605134",
+      "period_start": "2025-02-18",
+      "period_end": "2025-03-03"
+    },
+    {
+      "case_id": "F882016_2024-09-16_2024-09-29",
+      "source_label_row_identity_sha256": "d132f6cdc6124d2f164e374ff57dd494f2139c87c6bee3f4316ee56230ce763d",
+      "input_artifact_sha256": null,
+      "farm_id": "F882016",
+      "period_start": "2024-09-16",
+      "period_end": "2024-09-29"
+    },
+    {
+      "case_id": "F541562_2024-12-07_2024-12-20",
+      "source_label_row_identity_sha256": "e7ce29725945c84f95f337941eac62db77f95672cda84b654a3f9cb0d20758b8",
+      "input_artifact_sha256": null,
+      "farm_id": "F541562",
+      "period_start": "2024-12-07",
+      "period_end": "2024-12-20"
+    },
+    {
+      "case_id": "F354848_2025-03-25_2025-04-07",
+      "source_label_row_identity_sha256": "a572de8c7d2edf39c817145629ecdab4a2e4897b11ca53a601f8bf617fccce4a",
+      "input_artifact_sha256": null,
+      "farm_id": "F354848",
+      "period_start": "2025-03-25",
+      "period_end": "2025-04-07"
+    },
+    {
+      "case_id": "F155481_2024-12-24_2025-01-06",
+      "source_label_row_identity_sha256": "5ad5b0c0c224f600031d045d145f38fe59a562db08c79f9b5b92f5403ece696d",
+      "input_artifact_sha256": null,
+      "farm_id": "F155481",
+      "period_start": "2024-12-24",
+      "period_end": "2025-01-06"
+    },
+    {
+      "case_id": "F584775_2024-11-08_2024-11-21",
+      "source_label_row_identity_sha256": "06be3ac1f39899df8b42a508961a7f7ba7df43c44ca2383245a29162e7b25c0c",
+      "input_artifact_sha256": null,
+      "farm_id": "F584775",
+      "period_start": "2024-11-08",
+      "period_end": "2024-11-21"
+    },
+    {
+      "case_id": "F551358_2024-09-21_2024-10-04",
+      "source_label_row_identity_sha256": "1b9d68584a3c50fac865f8efc369728a360ae1b0640170c83b240544cc8169f9",
+      "input_artifact_sha256": null,
+      "farm_id": "F551358",
+      "period_start": "2024-09-21",
+      "period_end": "2024-10-04"
+    },
+    {
+      "case_id": "F188026_2025-02-08_2025-02-21",
+      "source_label_row_identity_sha256": "8699753ecb13a76bedefe45350285e4978e430561825ed1c36312cb7d64802fc",
+      "input_artifact_sha256": null,
+      "farm_id": "F188026",
+      "period_start": "2025-02-08",
+      "period_end": "2025-02-21"
+    },
+    {
+      "case_id": "F760592_2025-01-15_2025-01-28",
+      "source_label_row_identity_sha256": "25da34b4696c649f67b1b5d331dec86ccefb9baf50954ed7ba4513e76b5e63ca",
+      "input_artifact_sha256": null,
+      "farm_id": "F760592",
+      "period_start": "2025-01-15",
+      "period_end": "2025-01-28"
+    },
+    {
+      "case_id": "F209570_2025-03-01_2025-03-14",
+      "source_label_row_identity_sha256": "387bac163e559ba8b644a473c935beaa9f46ba7ee9f52d1c1e4a38a31df69a15",
+      "input_artifact_sha256": null,
+      "farm_id": "F209570",
+      "period_start": "2025-03-01",
+      "period_end": "2025-03-14"
+    },
+    {
+      "case_id": "F302129_2024-10-15_2024-10-28",
+      "source_label_row_identity_sha256": "1023f0df81ec080ab4a6b05ee14e12a62d4948129e8dc3c410158931d8e88487",
+      "input_artifact_sha256": null,
+      "farm_id": "F302129",
+      "period_start": "2024-10-15",
+      "period_end": "2024-10-28"
+    },
+    {
+      "case_id": "F596090_2025-01-18_2025-01-31",
+      "source_label_row_identity_sha256": "f976083dc27a07a39ff20a027b6316deb0120c01cee4d873e92b10480d311d7f",
+      "input_artifact_sha256": null,
+      "farm_id": "F596090",
+      "period_start": "2025-01-18",
+      "period_end": "2025-01-31"
+    },
+    {
+      "case_id": "F257178_2024-12-21_2025-01-03",
+      "source_label_row_identity_sha256": "1b441098152ea4a7393c6eb358397deef3548c476fb52dd4614f2d013bb94ea5",
+      "input_artifact_sha256": null,
+      "farm_id": "F257178",
+      "period_start": "2024-12-21",
+      "period_end": "2025-01-03"
+    },
+    {
+      "case_id": "F541027_2025-03-07_2025-03-20",
+      "source_label_row_identity_sha256": "65e045be63e7e0d6caf04f78615ccecbdde7e4dd6858f529910798091bd37749",
+      "input_artifact_sha256": null,
+      "farm_id": "F541027",
+      "period_start": "2025-03-07",
+      "period_end": "2025-03-20"
+    },
+    {
+      "case_id": "F396544_2025-01-25_2025-02-07",
+      "source_label_row_identity_sha256": "0292e75e42b3a2c1d1ec902e795401d35131cd51dbc5f50731c6b2a4df600480",
+      "input_artifact_sha256": null,
+      "farm_id": "F396544",
+      "period_start": "2025-01-25",
+      "period_end": "2025-02-07"
+    },
+    {
+      "case_id": "F944488_2024-09-21_2024-10-04",
+      "source_label_row_identity_sha256": "392aef702cf3e3eccf3ecf3733a7bdf763eb48d04e8d77a0eb592f528bb2db38",
+      "input_artifact_sha256": null,
+      "farm_id": "F944488",
+      "period_start": "2024-09-21",
+      "period_end": "2024-10-04"
+    },
+    {
+      "case_id": "F854780_2024-09-23_2024-10-06",
+      "source_label_row_identity_sha256": "f70b9a390e37792e8a9dcac2f5244fb5517d4dcd8775732abc05e21645c4ed15",
+      "input_artifact_sha256": null,
+      "farm_id": "F854780",
+      "period_start": "2024-09-23",
+      "period_end": "2024-10-06"
+    },
+    {
+      "case_id": "F135380_2024-12-24_2025-01-06",
+      "source_label_row_identity_sha256": "daf03b93f5db65ba80fc4c320c57e07934977f29f7faecc8b78a37510be6d607",
+      "input_artifact_sha256": null,
+      "farm_id": "F135380",
+      "period_start": "2024-12-24",
+      "period_end": "2025-01-06"
+    },
+    {
+      "case_id": "F451640_2025-03-22_2025-04-04",
+      "source_label_row_identity_sha256": "c3d58205e385ba29d9cbe19dfa3c609c95b8d1e4312c897ef44dd72e9e563fcd",
+      "input_artifact_sha256": null,
+      "farm_id": "F451640",
+      "period_start": "2025-03-22",
+      "period_end": "2025-04-04"
+    },
+    {
+      "case_id": "F295998_2024-12-08_2024-12-21",
+      "source_label_row_identity_sha256": "766de96705a335b9577f33ff42a494ee81d53d027b3da0d2745fed1fd7bef800",
+      "input_artifact_sha256": null,
+      "farm_id": "F295998",
+      "period_start": "2024-12-08",
+      "period_end": "2024-12-21"
+    },
+    {
+      "case_id": "F968401_2025-03-24_2025-04-06",
+      "source_label_row_identity_sha256": "b2f10b44751f92deb69417553c0743aeab22374abd574c2f1fa3b077c6b31e0a",
+      "input_artifact_sha256": null,
+      "farm_id": "F968401",
+      "period_start": "2025-03-24",
+      "period_end": "2025-04-06"
+    },
+    {
+      "case_id": "F972654_2024-10-01_2024-10-14",
+      "source_label_row_identity_sha256": "7fd7e64d8aaa7df8a4345b3c8be44e7b7157d1a09cf4a4264d9fc9b72ec3cdc9",
+      "input_artifact_sha256": null,
+      "farm_id": "F972654",
+      "period_start": "2024-10-01",
+      "period_end": "2024-10-14"
+    },
+    {
+      "case_id": "F981237_2024-12-18_2024-12-31",
+      "source_label_row_identity_sha256": "08ce647dcea23b258c8d1678c8c324d5cef512871bdaa3cab7c6e9fafe8d0e14",
+      "input_artifact_sha256": null,
+      "farm_id": "F981237",
+      "period_start": "2024-12-18",
+      "period_end": "2024-12-31"
+    },
+    {
+      "case_id": "F995842_2025-02-12_2025-02-25",
+      "source_label_row_identity_sha256": "e26de7eef19afd5e553566f293c3f9589eb92bc57cc1726c005a6c194e5986bb",
+      "input_artifact_sha256": null,
+      "farm_id": "F995842",
+      "period_start": "2025-02-12",
+      "period_end": "2025-02-25"
+    }
+  ],
+  "ground_truth_value_in_runtime_manifest": null
+}

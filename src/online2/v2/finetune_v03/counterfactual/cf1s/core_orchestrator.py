@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -93,7 +94,7 @@ from .core_selection import (
     classify_control_reeval,
     select_after_search,
 )
-from .core_trace import GlobalForwardTrace
+from .core_trace import GlobalForwardTrace, TraceKind
 from .core_verifier import (
     FINAL,
     PRE_PROMOTION,
@@ -348,7 +349,24 @@ def _ledger_row(
     }
 
 
-def run_development3_orchestrator(
+COHORT_EVALUATION_STAGES = {
+    "DEVELOPMENT3": EvaluationStage.DEVELOPMENT_PRODUCTION,
+    "VALIDATION20": EvaluationStage.PROBLEM20_BLIND,
+    "PRIMARY32": EvaluationStage.PRIMARY32,
+}
+COHORT_INTERPRETATION_LABELS = {
+    "DEVELOPMENT3": "Development3 selection-blind contract verification evidence",
+    "VALIDATION20": "Validation20 finetune-unseen, selection-blind-to-Fold2 evaluation",
+    "PRIMARY32": "Primary32 training-seen diagnostic evidence",
+}
+COHORT_TRAINING_SEEN_DEFAULTS = {
+    "DEVELOPMENT3": True,
+    "VALIDATION20": False,
+    "PRIMARY32": True,
+}
+
+
+def run_cohort_orchestrator(
     *,
     config: Mapping[str, Any],
     authorization_artifact: Mapping[str, Any],
@@ -360,9 +378,14 @@ def run_development3_orchestrator(
     quarantine: bool = True,
     observed_stable_lock: Optional[Mapping[str, Any]] = None,
     repo_root: Path = Path("/home/dasom/life2vec"),
+    cohort_id: str = "DEVELOPMENT3",
+    expected_case_count: int = 3,
+    manifest_config_key: str = "development_manifest_path",
+    fold_routing_manifest_id: str = "CF1S_DEVELOPMENT3_FOLD_ROUTING_V1",
+    locked_threshold_dict: Optional[Mapping[str, Any]] = None,
 ) -> OrchestratorResult:
     """
-    Full Development3 phase machine.
+    Full cohort phase machine (Development3 / Validation20 / Primary32).
     Quarantine first; promote only after POST attestation + public-key verify + atomic rename.
     """
     gate_results: Dict[str, str] = {f"G{i}": "NOT_RUN" for i in range(1, 13)}
@@ -389,10 +412,11 @@ def run_development3_orchestrator(
         trust_root_sha256=tr_sha,
         observed_stable_lock=pre_stable,
         expected_run_id=run_id,
+        expected_cohort_id=cohort_id,
     )
 
     quarantine_dir = out_root / "quarantine" / run_id
-    final_dir = out_root / "development3_evidence" / run_id
+    final_dir = out_root / f"{cohort_id.lower()}_evidence" / run_id
     sidecar_dir = out_root / "sidecars" / run_id
     if final_dir.exists() or quarantine_dir.exists() or sidecar_dir.exists():
         raise CoreContractError(f"run ID collision; refuse overwrite: {run_id}")
@@ -404,14 +428,18 @@ def run_development3_orchestrator(
     _atomic_write_json(quarantine_dir / "runtime_observation.json", runtime_obs)
     _atomic_write_json(quarantine_dir / "pre_stable_lock.json", pre_stable)
 
-    routing = load_fold_routing_manifest(fold_routing_path)
-    man_path = Path(str(config["development_manifest_path"]))
+    routing = load_fold_routing_manifest(
+        fold_routing_path, expected_manifest_id=fold_routing_manifest_id
+    )
+    man_path = Path(str(config[manifest_config_key]))
     if not man_path.is_absolute():
         man_path = repo_root / man_path
     manifest = json.loads(man_path.read_text(encoding="utf-8"))
     case_ids = list(manifest["ordered_case_ids"])
-    if len(case_ids) != 3:
-        raise CoreContractError("Development3 requires exactly 3 cases")
+    if len(case_ids) != expected_case_count:
+        raise CoreContractError(
+            f"{cohort_id} requires exactly {expected_case_count} cases"
+        )
 
     ckpts = list(hooks.list_checkpoint_paths())
     fold_ids = [int(x) for x in hooks.fold_ids]
@@ -442,6 +470,31 @@ def run_development3_orchestrator(
         sm.advance(DevelopmentPhase.ATTRIBUTION)
         sm.advance(DevelopmentPhase.CANDIDATE_UNIVERSE)
         candidates = list(hooks.build_candidates(case_id))
+        if not candidates:
+            construction_invocation_id = f"construction::{case_id}"
+            global_trace.begin_operation(
+                kind=TraceKind.PIPELINE_INVOCATION,
+                invocation_id=construction_invocation_id,
+                phase="CANDIDATE_UNIVERSE",
+                scope="search",
+                case_id=case_id,
+            )
+            global_trace.start(
+                kind=TraceKind.PIPELINE_INVOCATION,
+                invocation_id=construction_invocation_id,
+                phase="CANDIDATE_UNIVERSE",
+                scope="search",
+                case_id=case_id,
+            )
+            global_trace.fail(
+                kind=TraceKind.PIPELINE_INVOCATION,
+                invocation_id=construction_invocation_id,
+                phase="CANDIDATE_UNIVERSE",
+                scope="search",
+                case_id=case_id,
+                failure_code="NO_CANDIDATES_CONSTRUCTIBLE",
+                extra={"terminal_failure": True},
+            )
         # Reject any bare edits
         for c in candidates:
             if "edits" in c and "validated_transaction" not in c:
@@ -548,10 +601,16 @@ def run_development3_orchestrator(
                 baseline_by_fold=baseline_med,
             )
             sm.advance(DevelopmentPhase.THRESHOLD_LOCK)
-            thr = lock_thresholds_from_search_baseline_noise(
-                runtime_noise,
-                max_search_identity_reconstruction_error=identity_err,
-            )
+            if locked_threshold_dict is not None:
+                # Reuse Development3's locked threshold verbatim — noise/identity
+                # error are still measured for the evaluability gate below, but
+                # must never feed back into (re-derive) the threshold value.
+                thr = dict(locked_threshold_dict)
+            else:
+                thr = lock_thresholds_from_search_baseline_noise(
+                    runtime_noise,
+                    max_search_identity_reconstruction_error=identity_err,
+                )
             gate = evaluate_scope_gate(
                 scope="search",
                 identity_pass=identity_err <= 0.001,
@@ -1060,7 +1119,7 @@ def run_development3_orchestrator(
         case_dir = quarantine_dir / case_id
         case_dir.mkdir(parents=True, exist_ok=True)
         authority = AuthorityContext(
-            evaluation_stage=EvaluationStage.DEVELOPMENT_PRODUCTION,
+            evaluation_stage=COHORT_EVALUATION_STAGES[cohort_id],
             execution_authorized=True,
             development_production_execution_authorized=True,
             evidence_output_authorized=True,
@@ -1107,11 +1166,13 @@ def run_development3_orchestrator(
             scientific_status_reason=str(scientific_detail.get("reason") or status_name),
             forward_counts=forward_counts,
             extra={
-                "interpretation_label": "Development3 selection-blind contract verification evidence",
+                "interpretation_label": COHORT_INTERPRETATION_LABELS[cohort_id],
                 "execution_scope": "TWO_EVENT_ONLY",
                 "three_event_execution_status": "OUT_OF_SCOPE",
                 "scientifically_independent_holdout": False,
-                "training_seen": True,
+                "training_seen": bool(
+                    prov.get("training_seen", COHORT_TRAINING_SEEN_DEFAULTS[cohort_id])
+                ),
                 "fold_provenance": prov,
                 "closure": frozen,
                 "threshold": thr,
@@ -1150,7 +1211,7 @@ def run_development3_orchestrator(
     axes = development_readiness_axes(
         execution_ready=execution_ready,
         evaluable_cases=evaluable,
-        locked_cohort_size=3,
+        locked_cohort_size=len(case_ids),
         scientific_counts=scientific_counts,
     )
     coverage_axes = derive_coverage_axes(case_results)
@@ -1167,9 +1228,9 @@ def run_development3_orchestrator(
         # Do NOT include attested_evaluation_coverage inside package
         "execution_scope": "TWO_EVENT_ONLY",
         "three_event_execution_status": "OUT_OF_SCOPE",
-        "interpretation_label": "Development3 selection-blind contract verification evidence",
+        "interpretation_label": COHORT_INTERPRETATION_LABELS[cohort_id],
         "scientifically_independent_holdout": False,
-        "training_seen": True,
+        "training_seen": COHORT_TRAINING_SEEN_DEFAULTS[cohort_id],
     }
     # Strip ambiguous attested-ready claim until external verify
     axes_package["development_evaluation_coverage"] = computed_coverage
@@ -1181,7 +1242,9 @@ def run_development3_orchestrator(
         root=repo_root,
     )
     try:
-        pre_post_identical = assert_stable_locks_identical(pre_stable, post_stable)
+        pre_post_identical = assert_stable_locks_identical(
+            pre_stable, post_stable, expected_cohort=cohort_id.lower()
+        )
     except CoreContractError:
         pre_post_identical = False
         execution_ready = False
@@ -1345,6 +1408,7 @@ def run_development3_orchestrator(
                 "execution_scope": "TWO_EVENT_ONLY",
             },
             pre_post_lock_identical=True,
+            cohort_id=cohort_id,
         )
         _atomic_write_json(sidecar_dir / "POST_EXECUTION_EVIDENCE_ATTESTATION.json", att)
         try:
@@ -1362,6 +1426,7 @@ def run_development3_orchestrator(
                         "final_rerun_observation_manifest_sha256"
                     )
                 ),
+                expected_cohort_id=cohort_id,
             )
             pre_promotion_verdict = verify_cf1s_package(
                 phase=PRE_PROMOTION,
@@ -1374,6 +1439,8 @@ def run_development3_orchestrator(
                 trust_root=trust_root,
                 trust_root_sha256=tr_sha,
                 verifier_code_sha256=verifier_code_sha,
+                expected_case_count=len(case_ids),
+                cohort_id=cohort_id,
             )
             _atomic_write_json(
                 sidecar_dir / "PRE_PROMOTION_VERDICT.json",
@@ -1449,6 +1516,8 @@ def run_development3_orchestrator(
                         verifier_code_sha256=verifier_code_sha,
                         receipt=receipt,
                         pre_promotion_verdict=pre_promotion_verdict,
+                        expected_case_count=len(case_ids),
+                        cohort_id=cohort_id,
                     )
                     _atomic_write_json(
                         sidecar_dir / "FINAL_VERDICT.json",
@@ -1497,3 +1566,12 @@ def run_development3_orchestrator(
         report_lines=report_lines,
         gate_results=gate_results,
     )
+
+
+run_development3_orchestrator = functools.partial(
+    run_cohort_orchestrator,
+    cohort_id="DEVELOPMENT3",
+    expected_case_count=3,
+    manifest_config_key="development_manifest_path",
+    fold_routing_manifest_id="CF1S_DEVELOPMENT3_FOLD_ROUTING_V1",
+)

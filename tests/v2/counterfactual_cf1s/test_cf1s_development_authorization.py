@@ -111,6 +111,65 @@ def test_issue_and_consume_pre_execution(monkeypatch):
         )
 
 
+def test_cohort_id_mismatch_is_rejected(monkeypatch):
+    monkeypatch.setenv(TRUST_ROOT_ENV, sha256_file(TRUST))
+    root = load_trust_root(TRUST)
+    tr_sha = verify_trust_root_env(TRUST)
+    stable = dict(_stable_lock())
+    stable["cohort"] = "validation20"
+    stable["stable_lock_sha256"] = canonical_json_sha256(
+        {k: v for k, v in stable.items() if k != "stable_lock_sha256"}
+    )
+    art = issue_pre_execution_authorization(
+        trust_root=root,
+        trust_root_sha256=tr_sha,
+        issuer_id="cf1s-development-issuer-v1",
+        key_id="dev-key-1",
+        private_key_hex=DEV_PRIV,
+        stable_lock_manifest=stable,
+        run_id="test-run-cohort",
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        cohort_id="VALIDATION20",
+    )
+    assert art["cohort_id"] == "VALIDATION20"
+    assert art["scope"] == ["VALIDATION20", "TWO_EVENT_ONLY"]
+
+    # A Development3-expecting verifier must reject a Validation20 authorization.
+    with pytest.raises(CoreContractError, match="cohort mismatch"):
+        consume_pre_execution_authorization(
+            art,
+            trust_root=root,
+            trust_root_sha256=tr_sha,
+            observed_stable_lock=stable,
+            expected_run_id="test-run-cohort",
+            expected_cohort_id="DEVELOPMENT3",
+        )
+
+    # Correctly-scoped consumption succeeds.
+    out = consume_pre_execution_authorization(
+        art,
+        trust_root=root,
+        trust_root_sha256=tr_sha,
+        observed_stable_lock=stable,
+        expected_run_id="test-run-cohort",
+        expected_cohort_id="VALIDATION20",
+    )
+    assert out["ok"]
+
+    with pytest.raises(CoreContractError, match="unknown cohort_id"):
+        issue_pre_execution_authorization(
+            trust_root=root,
+            trust_root_sha256=tr_sha,
+            issuer_id="cf1s-development-issuer-v1",
+            key_id="dev-key-1",
+            private_key_hex=DEV_PRIV,
+            stable_lock_manifest=_stable_lock(),
+            run_id="test-run-bad-cohort",
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            cohort_id="UNKNOWN_COHORT",
+        )
+
+
 def test_post_execution_attestation_requires_lock_identity(monkeypatch):
     monkeypatch.setenv(TRUST_ROOT_ENV, sha256_file(TRUST))
     root = load_trust_root(TRUST)
