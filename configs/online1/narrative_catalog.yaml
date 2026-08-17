@@ -1,0 +1,164 @@
+version: online1_v1
+narratives:
+  - narrative_id: N_SNAP_W8
+    version: 1
+    source_types: [env]
+    family: mid_snapshot
+    anchor_definition: every_5min_zone_dat
+    temporal_direction: bidirectional_pretrain
+    lookback: 40
+    horizon: 0
+    stride: 5
+    grouping_keys: [dat, zone_id]
+    required_fields: [temperature, humidity, co2]
+    optional_fields: [fogging]
+    event_grain: 5min_snapshot
+    order_semantics: temporal
+    sop_eligible: true
+    op_eligible: true
+    allowed_token_families: [ENV, ACTUATOR, DERIVED, QUALITY, VIEW]
+    forbidden_lineage_tags: [target_dependency, future_dependency]
+    cube_policy: none
+    max_cube_events: 0
+    chunk_policy: event_grain
+    regression_eligible: true
+    pretrain_only: false
+    minimum_coverage: 0.8
+    missingness_policy: quality_event
+    dedup_key: [dat, zone_id, anchor_t_ord, narrative_id]
+
+  - narrative_id: N_ACT_FAN_RESPONSE
+    version: 1
+    source_types: [env]
+    family: short_actuator_candidate
+    anchor_definition: circ_fan_or_fcu_state_change
+    temporal_direction: bidirectional_pretrain
+    lookback: 15
+    horizon: 15
+    stride: 1
+    grouping_keys: [dat, zone_id]
+    required_fields: [circ_fan, fcu_fan, temperature, humidity]
+    optional_fields: []
+    event_grain: 1min
+    order_semantics: temporal
+    sop_eligible: true
+    op_eligible: true
+    allowed_token_families: [ENV, ACTUATOR, DERIVED, QUALITY, VIEW]
+    forbidden_lineage_tags: [target_dependency, future_dependency]
+    cube_policy: none
+    max_cube_events: 0
+    chunk_policy: event_grain
+    regression_eligible: false
+    pretrain_only: true
+    minimum_coverage: 0.7
+    missingness_policy: quality_event
+    dedup_key: [dat, zone_id, event_t_ord, narrative_id]
+    claim_language: ACTUATOR_RESPONSE_CANDIDATE
+
+  - narrative_id: N_EXT_TEMP_DAY
+    version: 1
+    source_types: [env]
+    family: long_external
+    anchor_definition: dat_day_end
+    temporal_direction: bidirectional_pretrain
+    lookback: 1439
+    horizon: 0
+    stride: 60
+    grouping_keys: [dat, zone_id]
+    required_fields: [temperature_outside, solar_radiation, rainfall]
+    optional_fields: []
+    event_grain: 15min_trace
+    order_semantics: temporal
+    sop_eligible: true
+    op_eligible: true
+    allowed_token_families: [ENV, DERIVED, QUALITY, VIEW]
+    forbidden_lineage_tags: [target_dependency, future_dependency]
+    cube_policy: none
+    max_cube_events: 0
+    chunk_policy: head_tail
+    regression_eligible: false
+    pretrain_only: true
+    minimum_coverage: 0.6
+    missingness_policy: split_on_large_gap
+    dedup_key: [dat, zone_id, narrative_id]
+
+  - narrative_id: N_PARALLEL_NOON
+    version: 1
+    source_types: [env]
+    family: parallel_zone
+    anchor_definition: weather_slot_noon
+    temporal_direction: bidirectional_pretrain
+    lookback: 0
+    horizon: 0
+    stride: 1440
+    grouping_keys: [weather_day_index, minutes_of_day]
+    required_fields: [temperature, humidity, shading_curtain]
+    optional_fields: []
+    event_grain: zone_set
+    order_semantics: unordered_set
+    sop_eligible: false
+    op_eligible: false
+    allowed_token_families: [ENV, ACTUATOR, VIEW]
+    forbidden_lineage_tags: [target_dependency, future_dependency]
+    cube_policy: none
+    max_cube_events: 0
+    chunk_policy: none
+    regression_eligible: false
+    pretrain_only: true
+    minimum_coverage: 1.0
+    missingness_policy: exclude_incomplete_set
+    dedup_key: [weather_day_index, minutes_of_day, narrative_id]
+
+  - narrative_id: N_CUBE_ENV_ALIGN
+    version: 1
+    source_types: [env, cube]
+    family: multimodal
+    anchor_definition: cube_capture
+    temporal_direction: bidirectional_pretrain
+    lookback: 30
+    horizon: 0
+    stride: 1
+    grouping_keys: [dat, zone_id]
+    required_fields: [temperature, humidity]
+    optional_fields: []
+    event_grain: cube_plus_env
+    order_semantics: temporal
+    sop_eligible: true
+    op_eligible: true
+    allowed_token_families: [ENV, ACTUATOR, CUBE_BAND_SLOT, QUALITY, VIEW]
+    forbidden_lineage_tags: [target_dependency, future_dependency]
+    cube_policy: insert_at_capture_end
+    max_cube_events: 1
+    chunk_policy: event_grain
+    regression_eligible: true
+    pretrain_only: false
+    minimum_coverage: 0.8
+    missingness_policy: quality_token_or_exclude
+    dedup_key: [cube_id, narrative_id]
+
+  - narrative_id: N_REG_PAST_WINDOW
+    version: 1
+    source_types: [env, cube]
+    family: regression_past_only
+    anchor_definition: train_y_5min
+    temporal_direction: past_only
+    lookback: 60
+    horizon: 0
+    stride: 5
+    grouping_keys: [dat, zone_id]
+    required_fields: [temperature, humidity, co2]
+    optional_fields: []
+    event_grain: 5min_snapshot
+    order_semantics: temporal
+    sop_eligible: false
+    op_eligible: false
+    allowed_token_families: [ENV, ACTUATOR, DERIVED, CUBE_BAND_SLOT, QUALITY, VIEW]
+    forbidden_lineage_tags: [target_dependency, future_dependency]
+    cube_policy: STRICT_PAST_ONLY
+    max_cube_events: 4
+    chunk_policy: head_tail
+    regression_eligible: true
+    pretrain_only: false
+    minimum_coverage: 0.8
+    missingness_policy: quality_event
+    dedup_key: [regression_example_id]

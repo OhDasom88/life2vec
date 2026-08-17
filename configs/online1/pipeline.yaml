@@ -1,0 +1,113 @@
+# Online1 P0 contracts — locked before full build
+data_root: /data/datasets/agrichallenge/online1/dataset
+output_root: /home/dasom/life2vec/outputs/online1
+git_workspace: /home/dasom/life2vec
+
+corpus_scope:
+  inductive:
+    sources: [train_X, train_cube]
+  transductive_public:
+    sources: [train_X, test_X, train_cube, test_cube]
+    hidden_labels_used: false
+
+zone:
+  enabled: true
+  train_days_per_zone: 6
+  test_days_per_zone: 3
+  max_zones: 4
+  cube_zone_to_env:
+    "0": 0
+    "1": 1
+    "2": 2
+    "3": 3
+  env_zone_to_label: ["A", "B", "C", "D"]
+
+drop_cols: [tube_rail_valve]
+binary_actuator_cols:
+  - fcu_fan
+  - fcu_pump
+  - circ_fan
+  - co2_supply
+  - fogging
+
+target_columns: [soil_moisture, soil_ec, soil_temp]
+
+regression:
+  lookback_minutes: 60
+  max_cube_events: 4
+  past_policy: STRICT_PAST_ONLY
+  missing_y_policy: loss_mask_partial_skip_all_missing
+  missing_x_policy: skip
+  duplicate_anchor_policy: fail_on_conflict
+  timestamp_restore_policy: fail
+
+embargo:
+  regression_lookback: 60
+  narrative_maximum_lookback: 180
+  cube_event_window: 30
+  derived_feature_dependency_horizon: 60
+
+splits:
+  development:
+    # DAT-block forward holdout for development
+    train_dats: [109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124]
+    valid_dats: [125, 126, 127, 128, 129]
+    holdout_dats: [130, 131, 132, 133, 134]
+  temporal_forward:
+    train_ratio_dats: 0.7
+    valid_ratio_dats: 0.15
+    holdout_ratio_dats: 0.15
+
+sequence:
+  support_max_length: 4096
+  candidate_default_lengths: [1024, 2048, 4096]
+  smoke_lengths: [512, 1024]
+  event_token_budget: 24
+
+materialize:
+  # null = uncapped (production scale, every matching window becomes a sequence).
+  # Set to a small int for fast dev/smoke iteration.
+  max_per_narrative: null
+  ext_temp_day_head_tail_k: 8
+
+pretrain:
+  mask_ratio: 0.15
+  sop_ratio: 0.5
+  # Production scale (was hidden=128/layers=2/heads=4/batch=4, sized for a 445-sequence
+  # smoke corpus). With the uncapped corpus at ~4.9k train sequences, scaled up but still
+  # modest for the vocab size (~600 tokens) to avoid overfitting a small dataset.
+  hidden_size: 256
+  num_layers: 4
+  num_heads: 8
+  dropout: 0.1
+  lr: 0.001
+  weight_decay: 0.01
+  warmup_steps: 10
+  max_steps_smoke: 20
+  # max_steps_dev is the per-trial step budget for both the Phase3-4 smoke check and the
+  # Phase5-6 champion sweep. ~4938 train sequences / batch_size 32 ≈ 154 steps/epoch, so
+  # 4800 steps ≈ 30 real epochs over the full corpus (measured ~11 steps/sec on the RTX3090
+  # in this box, i.e. ~7-8 min per trial).
+  max_steps_dev: 4800
+  batch_size: 32
+  grad_accum: 1
+  # Real sequence lengths after uncapping top out at 194 tokens (N_SNAP_W8/N_EXT_TEMP_DAY);
+  # training pads every batch to this length. support_max_length/candidate_default_lengths
+  # above are validated separately via the Phase3-4 preflight (forward/backward + OOM check)
+  # to lock safety headroom for future longer narratives, without wasting 4096-token padding
+  # compute on data that doesn't need it yet.
+  train_max_length: 512
+
+champion_score:
+  w_mlm: 0.40
+  w_sop: 0.20
+  w_cube: 0.25
+  w_align: 0.15
+  arm_internal_selection_only: true
+  tie_break_rule: lower_compute_then_earlier_trial
+
+wandb:
+  enabled: false
+  project: Online1-Life2Vec
+  entity: null
+  mode: offline

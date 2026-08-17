@@ -1,0 +1,39 @@
+acceptance:
+  leakage:
+    target_lineage_violations: 0
+    future_dependency_violations: 0
+    cross_fold_raw_overlap: 0
+    cross_fold_cube_overlap: 0
+    cross_fold_source_window_overlap: 0
+    cross_fold_timestamp_interval_overlap: 0
+    strict_past_violations: 0
+    test_label_accesses: 0
+    fold_external_fit_violations: 0
+
+  cube:
+    unverified_zone_mapping: 0
+    malformed_cube_count: 0
+    frozen_weight_sha_changed: false
+    embedding_reproducibility_min_cosine: 0.9999
+    invalid_pixel_ratio_max: 0.35
+    cube_env_alignment_max_backward_minutes: 5
+    future_alignment_in_regression: 0
+
+  training:
+    nan_inf_steps: 0
+    resume_parity_required: true
+    wandb_required_fields_missing: 0
+    oov_required_families: 0
+    padding_loss_applied: false
+    cube_missing_cube_loss_applied: false
+    frozen_encoder_grad_norm_max: 0.0
+
+  compute:
+    forward_backward_resume_smoke: PASS
+    default_max_length_locked: true
+    full_store_cost_estimate_reported: true
+
+  champion:
+    score_formula_locked_before_sweep: true
+    arm_internal_selection_only: true
+    tie_break_rule: lower_compute_then_earlier_trial

@@ -1,0 +1,41 @@
+# Features/tokens with target or future dependency are denied for encoder input.
+deny_source_columns:
+  - soil_moisture
+  - soil_ec
+  - soil_temp
+  - SM
+  - SEC
+  - ST
+
+deny_name_patterns:
+  - "(?i)soil[_-]?(moisture|ec|temp)"
+  - "(?i)root[_-]?zone"
+  - "(?i)irrigation[_-]?deficit"
+  - "(?i)target[_-]?(anom|flag|norm)"
+  - "(?i)\\b(sm|sec|st)\\b.*bin"
+
+allowed_env_columns:
+  - temperature_outside
+  - humidity_outside
+  - solar_radiation
+  - wind_direction_outside
+  - wind_speed_outside
+  - rainfall
+  - greenhouse_roof_vent1
+  - greenhouse_roof_vent2
+  - shading_curtain
+  - thermal_curtain
+  - fcu_fan
+  - fcu_pump
+  - circ_fan
+  - co2_supply
+  - fogging
+  - temperature
+  - humidity
+  - co2
+
+forbidden_lineage_tags:
+  - target_dependency
+  - future_dependency
+  - label_proxy
+  - post_dat_statistic

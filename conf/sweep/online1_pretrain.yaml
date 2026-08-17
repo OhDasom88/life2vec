@@ -1,0 +1,17 @@
+# Offline-capable W&B sweep definition (not launched by default)
+# Usage:
+#   wandb sweep --project Online1-Life2Vec conf/sweep/online1_pretrain.yaml
+program: scripts/online1/run_phase5_6_dev_eval.py
+method: grid
+metric:
+  name: champion_score
+  goal: maximize
+parameters:
+  pretrain.lr:
+    values: [0.001, 0.0005]
+  pretrain.mask_ratio:
+    values: [0.15, 0.2]
+  pretrain.weight_decay:
+    values: [0.01, 0.05]
+  arm:
+    values: [C0, C1]
