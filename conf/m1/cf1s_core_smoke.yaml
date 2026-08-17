@@ -16,6 +16,10 @@ abspos_reference_path: /home/dasom/life2vec/outputs/online2/v2_build/abspos_refe
 device: cuda
 gpu_memory_fraction: 0.4
 
+final_rerun_observation_manifest_path: outputs/cf1s_core/final_rerun_staging/qualification_observation_base.json
+final_rerun_test_log_path: outputs/cf1s_core/final_rerun_staging/final_rerun_test.log
+final_rerun_node_id_manifest_path: outputs/cf1s_core/final_rerun_staging/final_rerun_node_id_manifest.json
+
 edit_policy_path: conf/m1/cf1s_policies/CF1S_EDIT_POLICY_V1.yaml
 search_policy_path: conf/m1/cf1s_policies/CF1S_SEARCH_POLICY_V1.yaml
 saliency_policy_path: conf/m1/cf1s_policies/CF1S_SALIENCY_POLICY_V1.yaml
@@ -24,6 +28,7 @@ acceptance_policy_path: conf/m1/cf1s_policies/CF1S_CORE_ACCEPTANCE_POLICY.yaml
 development_manifest_path: conf/m1/cf1s_policies/cohorts/CF1S_DEVELOPMENT3_MANIFEST.json
 primary32_manifest_path: conf/m1/cf1s_policies/cohorts/CF1S_PRIMARY32_MANIFEST.json
 problem20_manifest_path: conf/m1/cf1s_policies/cohorts/CF1S_PROBLEM20_MANIFEST.json
+validation20_manifest_path: conf/m1/cf1s_policies/cohorts/CF1S_VALIDATION20_MANIFEST.json
 # Sealed labels must NOT be passed to blind runner argv/env/config.
 problem20_labels_sealed_path: conf/m1/cf1s_policies/cohorts/CF1S_PROBLEM20_LABELS_SEALED.json
 

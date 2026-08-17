@@ -456,7 +456,10 @@ def validate_persisted_trace(events: Sequence[Mapping[str, Any]]) -> Dict[str, A
         if not invocation.terminal:
             raise CoreContractError(f"trace invocation missing terminal: {invocation_id}")
 
-    # A failed logical operation is acceptable only when an explicit retry completed.
+    # A failed logical operation is acceptable only when an explicit retry
+    # completed, unless it is marked as a legitimate case-disposition terminal
+    # failure (terminal_failure=True) — e.g. NOT_CONSTRUCTIBLE/NOT_EVALUABLE
+    # case outcomes, which by definition have no successful retry.
     failed_logical_ids = set()
     completed_logical_ids = set()
     for event in rebuilt.events:
@@ -465,6 +468,8 @@ def validate_persisted_trace(events: Sequence[Mapping[str, Any]]) -> Dict[str, A
             or event.get("invocation_id")
         )
         if event["state"] == TraceState.FAILED.value:
+            if (event.get("extra") or {}).get("terminal_failure") is True:
+                continue
             failed_logical_ids.add(logical_id)
         elif event["state"] == TraceState.COMPLETED.value:
             completed_logical_ids.add(logical_id)

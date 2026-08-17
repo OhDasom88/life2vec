@@ -17,6 +17,11 @@ TRUST_ROOT_ENV = "CF1S_TRUST_ROOT_SHA256"
 TRUST_ROOT_RELPATH = "conf/m1/cf1s_policies/CF1S_DEVELOPMENT_TRUST_ROOT_V1.json"
 PRE_EXECUTION_KIND = "PRE_EXECUTION_AUTHORIZATION"
 POST_EXECUTION_KIND = "POST_EXECUTION_EVIDENCE_ATTESTATION"
+ALLOWED_COHORT_IDS = ("DEVELOPMENT3", "VALIDATION20", "PRIMARY32")
+
+
+def _cohort_execution_kind(cohort_id: str) -> str:
+    return f"{cohort_id}_PRODUCTION_TWO_EVENT"
 
 
 def repository_relative(path: Path, root: Path) -> str:
@@ -142,12 +147,15 @@ def issue_pre_execution_authorization(
     stable_lock_manifest: Optional[Mapping[str, Any]] = None,
     run_id: Optional[str] = None,
     locks: Optional[Mapping[str, Any]] = None,
+    cohort_id: str = "DEVELOPMENT3",
 ) -> Dict[str, Any]:
     from .core_locks import validate_stable_lock_manifest
 
+    if cohort_id not in ALLOWED_COHORT_IDS:
+        raise CoreContractError(f"unknown cohort_id: {cohort_id}")
     verify_issuer(trust_root, issuer_id=issuer_id, key_id=key_id)
     stable = dict(stable_lock_manifest or locks or {})
-    validate_stable_lock_manifest(stable)
+    validate_stable_lock_manifest(stable, expected_cohort=cohort_id.lower())
     if not run_id:
         raise CoreContractError("PRE authorization run_id required")
     pub = trust_root["keys"][key_id]["public_key_hex"]
@@ -156,11 +164,11 @@ def issue_pre_execution_authorization(
         "schema_version": "CF1S_PRE_AUTHORIZATION_V2",
         "authorization_type": "DEVELOPMENT_PRODUCTION_EXECUTION",
         "run_id": str(run_id),
-        "cohort_id": "DEVELOPMENT3",
-        "scope": ["DEVELOPMENT3", "TWO_EVENT_ONLY"],
+        "cohort_id": cohort_id,
+        "scope": [cohort_id, "TWO_EVENT_ONLY"],
         "stable_lock_sha256": stable["stable_lock_sha256"],
         "stable_lock_manifest": stable,
-        "allowed_execution_kinds": ["DEVELOPMENT3_PRODUCTION_TWO_EVENT"],
+        "allowed_execution_kinds": [_cohort_execution_kind(cohort_id)],
         "issuer_id": issuer_id,
         "key_id": key_id,
         "trust_root_sha256": trust_root_sha256,
@@ -209,9 +217,12 @@ def consume_pre_execution_authorization(
     expected_run_id: Optional[str] = None,
     expected_locks: Optional[Mapping[str, Any]] = None,
     now: Optional[datetime] = None,
+    expected_cohort_id: str = "DEVELOPMENT3",
 ) -> Dict[str, Any]:
     from .core_locks import validate_stable_lock_manifest
 
+    if expected_cohort_id not in ALLOWED_COHORT_IDS:
+        raise CoreContractError(f"unknown expected cohort_id: {expected_cohort_id}")
     if expected_locks is not None:
         raise CoreContractError("AUTH_SELF_REFERENCE_FORBIDDEN")
     if artifact.get("artifact_kind") != PRE_EXECUTION_KIND:
@@ -242,12 +253,12 @@ def consume_pre_execution_authorization(
         raise CoreContractError("authorization schema version mismatch")
     if artifact.get("authorization_type") != "DEVELOPMENT_PRODUCTION_EXECUTION":
         raise CoreContractError("authorization type mismatch")
-    if artifact.get("cohort_id") != "DEVELOPMENT3":
+    if artifact.get("cohort_id") != expected_cohort_id:
         raise CoreContractError("authorization cohort mismatch")
-    if artifact.get("scope") != ["DEVELOPMENT3", "TWO_EVENT_ONLY"]:
+    if artifact.get("scope") != [expected_cohort_id, "TWO_EVENT_ONLY"]:
         raise CoreContractError("authorization scope mismatch")
     if artifact.get("allowed_execution_kinds") != [
-        "DEVELOPMENT3_PRODUCTION_TWO_EVENT"
+        _cohort_execution_kind(expected_cohort_id)
     ]:
         raise CoreContractError("authorization execution kinds mismatch")
     if expected_run_id is not None and artifact.get("run_id") != expected_run_id:
@@ -266,14 +277,17 @@ def consume_pre_execution_authorization(
     if not artifact.get("development_production_execution_authorized"):
         raise CoreContractError("development_production_execution_authorized=false")
     signed_stable = validate_stable_lock_manifest(
-        artifact.get("stable_lock_manifest") or {}
+        artifact.get("stable_lock_manifest") or {},
+        expected_cohort=expected_cohort_id.lower(),
     )
     if artifact.get("stable_lock_sha256") != signed_stable["stable_lock_sha256"]:
         raise CoreContractError("authorization stable lock payload mismatch")
     observed = dict(observed_stable_lock or {})
     if not observed:
         raise CoreContractError("fresh observed stable lock required")
-    observed = validate_stable_lock_manifest(observed)
+    observed = validate_stable_lock_manifest(
+        observed, expected_cohort=expected_cohort_id.lower()
+    )
     if observed["stable_lock_sha256"] != signed_stable["stable_lock_sha256"]:
         raise CoreContractError("observed stable lock mismatch")
     return {
@@ -300,7 +314,10 @@ def issue_post_execution_attestation(
     post_stable_lock_sha256: Optional[str] = None,
     intended_final_destination: Optional[str] = None,
     final_rerun_observation_manifest_sha256: Optional[str] = None,
+    cohort_id: str = "DEVELOPMENT3",
 ) -> Dict[str, Any]:
+    if cohort_id not in ALLOWED_COHORT_IDS:
+        raise CoreContractError(f"unknown cohort_id: {cohort_id}")
     verify_issuer(trust_root, issuer_id=issuer_id, key_id=key_id)
     if not pre_post_lock_identical:
         raise CoreContractError("pre/post lock mismatch; attestation forbidden")
@@ -318,8 +335,8 @@ def issue_post_execution_attestation(
         "artifact_kind": POST_EXECUTION_KIND,
         "schema_version": "CF1S_POST_ATTESTATION_V2",
         "run_id": str(run_id),
-        "cohort_id": "DEVELOPMENT3",
-        "scope": ["DEVELOPMENT3", "TWO_EVENT_ONLY"],
+        "cohort_id": cohort_id,
+        "scope": [cohort_id, "TWO_EVENT_ONLY"],
         "trust_root_sha256": trust_root_sha256,
         "issuer_id": issuer_id,
         "key_id": key_id,

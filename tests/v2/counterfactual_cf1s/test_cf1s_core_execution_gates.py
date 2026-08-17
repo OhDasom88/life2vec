@@ -120,23 +120,11 @@ def test_legacy_runner_requires_flag_and_blocks_production():
     assert "Legacy production mode is blocked" in (r2.stderr + r2.stdout)
 
 
-def test_primary32_and_problem20_blocked_without_authorization():
+def test_problem20_blocked_without_authorization():
+    # Problem20's authorization marker genuinely does not exist in this repo
+    # (Problem20 execution is never reached by this pipeline), so this
+    # subprocess check against real repo state remains valid.
     py = sys.executable
-    r = subprocess.run(
-        [
-            py,
-            str(ROOT / "scripts/online2_v2/v03/run_cf1s_core_v03.py"),
-            "--cohort",
-            "primary32",
-            "--mode",
-            "contract",
-            "--skip-preflight",
-        ],
-        cwd=str(ROOT),
-        capture_output=True,
-        text=True,
-    )
-    assert r.returncode != 0
     r2 = subprocess.run(
         [
             py,
@@ -152,6 +140,58 @@ def test_primary32_and_problem20_blocked_without_authorization():
         text=True,
     )
     assert r2.returncode != 0
+
+
+def test_assert_primary32_authorized_gate(tmp_path):
+    # Unlike Problem20, Primary32's authorization artifact is expected to
+    # exist for real once Development3 + Validation20 both reach FINAL PASS —
+    # so this checks the assert_primary32_authorized() contract directly
+    # against isolated fixtures, rather than a subprocess against real repo
+    # state (which would start failing the moment Primary32 is legitimately
+    # authorized, exactly as intended).
+    from src.online2.v2.finetune_v03.counterfactual.cf1s.core_readiness import (
+        assert_primary32_authorized,
+    )
+
+    missing = tmp_path / "missing.json"
+    with pytest.raises(CoreContractError, match="lock readiness missing"):
+        assert_primary32_authorized(missing)
+
+    def _write(doc: dict) -> Path:
+        path = tmp_path / "auth.json"
+        path.write_text(json.dumps(doc), encoding="utf-8")
+        return path
+
+    valid = {
+        "artifact_kind": "CF1S_PRIMARY32_EXECUTION_AUTHORIZATION_V1",
+        "scope": ["PRIMARY32", "TWO_EVENT_ONLY"],
+        "primary32_execution_authorized": True,
+        "threshold_change_authorized": False,
+        "source_development_final_verdict_sha256": "a" * 64,
+        "source_validation20_final_verdict_sha256": "b" * 64,
+    }
+    assert assert_primary32_authorized(_write(valid)) == valid
+
+    with pytest.raises(CoreContractError, match="not authoritative"):
+        assert_primary32_authorized(_write({**valid, "artifact_kind": "OTHER"}))
+    with pytest.raises(CoreContractError, match="scope mismatch"):
+        assert_primary32_authorized(_write({**valid, "scope": ["PRIMARY32"]}))
+    with pytest.raises(CoreContractError, match="not authorized"):
+        assert_primary32_authorized(
+            _write({**valid, "primary32_execution_authorized": False})
+        )
+    with pytest.raises(CoreContractError, match="threshold changes"):
+        assert_primary32_authorized(
+            _write({**valid, "threshold_change_authorized": True})
+        )
+    with pytest.raises(CoreContractError, match="Development3 FINAL link"):
+        assert_primary32_authorized(
+            _write({**valid, "source_development_final_verdict_sha256": None})
+        )
+    with pytest.raises(CoreContractError, match="Validation20 FINAL link"):
+        assert_primary32_authorized(
+            _write({**valid, "source_validation20_final_verdict_sha256": None})
+        )
 
 
 def test_core_contract_cohort_pipeline_runs():

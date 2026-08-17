@@ -28,6 +28,12 @@ from .core_scientific import (
 )
 from .core_selection import select_after_search
 from .core_trace import validate_persisted_trace
+from .disposition_profiles import (
+    NOT_CONSTRUCTIBLE,
+    case_trace_events,
+    classify_case_disposition,
+    evaluate_case_trace_profile,
+)
 
 
 PRE_PROMOTION = "PRE_PROMOTION"
@@ -43,6 +49,7 @@ _VERIFIER_MODULES = (
     "core_canonical.py",
     "core_contract.py",
     "core_promotion.py",
+    "disposition_profiles.py",
 )
 
 
@@ -65,12 +72,16 @@ def _load_json(path: Path) -> Dict[str, Any]:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def _case_proposals(package_dir: Path) -> List[Dict[str, Any]]:
+def _case_proposals(
+    package_dir: Path, expected_case_count: int = 3
+) -> List[Dict[str, Any]]:
     rows = []
     for path in sorted(Path(package_dir).glob("*/case_edit_proposal.json")):
         rows.append(_load_json(path))
-    if len(rows) != 3:
-        raise CoreContractError("Development3 verifier requires exactly three case proposals")
+    if len(rows) != int(expected_case_count):
+        raise CoreContractError(
+            f"cohort verifier requires exactly {expected_case_count} case proposals"
+        )
     return rows
 
 
@@ -151,16 +162,6 @@ def _gate_trace(package_dir: Path, summary: Mapping[str, Any]) -> None:
         if stored.get(key) != value:
             raise CoreContractError(f"trace summary mismatch: {key}")
     for key in (
-        "attribution_load_count",
-        "attribution_forward_count",
-        "stage_a_load_count",
-        "critic_load_count",
-        "checkpoint_forward_count",
-        "pipeline_invocation_count",
-    ):
-        if int(recalculated.get(key) or 0) <= 0:
-            raise CoreContractError(f"required trace operation not completed: {key}")
-    for key in (
         "fold2_attribution_load_count",
         "fold2_attribution_forward_count",
         "fold2_critic_load_before_closure_count",
@@ -188,6 +189,35 @@ def _gate_trace(package_dir: Path, summary: Mapping[str, Any]) -> None:
                     )
 
 
+def _gate_trace_per_case(
+    package_dir: Path,
+    summary: Mapping[str, Any],
+    proposals: Sequence[Mapping[str, Any]],
+) -> None:
+    """G3: package/isolation invariants plus a mandatory per-case disposition check.
+
+    A package-wide nonzero count is never sufficient on its own — each case's
+    disposition is recomputed and matched against that case's OWN filtered
+    trace, so a missing case's required trace can never be satisfied by
+    another case's operations.
+    """
+    _gate_trace(package_dir, summary)
+    trace_events = _load_json(Path(package_dir) / "trace_events.json").get("events") or []
+    for proposal in proposals:
+        case_id = str(proposal.get("case_id"))
+        disposition = classify_case_disposition(proposal)
+        case_events = case_trace_events(trace_events, case_id)
+        closure_sha = ((proposal.get("extra") or {}).get("closure") or {}).get(
+            "evaluation_closure_hash"
+        )
+        evaluate_case_trace_profile(
+            case_id=case_id,
+            disposition=disposition,
+            case_events=case_events,
+            closure_sha=closure_sha,
+        )
+
+
 def _gate_evidence(
     proposals: Sequence[Mapping[str, Any]],
     summary: Mapping[str, Any],
@@ -195,6 +225,8 @@ def _gate_evidence(
     for proposal in proposals:
         rows = proposal.get("candidate_results") or []
         if not rows:
+            if classify_case_disposition(proposal) == NOT_CONSTRUCTIBLE:
+                continue
             raise CoreContractError("candidate ledger empty")
         for row in rows:
             if row.get("failure_reason"):
@@ -637,6 +669,8 @@ def verify_cf1s_package(
     verifier_code_sha256: str,
     receipt: Optional[Mapping[str, Any]] = None,
     pre_promotion_verdict: Optional[Mapping[str, Any]] = None,
+    expected_case_count: int = 3,
+    cohort_id: str = "DEVELOPMENT3",
 ) -> Dict[str, Any]:
     if phase not in (PRE_PROMOTION, FINAL):
         raise CoreContractError("unknown verifier phase")
@@ -664,9 +698,15 @@ def verify_cf1s_package(
     )
     if recalculated_root != evidence_root:
         raise CoreContractError("immutable evidence root mismatch")
-    proposals = _case_proposals(package_dir)
-    pre_lock = validate_stable_lock_manifest(_load_json(package_dir / "pre_stable_lock.json"))
-    post_lock = validate_stable_lock_manifest(_load_json(package_dir / "post_stable_lock.json"))
+    proposals = _case_proposals(package_dir, expected_case_count)
+    pre_lock = validate_stable_lock_manifest(
+        _load_json(package_dir / "pre_stable_lock.json"),
+        expected_cohort=cohort_id.lower(),
+    )
+    post_lock = validate_stable_lock_manifest(
+        _load_json(package_dir / "post_stable_lock.json"),
+        expected_cohort=cohort_id.lower(),
+    )
     final_rerun_observation = _load_json(
         sidecar_dir / "final_rerun_observation_manifest.json"
     )
@@ -684,7 +724,7 @@ def verify_cf1s_package(
 
     evaluate("G1", lambda: _gate_transaction(proposals))
     evaluate("G2", lambda: _gate_runtime(summary, proposals, pre_lock))
-    evaluate("G3", lambda: _gate_trace(package_dir, summary))
+    evaluate("G3", lambda: _gate_trace_per_case(package_dir, summary, proposals))
     evaluate("G4", lambda: _gate_evidence(proposals, summary))
     def check_authorization_chain() -> None:
         consume_pre_execution_authorization(
@@ -693,6 +733,7 @@ def verify_cf1s_package(
             trust_root_sha256=trust_root_sha256,
             observed_stable_lock=pre_lock,
             expected_run_id=run_id,
+            expected_cohort_id=cohort_id,
         )
         stable_sha = pre_lock["stable_lock_sha256"]
         if stable_sha != post_lock["stable_lock_sha256"]:
@@ -731,6 +772,7 @@ def verify_cf1s_package(
                     "final_rerun_observation_manifest_sha256"
                 ]
             ),
+            expected_cohort_id=cohort_id,
         )
 
     evaluate("G10", check_post_attestation)

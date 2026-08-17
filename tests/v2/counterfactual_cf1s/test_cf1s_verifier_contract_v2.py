@@ -382,7 +382,7 @@ def test_two_phase_verifier_end_to_end(tmp_path):
     case_ids = ["case-1", "case-2", "case-3"]
     closures = {}
 
-    def traced(kind, invocation_id, case_id, fold_id, scope, phase):
+    def traced(kind, invocation_id, case_id, fold_id, scope, phase, extra=None):
         kwargs = {
             "kind": kind,
             "invocation_id": invocation_id,
@@ -391,6 +391,8 @@ def test_two_phase_verifier_end_to_end(tmp_path):
             "scope": scope,
             "phase": phase,
         }
+        if extra is not None:
+            kwargs["extra"] = extra
         trace.begin_operation(**kwargs)
         trace.start(**kwargs)
         trace.complete(**kwargs)
@@ -448,6 +450,7 @@ def test_two_phase_verifier_end_to_end(tmp_path):
             None,
             "search",
             "SEARCH_EFFECTS",
+            extra={"forward_kind": "CANDIDATE_EFFECT_FORWARD"},
         )
 
         parent_a = make_test_candidate_transaction(

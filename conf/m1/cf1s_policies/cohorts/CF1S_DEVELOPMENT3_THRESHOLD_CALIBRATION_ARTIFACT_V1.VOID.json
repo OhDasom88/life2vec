@@ -1,0 +1,19 @@
+{
+  "artifact_kind": "CF1S_VOID_MARKER_V1",
+  "status": "VOID",
+  "authority": "NONE",
+  "highest_claim_level": "NONE",
+  "voided_at": "20260719T122619Z",
+  "void_reason": "SELF_DECLARED_NOT_VERIFIER_ISSUED: artifact was written by ad-hoc script and must not be treated as DEVELOPMENT3_FINAL_CODE_LOCK, stable-lock authorization input, or measured qualification preflight. Same failure mode as CONTRACT_HOLD (PASS self-declaration without canonical verifier verdict / immutable machine-readable evidence).",
+  "artifact_was": "CF1S_DEVELOPMENT3_THRESHOLD_CALIBRATION_ARTIFACT_V1.json",
+  "quarantine_package": "outputs/cf1s_core/quarantine/SELF_DECLARED_DLOCK_VOID_20260719T122619Z",
+  "quarantine_item": "conf_cohorts/CF1S_DEVELOPMENT3_THRESHOLD_CALIBRATION_ARTIFACT_V1.json",
+  "reuse_forbidden": true,
+  "do_not_treat_as": [
+    "DEVELOPMENT3_FINAL_CODE_LOCK",
+    "D-LOCK",
+    "stable_lock_manifest",
+    "qualification_preflight",
+    "authorization_input"
+  ]
+}

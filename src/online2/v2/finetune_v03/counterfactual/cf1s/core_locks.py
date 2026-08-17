@@ -23,6 +23,7 @@ from .core_contract import CoreContractError, sha256_file
 
 REPO_ROOT = Path("/home/dasom/life2vec")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+ALLOWED_STABLE_LOCK_COHORTS = ("development3", "validation20", "primary32")
 REQUIRED_STABLE_LOCK_SHA_FIELDS = (
     "code_tree_sha256",
     "test_tree_sha256",
@@ -50,6 +51,7 @@ def default_code_tree_paths(root: Path = REPO_ROOT) -> list:
     return sorted(
         list((root / "src/online2/v2/finetune_v03/counterfactual/cf1s").glob("core_*.py"))
         + [
+            root / "src/online2/v2/finetune_v03/counterfactual/cf1s/disposition_profiles.py",
             root / "src/online2/v2/finetune_v03/counterfactual/pipeline_cf1s_core.py",
             root / "src/online2/v2/finetune_v03/counterfactual/attribution/token_ixg_v03.py",
             root / "src/online2/v2/finetune_v03/counterfactual/attribution/token_attribution.py",
@@ -57,10 +59,13 @@ def default_code_tree_paths(root: Path = REPO_ROOT) -> list:
             root / "scripts/online2_v2/v03/run_cf1s_core_development_production_v03.py",
             root / "scripts/online2_v2/v03/run_cf1s_stage_gpu_smoke_v03.py",
             root / "scripts/online2_v2/v03/build_cf1s_stable_lock_v03.py",
+            root / "scripts/online2_v2/v03/build_cf1s_development3_final_code_lock_v03.py",
+            root / "scripts/online2_v2/v03/build_cf1s_expansion_final_code_lock_v03.py",
             root / "scripts/online2_v2/v03/authorize_cf1s_development_smoke.py",
             root / "scripts/online2_v2/v03/authorize_cf1s_validation20_v03.py",
             root / "scripts/online2_v2/v03/complete_cf1s_run_v03.py",
             root / "scripts/online2_v2/v03/promote_cf1s_primary32_lock.py",
+            root / "scripts/online2_v2/v03/build_cf1s_primary32_fold_routing_v03.py",
             root / "scripts/online2_v2/v03/build_cf1s_train35_report_v03.py",
         ]
     )
@@ -85,6 +90,7 @@ def default_test_tree_paths(root: Path = REPO_ROOT) -> list:
 
 def compute_stable_lock_manifest(
     *,
+    cohort: str = "development3",
     root: Path = REPO_ROOT,
     qualification_test_log_sha: Optional[str] = None,
     qualification_preflight_sha: Optional[str] = None,
@@ -98,6 +104,8 @@ def compute_stable_lock_manifest(
     extra: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Exact-comparable stable lock — excludes volatile runtime observations."""
+    if cohort not in ALLOWED_STABLE_LOCK_COHORTS:
+        raise CoreContractError(f"unknown stable lock cohort: {cohort}")
     code_sha, _ = tree_manifest_sha(default_code_tree_paths(root), root=root, required=True)
     policy_sha, _ = tree_manifest_sha(default_policy_tree_paths(root), root=root, required=True)
     test_paths = [p for p in default_test_tree_paths(root) if p.is_file()]
@@ -124,7 +132,7 @@ def compute_stable_lock_manifest(
         "qualification_node_id_manifest_sha256": qualification_test_node_id_manifest_sha,
         "runtime_versions": dict(runtime_versions or {}),
         "risk_head_contract": dict(risk_head_contract or {}),
-        "cohort": "development3",
+        "cohort": cohort,
         "closure_kind": "SELECTION_BLIND_REEVALUATION_CLOSURE",
         "execution_scope": "TWO_EVENT_ONLY",
         "artifact_sources": dict(sorted((artifact_sources or {}).items())),
@@ -144,12 +152,16 @@ def compute_stable_lock_manifest(
     return body
 
 
-def validate_stable_lock_manifest(manifest: Mapping[str, Any]) -> Dict[str, Any]:
+def validate_stable_lock_manifest(
+    manifest: Mapping[str, Any], *, expected_cohort: str = "development3"
+) -> Dict[str, Any]:
+    if expected_cohort not in ALLOWED_STABLE_LOCK_COHORTS:
+        raise CoreContractError(f"unknown expected stable lock cohort: {expected_cohort}")
     body = dict(manifest)
     if body.get("version") != "CF1S_STABLE_LOCK_MANIFEST_V2":
         raise CoreContractError("stable lock version must be CF1S_STABLE_LOCK_MANIFEST_V2")
-    if body.get("cohort") != "development3":
-        raise CoreContractError("stable lock cohort must be development3")
+    if body.get("cohort") != expected_cohort:
+        raise CoreContractError(f"stable lock cohort must be {expected_cohort}")
     if body.get("execution_scope") != "TWO_EVENT_ONLY":
         raise CoreContractError("stable lock execution_scope must be TWO_EVENT_ONLY")
     for field_name in REQUIRED_STABLE_LOCK_SHA_FIELDS:
@@ -206,7 +218,9 @@ def recompute_stable_lock_manifest(
     observed["stable_lock_sha256"] = canonical_json_sha256(
         {key: value for key, value in observed.items() if key != "stable_lock_sha256"}
     )
-    return validate_stable_lock_manifest(observed)
+    return validate_stable_lock_manifest(
+        observed, expected_cohort=str(expected.get("cohort") or "development3")
+    )
 
 
 def compute_runtime_observation(
@@ -285,9 +299,14 @@ def build_final_rerun_observation_manifest(
     return body
 
 
-def assert_stable_locks_identical(pre: Mapping[str, Any], post: Mapping[str, Any]) -> bool:
-    validated_pre = validate_stable_lock_manifest(pre)
-    validated_post = validate_stable_lock_manifest(post)
+def assert_stable_locks_identical(
+    pre: Mapping[str, Any],
+    post: Mapping[str, Any],
+    *,
+    expected_cohort: str = "development3",
+) -> bool:
+    validated_pre = validate_stable_lock_manifest(pre, expected_cohort=expected_cohort)
+    validated_post = validate_stable_lock_manifest(post, expected_cohort=expected_cohort)
     pre_sha = validated_pre["stable_lock_sha256"]
     post_sha = validated_post["stable_lock_sha256"]
     if pre_sha != post_sha:
@@ -310,15 +329,18 @@ def verify_post_attestation_public_key_only(
     expected_stable_lock_sha256: Optional[str] = None,
     expected_final_destination: Optional[str] = None,
     expected_final_rerun_observation_manifest_sha256: Optional[str] = None,
+    expected_cohort_id: str = "DEVELOPMENT3",
 ) -> Dict[str, Any]:
     """Independent verifier — never requires signing private key."""
+    if expected_cohort_id not in ("DEVELOPMENT3", "VALIDATION20", "PRIMARY32"):
+        raise CoreContractError(f"unknown expected POST cohort_id: {expected_cohort_id}")
     if artifact.get("artifact_kind") != POST_EXECUTION_KIND:
         raise CoreContractError("not a POST_EXECUTION_EVIDENCE_ATTESTATION")
     if artifact.get("schema_version") != "CF1S_POST_ATTESTATION_V2":
         raise CoreContractError("POST schema version mismatch")
-    if artifact.get("cohort_id") != "DEVELOPMENT3":
+    if artifact.get("cohort_id") != expected_cohort_id:
         raise CoreContractError("POST cohort mismatch")
-    if artifact.get("scope") != ["DEVELOPMENT3", "TWO_EVENT_ONLY"]:
+    if artifact.get("scope") != [expected_cohort_id, "TWO_EVENT_ONLY"]:
         raise CoreContractError("POST scope mismatch")
     if artifact.get("trust_root_sha256") != trust_root_sha256:
         raise CoreContractError("POST trust_root_sha256 mismatch")

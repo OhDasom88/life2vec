@@ -218,9 +218,16 @@ def _build_tx_from_atomics(
     case_id: str,
     atomics_raw: Sequence[Mapping[str, Any]],
     original_caseevents_sha: str,
+    submitted_order_offset: int = 0,
 ) -> Dict[str, Any]:
+    # submitted_order must match the atomic's position within its eventual pair
+    # bundle even when built standalone as a dependency parent — otherwise the
+    # parent's own to_dict() diverges from the bundle's view of the same atomic
+    # (BUNDLE_ATOMIC_SET_NOT_EXACT_PARENT_UNION on every pair with a non-zero-index parent).
     validated_atomics = [
-        _atomic_to_validated(case_id=case_id, atomic=a, submitted_order=i)
+        _atomic_to_validated(
+            case_id=case_id, atomic=a, submitted_order=submitted_order_offset + i
+        )
         for i, a in enumerate(atomics_raw)
     ]
     targeted = [a.raw_field_path for a in validated_atomics]
@@ -305,14 +312,23 @@ def build_multievent_candidates_for_case(
         )
         if len(atomics) != 2:
             continue
-        for atomic in atomics:
-            cid = f"ATOMIC::{atomic['event_id']}::{atomic['feature_id']}"
+        # candidate_id is position-scoped (posN): the same event+feature atomic
+        # can appear at a different index in another pair (overlapping pairs
+        # share an event), and its standalone tx's submitted_order must match
+        # that index — so it cannot be deduped across positions.
+        pair_parent_cids = [
+            f"ATOMIC::{a['event_id']}::{a['feature_id']}::pos{i}"
+            for i, a in enumerate(atomics)
+        ]
+        for atomic_index, atomic in enumerate(atomics):
+            cid = pair_parent_cids[atomic_index]
             if any(c["candidate_id"] == cid for c in candidates):
                 continue
             built = _build_tx_from_atomics(
                 case_id=case_id,
                 atomics_raw=[atomic],
                 original_caseevents_sha=original_sha,
+                submitted_order_offset=atomic_index,
             )
             tx = built["validated_transaction"]
             candidates.append(
@@ -340,23 +356,24 @@ def build_multievent_candidates_for_case(
         )
         tx_pair = built_pair["validated_transaction"]
         bundle_id = f"PAIR::{a_id}::{b_id}::{atomics[0]['feature_id']}"
-        atomic_candidates = [
-            candidate
-            for candidate in candidates
-            if candidate.get("kind") == "ATOMIC"
-            and set(candidate.get("event_ids") or []).issubset({a_id, b_id})
+        # pair_parent_cids[i] is exactly the atomic that occupies position i in
+        # this bundle (see submitted_order note above) — look these up directly
+        # rather than filtering by event_ids, which cannot distinguish an atomic's
+        # role across pairs that overlap on a shared event.
+        by_cid = {str(c["candidate_id"]): c for c in candidates}
+        pair_parents = [
+            by_cid[cid] for cid in pair_parent_cids if cid in by_cid
         ]
-        atomic_candidates = sorted(
-            atomic_candidates,
-            key=lambda candidate: (
-                tuple(candidate.get("event_ids") or []),
-                str(candidate.get("candidate_id")),
-            ),
-        )
-        if len(atomic_candidates) != 2:
+        if len(pair_parents) != 2:
             raise CoreContractError(
                 f"pair {bundle_id} requires exactly two canonical atomic parents"
             )
+        # Declared order must match verify_exact_parent_transactions' canonical
+        # sort (by the parent's own atomic sort_key), not pair/position order.
+        atomic_candidates = sorted(
+            pair_parents,
+            key=lambda candidate: candidate["validated_transaction"].atomics[0].sort_key(),
+        )
         parent_candidate_ids = [str(candidate["candidate_id"]) for candidate in atomic_candidates]
         parent_transaction_shas = [
             str(candidate["transaction_sha"]) for candidate in atomic_candidates

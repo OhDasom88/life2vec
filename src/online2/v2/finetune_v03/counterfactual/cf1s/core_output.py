@@ -201,8 +201,12 @@ def build_case_edit_proposal_envelope(
                 "scientific_status": ScientificStatus.NOT_EVALUATED.value,
             }
         )
+    # Nested, not flattened: the verifier reads these back via
+    # proposal.get("extra").get(...) (threshold/closure/selection_manifest/
+    # scientific_detail) — flattening into the top level silently orphans
+    # them and fails G6-G9 with "missing" errors on real (non-mocked) output.
     if extra:
-        envelope.update(dict(extra))
+        envelope["extra"] = dict(extra)
     assert_no_forbidden_ranking_fields(envelope)
     if envelope.get("recommendation") is not None and disposition != OutputDisposition.AUTHORIZED_RECOMMENDATION:
         raise CoreContractError("recommendation must be null without AUTHORIZED_RECOMMENDATION")

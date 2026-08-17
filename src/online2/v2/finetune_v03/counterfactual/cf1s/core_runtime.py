@@ -164,11 +164,13 @@ def resolve_stage_a_critic_pairings(
     }
 
 
-def load_fold_routing_manifest(path: Path) -> Dict[str, Any]:
+def load_fold_routing_manifest(
+    path: Path, *, expected_manifest_id: str = "CF1S_DEVELOPMENT3_FOLD_ROUTING_V1"
+) -> Dict[str, Any]:
     import json
 
     data = json.loads(Path(path).read_text(encoding="utf-8"))
-    if data.get("manifest_id") != "CF1S_DEVELOPMENT3_FOLD_ROUTING_V1":
+    if data.get("manifest_id") != expected_manifest_id:
         raise CoreContractError("unexpected fold routing manifest_id")
     return data
 

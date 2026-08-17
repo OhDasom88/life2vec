@@ -1,0 +1,1 @@
+{"artifact_kind":"CF1S_RISK_HEAD_CONTRACT_V1","definition":"risk = sigmoid(abnormal_logit)","probability_transform":"SIGMOID","risk":"SIGMOID_ABNORMAL_LOGIT","risk_head_contract_sha256":"ba406aec8cee2303002255295ef6b93bace53f9439a630cc1a11fa63f2d505ca","target_head":"abnormal_binary","tolerance":1e-06}
