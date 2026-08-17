@@ -19,6 +19,20 @@ def main() -> int:
         help="JSON object mapping every non-code/test/policy SHA field to a source file.",
     )
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument(
+        "--risk-head-contract",
+        type=Path,
+        default=None,
+        help="JSON object describing the risk-head contract (risk_definition/target_head/...).",
+    )
+    parser.add_argument("--cohort", default="development3")
+    parser.add_argument(
+        "--development-manifest-path",
+        type=Path,
+        default=None,
+        help="Cohort case manifest (despite the flag name, used for any cohort).",
+    )
+    parser.add_argument("--fold-routing-path", type=Path, default=None)
     args = parser.parse_args()
 
     from src.online2.v2.finetune_v03.counterfactual.cf1s.core_authorization import (
@@ -75,8 +89,18 @@ def main() -> int:
         except ValueError:
             normalized_sources[field] = str(path.resolve())
 
+    risk_head_contract = {}
+    if args.risk_head_contract is not None:
+        rhc_path = (
+            args.risk_head_contract
+            if args.risk_head_contract.is_absolute()
+            else ROOT / args.risk_head_contract
+        )
+        risk_head_contract = json.loads(rhc_path.read_text(encoding="utf-8"))
+
     manifest = compute_stable_lock_manifest(
         root=ROOT,
+        cohort=args.cohort,
         qualification_test_log_sha=resolved["qualification_test_log_sha256"],
         qualification_preflight_sha=resolved["qualification_preflight_sha256"],
         qualification_test_node_id_manifest_sha=resolved[
@@ -85,9 +109,11 @@ def main() -> int:
         artifact_sha256=resolved,
         artifact_sources=normalized_sources,
         runtime_versions={},
-        risk_head_contract={},
+        risk_head_contract=risk_head_contract,
+        development_manifest_path=args.development_manifest_path,
+        fold_routing_path=args.fold_routing_path,
     )
-    validate_stable_lock_manifest(manifest)
+    validate_stable_lock_manifest(manifest, expected_cohort=args.cohort)
     out = args.out if args.out.is_absolute() else ROOT / args.out
     out.parent.mkdir(parents=True, exist_ok=True)
     if out.exists():

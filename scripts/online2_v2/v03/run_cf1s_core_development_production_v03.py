@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Development3-only production evidence runner. No cohort argument. Fail-closed."""
+"""Cohort production evidence runner. No CLI cohort flag — cohort is bound by
+the signed authorization artifact's cohort_id, not caller input. Fail-closed."""
 
 from __future__ import annotations
 
@@ -12,6 +13,32 @@ from typing import Any, Dict, List, Mapping, Sequence
 import yaml
 
 ROOT = Path(__file__).resolve().parents[3]
+
+COHORT_CASE_COUNTS = {
+    "DEVELOPMENT3": 3,
+    "VALIDATION20": 20,
+    "PRIMARY32": 32,
+}
+COHORT_MANIFEST_CONFIG_KEYS = {
+    "DEVELOPMENT3": "development_manifest_path",
+    "VALIDATION20": "validation20_manifest_path",
+    "PRIMARY32": "primary32_manifest_path",
+}
+COHORT_FOLD_ROUTING_MANIFEST_IDS = {
+    "DEVELOPMENT3": "CF1S_DEVELOPMENT3_FOLD_ROUTING_V1",
+    "VALIDATION20": "CF1S_VALIDATION20_FOLD_ROUTING_V1",
+    "PRIMARY32": "CF1S_PRIMARY32_FOLD_ROUTING_V1",
+}
+COHORT_DEFAULT_FOLD_ROUTING_RELPATHS = {
+    "DEVELOPMENT3": "conf/m1/cf1s_policies/cohorts/CF1S_DEVELOPMENT3_FOLD_ROUTING_V1.json",
+    "VALIDATION20": "conf/m1/cf1s_policies/cohorts/CF1S_VALIDATION20_FOLD_ROUTING_V1.json",
+    "PRIMARY32": "conf/m1/cf1s_policies/cohorts/CF1S_PRIMARY32_FOLD_ROUTING_V1.json",
+}
+# Validation20/Primary32 must reuse Development3's locked threshold verbatim
+# (never recompute) — see plan §Phase E1/E2 "threshold/candidate policy 변경 금지".
+DEVELOPMENT3_LOCKED_THRESHOLD_PATH = (
+    ROOT / "outputs/cf1s_core/policy_snapshots/CF1S_DEVELOPMENT3_LOCKED_THRESHOLD.json"
+)
 
 
 def _load_yaml(path: Path) -> Dict[str, Any]:
@@ -159,7 +186,8 @@ def main() -> int:
     parser.add_argument(
         "--fold-routing",
         type=Path,
-        default=ROOT / "conf/m1/cf1s_policies/cohorts/CF1S_DEVELOPMENT3_FOLD_ROUTING_V1.json",
+        default=None,
+        help="Defaults to the authorized cohort's routing manifest if omitted.",
     )
     parser.add_argument(
         "--dry-authority-check",
@@ -183,6 +211,18 @@ def main() -> int:
     auth = json.loads(auth_path.read_text(encoding="utf-8"))
     if auth.get("artifact_kind") != "PRE_EXECUTION_AUTHORIZATION":
         raise SystemExit("authorization must be signed PRE_EXECUTION_AUTHORIZATION")
+    cohort_id = str(auth.get("cohort_id") or "")
+    if cohort_id not in COHORT_CASE_COUNTS:
+        raise SystemExit(f"authorization cohort_id not recognized: {cohort_id!r}")
+    fold_routing_manifest_id = COHORT_FOLD_ROUTING_MANIFEST_IDS[cohort_id]
+    if args.fold_routing is not None:
+        fold_routing_path = (
+            args.fold_routing
+            if args.fold_routing.is_absolute()
+            else ROOT / args.fold_routing
+        )
+    else:
+        fold_routing_path = ROOT / COHORT_DEFAULT_FOLD_ROUTING_RELPATHS[cohort_id]
     if not auth.get("development_production_execution_authorized"):
         raise SystemExit("development_production_execution_authorized=false")
     if not auth.get("evidence_output_authorized"):
@@ -201,10 +241,14 @@ def main() -> int:
     if core.get("problem20", {}).get("execution_allowed") or core.get("problem20_allowed"):
         raise SystemExit("policy problem20 execution must remain false")
 
-    man = json.loads((ROOT / str(cfg["development_manifest_path"])).read_text(encoding="utf-8"))
+    manifest_config_key = COHORT_MANIFEST_CONFIG_KEYS[cohort_id]
+    if manifest_config_key not in cfg:
+        raise SystemExit(f"config missing {manifest_config_key} for cohort {cohort_id}")
+    man = json.loads((ROOT / str(cfg[manifest_config_key])).read_text(encoding="utf-8"))
     case_ids = list(man["ordered_case_ids"])
-    if len(case_ids) != 3:
-        raise SystemExit("Development3 must have exactly 3 cases")
+    expected_case_count = COHORT_CASE_COUNTS[cohort_id]
+    if len(case_ids) != expected_case_count:
+        raise SystemExit(f"{cohort_id} requires exactly {expected_case_count} cases")
 
     if args.dry_authority_check:
         from src.online2.v2.finetune_v03.counterfactual.cf1s.core_authorization import (
@@ -227,12 +271,13 @@ def main() -> int:
             trust_root_sha256=tr_sha,
             observed_stable_lock=observed_stable,
             expected_run_id=str(auth.get("run_id") or ""),
+            expected_cohort_id=cohort_id,
         )
         print(
             json.dumps(
                 {
                     "status": "AUTHORITY_GATE_PASS",
-                    "cohort": "development3",
+                    "cohort": cohort_id.lower(),
                     "case_ids": case_ids,
                     "authorization": str(auth_path),
                     "closure_kind": "SELECTION_BLIND_REEVALUATION_CLOSURE",
@@ -243,7 +288,7 @@ def main() -> int:
         return 0
 
     from src.online2.v2.finetune_v03.counterfactual.cf1s.core_orchestrator import (
-        run_development3_orchestrator,
+        run_cohort_orchestrator,
     )
     from src.online2.v2.finetune_v03.counterfactual.cf1s.core_runtime import (
         apply_exact_byte_deterministic_runtime,
@@ -254,16 +299,31 @@ def main() -> int:
 
     out_root = Path(args.out) if args.out else Path(cfg.get("output_root") or (ROOT / "outputs/cf1s_core"))
     hooks = _build_production_hooks(cfg)
-    result = run_development3_orchestrator(
+    locked_threshold_dict = None
+    if cohort_id != "DEVELOPMENT3":
+        if not DEVELOPMENT3_LOCKED_THRESHOLD_PATH.is_file():
+            raise SystemExit(
+                f"{cohort_id} requires Development3's locked threshold artifact, "
+                f"missing: {DEVELOPMENT3_LOCKED_THRESHOLD_PATH}"
+            )
+        locked_artifact = json.loads(
+            DEVELOPMENT3_LOCKED_THRESHOLD_PATH.read_text(encoding="utf-8")
+        )
+        locked_threshold_dict = locked_artifact["threshold"]
+
+    result = run_cohort_orchestrator(
         config=cfg,
         authorization_artifact=auth,
         trust_root_path=trust_path,
-        fold_routing_path=args.fold_routing
-        if args.fold_routing.is_absolute()
-        else ROOT / args.fold_routing,
+        fold_routing_path=fold_routing_path,
         hooks=hooks,
         out_root=out_root,
         signing_private_key_hex=os.environ.get("CF1S_DEVELOPMENT_SIGNING_KEY_HEX"),
+        cohort_id=cohort_id,
+        expected_case_count=expected_case_count,
+        manifest_config_key=manifest_config_key,
+        fold_routing_manifest_id=fold_routing_manifest_id,
+        locked_threshold_dict=locked_threshold_dict,
     )
     print(
         json.dumps(

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Staged GPU smoke: one Development3 case, search fold 0, identity cold→critic path."""
+"""Staged GPU smoke (PILOT_PRECHECK): one pre-fixed case, search fold 0,
+identity cold->critic path. No promotion, no receipt, not official evidence."""
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -14,8 +16,16 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--case-id",
+        default="F420458_2025-02-16_2025-03-01",
+        help="Pre-fixed pilot case ID (must be decided before seeing results).",
+    )
+    args = parser.parse_args()
+
     cfg = yaml.safe_load((ROOT / "conf/m1/cf1s_core_smoke.yaml").read_text()) or {}
-    case_id = "F420458_2025-02-16_2025-03-01"
+    case_id = args.case_id
 
     from src.online2.v2.finetune_v03.counterfactual.cf1s.core_canonical import (
         canonical_json_sha256,
@@ -107,11 +117,11 @@ def main() -> int:
         "semantic_critic_input_sha": out.get("semantic_critic_input_sha"),
         "runtime_lock_sha256": lock.sha256(),
         "smoke_max_events": max_events,
-        "interpretation_label": "Development3 selection-blind contract verification evidence",
+        "interpretation_label": "PILOT_PRECHECK evidence only — not an official cohort result",
     }
     out_dir = Path(cfg["output_root"]) / "gpu_smoke"
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / "CF1S_STAGE_GPU_SMOKE.json"
+    path = out_dir / f"CF1S_STAGE_GPU_SMOKE_{case_id}.json"
     path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2))
     print(f"wrote {path}")
