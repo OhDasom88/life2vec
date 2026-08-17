@@ -19,6 +19,11 @@ def main() -> int:
     parser.add_argument("--expected-code-sha")
     parser.add_argument("--run-id", required=True)
     parser.add_argument(
+        "--cohort-id",
+        default="DEVELOPMENT3",
+        choices=["DEVELOPMENT3", "VALIDATION20", "PRIMARY32"],
+    )
+    parser.add_argument(
         "--stable-lock-manifest",
         type=Path,
         required=True,
@@ -131,6 +136,7 @@ def main() -> int:
             stable_lock_manifest=observed_stable,
             run_id=args.run_id,
             expires_at=datetime.now(timezone.utc) + timedelta(hours=float(args.expires_hours)),
+            cohort_id=args.cohort_id,
         )
     else:
         artifact = {
@@ -156,7 +162,7 @@ def main() -> int:
             "run_id": args.run_id,
             "stable_lock_sha256": observed_stable["stable_lock_sha256"],
             "stable_lock_manifest": observed_stable,
-            "cohort": "development3",
+            "cohort": args.cohort_id.lower(),
             "closure_kind": "SELECTION_BLIND_REEVALUATION_CLOSURE",
             "interpretation_scope": "Development3 selection-blind contract verification evidence",
             "notes": (

@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
 ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
@@ -59,6 +59,9 @@ from src.online2.v2.finetune_v03.open_set import energy_from_logits, route_case 
 from src.online2.v2.finetune_v03.pos_weight import (  # noqa: E402
     parse_pos_weight_arg,
     resolve_pos_weight,
+)
+from src.online2.v2.finetune_v03.sample_weights import (  # noqa: E402
+    class_balanced_sample_weights,
 )
 from src.online2.v2.finetune_v03.version import DEFAULT_OUTPUT_ROOT, FINETUNE_VERSION  # noqa: E402
 
@@ -129,6 +132,16 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="auto",
         help="auto (=N_normal/N_abnormal on train split) or absolute float",
+    )
+    p.add_argument(
+        "--weighted-sampler",
+        "--weighted_sampler",
+        type=str2bool,
+        default=True,
+        help="class-balanced WeightedRandomSampler on the fine label for train batches "
+        "(mirrors original life2vec CLSDataModule.get_train_weights(), replacement=True). "
+        "Independent of --pos-weight (loss reweighting) -- both act on train only, "
+        "val/test are never resampled.",
     )
     p.add_argument("--binary-threshold", "--binary_threshold", type=float, default=0.5)
     p.add_argument(
@@ -254,6 +267,7 @@ def apply_wandb_config(args: argparse.Namespace) -> argparse.Namespace:
         "lambda_prototype": "lambda_prototype",
         "supcon_temperature": "supcon_temperature",
         "pos_weight": "pos_weight",
+        "weighted_sampler": "weighted_sampler",
         "binary_threshold": "binary_threshold",
         "monitor": "monitor",
         "n_folds": "n_folds",
@@ -399,6 +413,7 @@ def eval_and_analyze(
                     "route": route.decision,
                     "route_reasons": ",".join(route.reasons),
                     "z_proj": out["z_proj"][i].detach().cpu().numpy(),
+                    "h_binary": out["h_binary"][i].detach().cpu().numpy(),
                 }
             )
 
@@ -420,8 +435,9 @@ def eval_and_analyze(
         "loss": loss_sum / max(n, 1),
         "n": n,
         **{f"fine_{k}": v for k, v in fine.items()},
-        **{f"bin_{k}": v for k, v in binm.items() if k != "threshold_table"},
+        **{f"bin_{k}": v for k, v in binm.items() if k not in ("threshold_table", "reliability_bins")},
         "bin_threshold_table": binm.get("threshold_table"),
+        "bin_reliability_bins": binm.get("reliability_bins"),
         **{f"cons_{k}": v for k, v in cons.items()},
         **{f"dist_{k}": v for k, v in dist.items()},
         "case_rows": case_rows,
@@ -472,18 +488,26 @@ def train_one_split(
     ).to(device)
     effective_pw = float(pos_w.item())
 
-    def make_loader(ds, shuffle: bool) -> DataLoader:
+    def make_loader(ds, *, shuffle: bool = False, sampler=None) -> DataLoader:
         bs = max(1, min(int(args.batch_size), len(ds)))
         return DataLoader(
             ds,
             batch_size=bs,
             shuffle=shuffle,
+            sampler=sampler,
             collate_fn=lambda xs: collate_diagnosis_batch_v03(xs, max_events=args.max_events),
             num_workers=0,
         )
 
-    train_loader = make_loader(train_ds, True)
-    val_loader = make_loader(val_ds, False) if val_ds and len(val_ds) else None
+    if args.weighted_sampler:
+        sample_weights = class_balanced_sample_weights(train_ds.case_ids, labels_df)
+        train_sampler = WeightedRandomSampler(
+            sample_weights, num_samples=len(sample_weights), replacement=True
+        )
+        train_loader = make_loader(train_ds, sampler=train_sampler)
+    else:
+        train_loader = make_loader(train_ds, shuffle=True)
+    val_loader = make_loader(val_ds, shuffle=False) if val_ds and len(val_ds) else None
     best_path = fold_ckpt_path(run_dir, fold_index or 0, repeat=repeat_index)
 
     best_score = 1e18 if args.monitor == "val_loss" else -1e18
@@ -528,6 +552,7 @@ def train_one_split(
             "binary_pos_weight_effective": effective_pw,
         }
         improved = False
+        per_class_f1 = confmat = reliability = None
         if val_loader is not None:
             ev = eval_and_analyze(
                 model,
@@ -541,8 +566,14 @@ def train_one_split(
             # drop heavy case_rows from epoch history
             case_rows = ev.pop("case_rows", [])
             thr_table = ev.pop("bin_threshold_table", None)
+            per_class_f1 = ev.pop("fine_per_class_f1", None)
+            confmat = ev.pop("fine_confusion_matrix", None)
+            reliability = ev.pop("bin_reliability_bins", None)
             row.update({f"val_{k}": v for k, v in ev.items() if not isinstance(v, (dict, list))})
             row["val_bin_threshold_table"] = thr_table
+            row["val_fine_per_class_f1"] = per_class_f1
+            row["val_fine_confusion_matrix"] = confmat
+            row["val_bin_reliability_bins"] = reliability
 
             if args.monitor == "val_loss":
                 score = float(ev["loss"])
@@ -595,6 +626,24 @@ def train_one_split(
                 payload["repeat"] = int(repeat_index)
             if improved:
                 payload[f"{split_name}/best_epoch"] = float(epoch)
+            if per_class_f1 is not None:
+                label_names = label_map.get("labels", [])
+                for cls_id, f1 in enumerate(per_class_f1):
+                    if not _finite_num(f1):
+                        continue
+                    name = label_names[cls_id] if cls_id < len(label_names) else str(cls_id)
+                    payload[f"{split_name}/val_fine_f1__{name}"] = float(f1)
+            if improved and confmat is not None:
+                label_names = label_map.get("labels", [])
+                cm_table = wandb.Table(columns=["true_label"] + list(label_names))
+                for i, true_name in enumerate(label_names):
+                    cm_table.add_data(true_name, *[int(x) for x in confmat[i]])
+                payload[f"{split_name}/val_fine_confusion_matrix"] = cm_table
+            if improved and reliability is not None:
+                rel_table = wandb.Table(columns=["bin_lo", "bin_hi", "mean_pred", "mean_true", "count"])
+                for b in reliability:
+                    rel_table.add_data(b["bin_lo"], b["bin_hi"], b["mean_pred"], b["mean_true"], b["count"])
+                payload[f"{split_name}/val_bin_reliability"] = rel_table
             wandb.log(payload, step=int(step_box[0]))
 
         if epoch == 1 or epoch % 5 == 0 or epoch == args.epochs:
@@ -628,12 +677,20 @@ def train_one_split(
     # write analysis artifacts for best val cases
     if val_loader is not None and isinstance(best_row, dict) and best_row.get("case_rows"):
         rows = best_row["case_rows"]
-        pdf = pd.DataFrame([{k: v for k, v in r.items() if k != "z_proj"} for r in rows])
+        pdf = pd.DataFrame([{k: v for k, v in r.items() if k not in ("z_proj", "h_binary")} for r in rows])
         tag = split_name
         pdf.to_csv(run_dir / f"{tag}_oof_head_consistency.csv", index=False)
         thr = best_row.get("val_bin_threshold_table")
         if thr:
             pd.DataFrame(thr).to_csv(run_dir / f"{tag}_oof_binary_thresholds.csv", index=False)
+        # persist OOF representations (concept-space probing input; previously computed but discarded)
+        np.savez(
+            run_dir / f"{tag}_oof_representations.npz",
+            case_id=np.array([r["case_id"] for r in rows]),
+            y_abnormal=np.array([r["y_abnormal"] for r in rows], dtype=np.float64),
+            z_proj=np.stack([r["z_proj"] for r in rows]),
+            h_binary=np.stack([r["h_binary"] for r in rows]),
+        )
 
     hist_path = run_dir / f"{split_name}_history.json"
     hist_path.write_text(json.dumps(history, ensure_ascii=False, indent=2, default=str))
