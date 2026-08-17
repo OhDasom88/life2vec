@@ -37,3 +37,13 @@ output*.log
 .DS_Store
 .idea/
 .vscode/
+
+# Generated report bundles (work-package zips/tars/logs) — keep only
+# the top-level planning/progress docs under reports/
+reports/*
+!reports/*.md
+
+# Stray local files not meant for version control
+/online2 (4).zip
+/berry2vec_presentation_draft.html
+/v03_followup_docs_20260715_164343.tar.gz
