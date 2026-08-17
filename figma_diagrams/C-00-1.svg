@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" style="background-color: #FBF9F5; font-family: 'Malgun Gothic', 'Noto Sans KR', 'Segoe UI', sans-serif;">
+  <defs>
+    <style>
+      .t-title { font-size: 26px; font-weight: 900; fill: #FFFFFF; }
+      .t-sub { font-size: 15px; font-weight: 500; fill: #F9F0F2; }
+      .t-badge { font-size: 16px; font-weight: 900; fill: #6D2E46; }
+      .box-head { font-size: 17px; font-weight: 800; fill: #2B2B2B; }
+      .box-sub { font-size: 13px; font-weight: 600; fill: #6E6167; }
+      .txt { font-size: 13px; font-weight: 500; fill: #333333; }
+      .txt-bold { font-size: 13px; font-weight: 700; fill: #2B2B2B; }
+      .code { font-family: 'Consolas', 'Fira Code', monospace; font-size: 12px; fill: #6D2E46; font-weight: bold; }
+      .footer-txt { font-size: 13px; font-weight: 500; fill: #6E6167; }
+    </style>
+
+    <!-- Clean PPT Styled Arrow Markers -->
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0563C1" />
+    </marker>
+    <marker id="arr-burgundy" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6D2E46" />
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4F7942" />
+    </marker>
+    <marker id="arr-gold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#D97706" />
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#B04A4A" />
+    </marker>
+  </defs>
+
+  <!-- PPT v7 Style Header (Warm Burgundy #6D2E46) -->
+  <rect x="0" y="0" width="1920" height="100" fill="#6D2E46" />
+  <rect x="60" y="25" width="110" height="34" rx="6" fill="#FBF9F5" />
+  <text x="115" y="48" text-anchor="middle" class="t-badge">C-00-1</text>
+  <text x="190" y="48" class="t-title">C-00-1 경영 목적함수 J 극대화 세부 수지 구조 &amp; 3대 제약 수호</text>
+  <text x="190" y="78" class="t-sub">매출 극대화, 전력량 분석 3단계, 인건비 절감 3건 제약 수호 알고리즘 | 카테고리: 생육단계별 작기 수행안</text>
+
+  <!-- PPT v7 Styled Clean Legend Header (No Raw Hex Codes!) -->
+  <g transform="translate(1320, 16)">
+    <rect x="0" y="0" width="540" height="72" rx="8" fill="#4A3A40" />
+    <line x1="20" y1="22" x2="55" y2="22" stroke="#FFFFFF" stroke-width="3" />
+    <text x="63" y="26" fill="#FFF" font-size="12" font-weight="bold">2026 확정 사양</text>
+    <line x1="155" y1="22" x2="190" y2="22" stroke="#5B9BD5" stroke-width="2" />
+    <text x="198" y="26" fill="#5B9BD5" font-size="12">2025 참고 사양</text>
+    <line x1="285" y1="22" x2="320" y2="22" stroke="#ED7D31" stroke-width="2" stroke-dasharray="5 3" />
+    <text x="328" y="26" fill="#ED7D31" font-size="12">팀 의사결정 모델</text>
+    <rect x="415" y="12" width="105" height="20" rx="4" fill="#F6E9EC" stroke="#B04A4A" stroke-width="1" />
+    <text x="467" y="26" fill="#B04A4A" font-size="11" font-weight="bold" text-anchor="middle">현장 검증 필요</text>
+
+    <line x1="20" y1="50" x2="55" y2="50" stroke="#5B9BD5" stroke-width="2.5" marker-end="url(#arr-blue)" />
+    <text x="63" y="54" fill="#F9F0F2" font-size="11">데이터 수집</text>
+    <line x1="155" y1="50" x2="190" y2="50" stroke="#F9F0F2" stroke-width="2.5" marker-end="url(#arr-burgundy)" />
+    <text x="198" y="54" fill="#F9F0F2" font-size="11">제어 명령</text>
+    <line x1="285" y1="50" x2="320" y2="50" stroke="#70AD47" stroke-width="2.5" marker-end="url(#arr-green)" />
+    <text x="328" y="54" fill="#F9F0F2" font-size="11">상태 검증</text>
+    <line x1="415" y1="50" x2="450" y2="50" stroke="#ED7D31" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arr-gold)" />
+    <text x="458" y="54" fill="#F9F0F2" font-size="11">경영 최적화</text>
+  </g>
+
+  <g transform="translate(60, 130)">
+    <!-- Header Box -->
+    <rect x="0" y="0" width="1800" height="70" rx="10" fill="#6D2E46" />
+    <text x="900" y="42" fill="#FFFFFF" font-size="20" font-weight="900" text-anchor="middle">경영 목적함수 J 극대화 세부 수지 구조 &amp; 비용 절감 알고리즘</text>
+
+    <!-- Formula Breakdown Grid (3 Main Boxes) -->
+    
+    <!-- Box 1: Revenue Optimization (수익 극대화) -->
+    <g transform="translate(0, 90)">
+      <rect x="0" y="0" width="570" height="420" rx="12" fill="#FFFFFF" stroke="#D97706" stroke-width="2.5" />
+      <rect x="0" y="0" width="570" height="50" rx="12" fill="#FFF9EB" stroke="#D97706" />
+      <text x="20" y="32" fill="#D97706" font-size="17" font-weight="900">💰 1. 매출 극대화: Σ (주차별 시세 × 상품과 중량)</text>
+      
+      <g transform="translate(20, 70)">
+        <text x="0" y="25" fill="#2B2B2B" font-size="14" font-weight="bold">가. 주차별 시세 추종 출하 전략</text>
+        <text x="15" y="50" fill="#333333" font-size="12">ㆍ 11월~12월 초저반기 딸기 최고 시세 타깃</text>
+        <text x="15" y="72" fill="#333333" font-size="12">ㆍ DIF (주야간 온도 차) 조정으로 출하 타이밍 조절</text>
+
+        <text x="0" y="115" fill="#2B2B2B" font-size="14" font-weight="bold">나. 상품과 비율 (B급 기형과 억제)</text>
+        <text x="15" y="140" fill="#333333" font-size="12">ㆍ 수정벌 투입 시기 최적화 및 1차 화방 적화</text>
+        <text x="15" y="162" fill="#333333" font-size="12">ㆍ 8MP 생육 이미지로 소과/기형과 조기 예찰</text>
+
+        <text x="0" y="205" fill="#2B2B2B" font-size="14" font-weight="bold">다. 당도 · 경도 품질 향상</text>
+        <text x="15" y="230" fill="#333333" font-size="12">ㆍ 수확기 야간 저온 (13.5~15℃) 및 EC 1.3~1.5 유지</text>
+        <text x="15" y="252" fill="#333333" font-size="12">ㆍ 당도 상승을 위한 광합성 잉여 산물 과실 배분</text>
+
+        <rect x="0" y="280" width="530" height="60" rx="8" fill="#FFF9EB" stroke="#D97706" />
+        <text x="15" y="305" fill="#D97706" font-size="13" font-weight="bold">목표: 대과/상급과 비중 85% 이상 확보로 매출 산식 극대화</text>
+      </g>
+    </g>
+
+    <!-- Box 2: Energy & Electricity Cost Optimization (전력량 분석 & 저비용 난방) -->
+    <g transform="translate(615, 90)">
+      <rect x="0" y="0" width="570" height="420" rx="12" fill="#FFFFFF" stroke="#6D2E46" stroke-width="2.5" />
+      <rect x="0" y="0" width="570" height="50" rx="12" fill="#F9F0F2" stroke="#6D2E46" />
+      <text x="20" y="32" fill="#6D2E46" font-size="17" font-weight="900">⚡ 2. 전력 비용 최소화: 저비용 3단계 소진 제어</text>
+
+      <g transform="translate(20, 70)">
+        <text x="0" y="25" fill="#2B2B2B" font-size="14" font-weight="bold">가. 설비별 소비 전력 분석</text>
+        <text x="15" y="50" fill="#333333" font-size="12">ㆍ FCU 팬(1710W) + 펌프(858.8W) = 2,568.8W (고비용)</text>
+        <text x="15" y="72" fill="#333333" font-size="12">ㆍ 유동팬 12대 1그룹 = 627W / 커튼 motor = 258.4W</text>
+
+        <text x="0" y="115" fill="#2B2B2B" font-size="14" font-weight="bold">나. 저비용 난방 소진 순서 (Prioritized Heating)</text>
+        <text x="15" y="140" fill="#6D2E46" font-size="12" font-weight="bold">  [1단계] 상부 보온커튼 폐쇄 (258.4W)로 열 유출 방지</text>
+        <text x="15" y="162" fill="#6D2E46" font-size="12" font-weight="bold">  [2단계] 낮 동안 축열된 흙/배지 열 자원 활용</text>
+        <text x="15" y="184" fill="#B04A4A" font-size="12" font-weight="bold">  [3단계] 심야 한대기에만 FCU (2.57kW) 최소 개입</text>
+
+        <text x="0" y="225" fill="#2B2B2B" font-size="14" font-weight="bold">다. 유동팬 &amp; CO2 시비 전력 절감</text>
+        <text x="15" y="250" fill="#333333" font-size="12">ㆍ 유동팬: 야간 결로 감지 시에만 12대 ON (상시가동 금지)</text>
+
+        <rect x="0" y="280" width="530" height="60" rx="8" fill="#F9F0F2" stroke="#6D2E46" />
+        <text x="15" y="305" fill="#6D2E46" font-size="13" font-weight="bold">목표: FCU 가동시간 45% 감축으로 야간 전기료 대폭 절감</text>
+      </g>
+    </g>
+
+    <!-- Box 3: Resource & Labor Cost Optimization (인건비 & 양액/CO2/장비비) -->
+    <g transform="translate(1230, 90)">
+      <rect x="0" y="0" width="570" height="420" rx="12" fill="#FFFFFF" stroke="#4F7942" stroke-width="2.5" />
+      <rect x="0" y="0" width="570" height="50" rx="12" fill="#EAF3EE" stroke="#4F7942" />
+      <text x="20" y="32" fill="#4F7942" font-size="17" font-weight="900">👨‍🌾 3. 자원 &amp; 인건비 절감: 주간 작업 ≤ 3건</text>
+
+      <g transform="translate(20, 70)">
+        <text x="0" y="25" fill="#2B2B2B" font-size="14" font-weight="bold">가. 주간 작업지시 3건 제약 수호</text>
+        <text x="15" y="50" fill="#333333" font-size="12">ㆍ 목요일 정오~금요일 정오 사이 익주 슬롯 예약</text>
+        <text x="15" y="72" fill="#4F7942" font-size="12" font-weight="bold">ㆍ 기여도 순: 1. 적화·적과 > 2. 방제 > 3. 적엽 > 4. 수확</text>
+
+        <text x="0" y="115" fill="#2B2B2B" font-size="14" font-weight="bold">나. 양액(물/비료) &amp; CO2 자원 절감</text>
+        <text x="15" y="140" fill="#333333" font-size="12">ㆍ 배지 EC/함수율 수렴 제어로 과관수·비료 유실 차단</text>
+        <text x="15" y="162" fill="#333333" font-size="12">ㆍ CO2 700ppm 시비 중 천창 개방 시 자동 밸브 차단</text>
+
+        <text x="0" y="205" fill="#2B2B2B" font-size="14" font-weight="bold">다. 감가상각비 (장비비 ÷ 5년) 절감</text>
+        <text x="15" y="230" fill="#333333" font-size="12">ㆍ 천창/스크린 온오프 잦은 스위칭 억제 (모터 수명 보호)</text>
+
+        <rect x="0" y="280" width="530" height="60" rx="8" fill="#EAF3EE" stroke="#4F7942" />
+        <text x="15" y="305" fill="#4F7942" font-size="13" font-weight="bold">목표: 인건비 무분별 지출 차단 및 원자재 18% 절감</text>
+      </g>
+    </g>
+
+    <!-- Bottom Constraints Box (y=530, height=270) -->
+    <g transform="translate(0, 530)">
+      <rect x="0" y="0" width="1800" height="270" rx="12" fill="#FDF2F2" stroke="#B04A4A" stroke-width="2" />
+      <rect x="0" y="0" width="1800" height="46" rx="12" fill="#B04A4A" />
+      <text x="20" y="30" fill="#FFFFFF" font-size="16" font-weight="900">🛡️ 목적함수 J 극대화의 3대 필수 제약조건 방어 메커니즘 (Constraint Guardrails)</text>
+
+      <g transform="translate(30, 65)">
+        <rect x="0" y="0" width="550" height="180" rx="8" fill="#FFF" stroke="#B04A4A" />
+        <text x="15" y="30" fill="#B04A4A" font-size="15" font-weight="900">제약 1: 온실 내부온도 ∈ [5℃, 35℃]</text>
+        <text x="15" y="60" fill="#333333" font-size="12">ㆍ 감점 기준(5℃/35℃)보다 2℃ 앞선 7℃/33℃ 선제 차단</text>
+        <text x="15" y="85" fill="#333333" font-size="12">ㆍ Layer 1 고정 규칙이 AI 통과 없이 24시간 독립 동작</text>
+        <text x="15" y="110" fill="#333333" font-size="12">ㆍ 돌풍 예보 시 천창 사전 폐쇄로 구조물 및 작물 보호</text>
+        <text x="15" y="145" fill="#B04A4A" font-size="12" font-weight="bold">➔ 온도 이탈 감점 0점 달성 입증</text>
+      </g>
+
+      <g transform="translate(615, 65)">
+        <rect x="0" y="0" width="570" height="180" rx="8" fill="#FFF" stroke="#B04A4A" />
+        <text x="15" y="30" fill="#B04A4A" font-size="15" font-weight="900">제약 2: AI 모델 업데이트 ≤ 6회 한정</text>
+        <text x="15" y="60" fill="#333333" font-size="12">ㆍ 무분별한 실시간 연속 학습 완전 금지</text>
+        <text x="15" y="85" fill="#333333" font-size="12">ㆍ 사전 배분: 개시 2회, 전환기 3회, 예비 1회 산정</text>
+        <text x="15" y="110" fill="#333333" font-size="12">ㆍ 오프라인 후보 학습 + Shadow 평가 후 통과 시에만 적용</text>
+        <text x="15" y="145" fill="#B04A4A" font-size="12" font-weight="bold">➔ 승인 배포 거버넌스로 안전 운용</text>
+      </g>
+
+      <g transform="translate(1215, 65)">
+        <rect x="0" y="0" width="555" height="180" rx="8" fill="#FFF" stroke="#B04A4A" />
+        <text x="15" y="30" fill="#B04A4A" font-size="15" font-weight="900">제약 3: 주간 작업신청 ≤ 3건 한정</text>
+        <text x="15" y="60" fill="#333333" font-size="12">ㆍ 목요일 정오~금요일 정오 사이 사전 배정 창구 이용</text>
+        <text x="15" y="85" fill="#333333" font-size="12">ㆍ 3개 슬롯 초과 요청 시 비용 대비 기여도 최하위 기각</text>
+        <text x="15" y="110" fill="#333333" font-size="12">ㆍ 작업 미발생 시 다음 주로 슬롯 이월 관리</text>
+        <text x="15" y="145" fill="#B04A4A" font-size="12" font-weight="bold">➔ 규정 위반 감점 완전 차단</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Footer -->
+  <line x1="60" y1="1020" x2="1860" y2="1020" stroke="#E3D8DC" stroke-width="1.5" />
+  <text x="60" y="1050" class="footer-txt">주석: 베리디시전 (BerryDecision) · 2026 스마트농업 AI 경진대회 본선 발표자료 v7 스타일 완전 정열</text>
+  <text x="1860" y="1050" text-anchor="end" class="footer-txt">베리디시전 · PPT v7 웜아이보리/소프트 버건디 스타일</text>
+</svg>
