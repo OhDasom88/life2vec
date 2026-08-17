@@ -11,7 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from math import isfinite
-from statistics import mean
+from statistics import mean, median
 from typing import Any, Iterable, Mapping, Optional, Protocol
 from zoneinfo import ZoneInfo
 
@@ -395,6 +395,19 @@ def _predicate(
         value = _number(point, parts[1])
         bounds = _bounds(quantiles, point, parts[1])
         return value is not None and bounds is not None and value <= bounds[0]
+    if kind in {"tod_high", "tod_low"}:
+        # 시간대 조건화: 같은 quantile 임계값이라도 하루 중 어느 구간(h0<=hour<h1,
+        # 야간처럼 자정을 넘기면 h0>h1로 표현해 wraparound 처리)인지로 서사를 나눈다.
+        feature, h0, h1 = parts[1], int(parts[2]), int(parts[3])
+        hour = _local_datetime(point["timestamp"]).hour
+        in_window = (h0 <= hour < h1) if h0 < h1 else (hour >= h0 or hour < h1)
+        if not in_window:
+            return False
+        value = _number(point, feature)
+        bounds = _bounds(quantiles, point, feature)
+        if value is None or bounds is None:
+            return False
+        return value >= bounds[1] if kind == "tod_high" else value <= bounds[0]
     if kind == "jump":
         if previous is None:
             return False
@@ -421,6 +434,15 @@ def _predicate(
             first is not None and second is not None
             and first >= float(parts[2]) and second <= float(parts[4])
         )
+    if kind == "and_gt":
+        # "and:"는 rain_detected 전용 특수 케이스로만 두 번째 조건을 ">"로
+        # 뒤집는다 — 다른 액추에이터(순환팬/환기창 등)에 "켜짐(>0) AND
+        # 환경변수 높음(>threshold)"을 표현하려면 일반화된 형태가 필요해서 추가.
+        first, second = _number(point, parts[1]), _number(point, parts[3])
+        return (
+            first is not None and second is not None
+            and first > float(parts[2]) and second > float(parts[4])
+        )
     if kind == "diff_positive":
         left, right = _number(point, parts[1]), _number(point, parts[2])
         return left is not None and right is not None and left > right
@@ -438,7 +460,8 @@ class MaterializerRegistry:
     SIMPLE_PREFIXES = {
         "positive", "change", "lt", "le", "gt", "quantile_high", "quantile_low",
         "jump", "reset", "fixed_zero", "run_ge", "and", "diff_positive",
-        "joint_quantile",
+        "joint_quantile", "tod_high", "tod_low", "and_gt", "trend_intervention", "co_trend",
+        "multi_trend", "window_summary", "lag_response",
     }
     NAMED = {
         "all_hourly", "solar_up", "solar_down", "growth_any", "crosszone_growth",
@@ -447,6 +470,8 @@ class MaterializerRegistry:
         "cross_zone_actuation", "rootcold12", "root_simultaneous_jump",
         "noon_solar_hourly", "image_preceding_env", "image_root_context",
         "image_growth_alignment", "public_observation_similarity",
+        "crossfarm_hourly", "crossfarm_growth", "image_longitudinal_pair",
+        "zone_outlier_hourly",
     }
 
     @classmethod
@@ -492,11 +517,27 @@ class MaterializerRegistry:
         key = template.materialization_key
         if key == "all_hourly":
             self._all_hourly(builder, template, report, hourly)
+        elif key.startswith("window_summary:"):
+            self._window_summary(builder, template, report, hourly, key)
         elif key in {"growth_any", "mixed_growth"}:
             self._growth(builder, template, report, hourly, growth, key == "mixed_growth")
         elif key in {"crosszone_growth", "crosszone_hourly", "cross_zone_actuation"}:
             source = growth if key == "crosszone_growth" else hourly
             self._crosszone(builder, template, report, source)
+        elif key == "crossfarm_hourly":
+            self._crossfarm_by_hour(builder, template, report, hourly)
+        elif key == "crossfarm_growth":
+            self._crossfarm_by_survey_index(builder, template, report, growth)
+        elif key == "image_longitudinal_pair":
+            self._image_longitudinal_pair(builder, template, report)
+        elif key == "zone_outlier_hourly":
+            self._zone_outlier_hourly(builder, template, report, hourly)
+        elif key.startswith(("trend_intervention:", "co_trend:")):
+            self._trend_intervention(builder, template, report, hourly, jumps, key)
+        elif key.startswith("multi_trend:"):
+            self._multi_trend(builder, template, report, hourly, jumps, key)
+        elif key.startswith("lag_response:"):
+            self._lag_response(builder, template, report, hourly, jumps, key)
         elif key.startswith("image_"):
             self._external(builder, template, report, key)
         elif key == "score90_terminal_relation":
@@ -518,6 +559,32 @@ class MaterializerRegistry:
             for day_points in by_day.values():
                 report.trigger_count += len(day_points)
                 events = _flatten(day_points, template)[-template.max_events :]
+                emitted, reason = builder.emit_template_sequence(template, events, [])
+                report.record(emitted, reason)
+
+    def _window_summary(
+        self, builder: SequenceEmitter, template: NarrativeTemplate, report: MatchReport,
+        histories: Mapping[tuple[str, str], list[dict[str, Any]]],
+        key: str,
+    ) -> None:
+        """`_all_hourly`(하루=00~23시 통째)의 세분화 — 임계값 조건 없이 하루보다
+        짧은 지역시각 구간(예: 00~06시)을 그대로 담는 통계형 요약. `all_hourly`와
+        달리 날짜+시간구간으로 묶어서, 같은 날의 다른 시간대와는 다른 raw 행
+        집합을 선택한다(실측 확인: 24시간 통째와 부분 구간은 서로 다른 행)."""
+        _, h0_str, h1_str = key.split(":")
+        h0, h1 = int(h0_str), int(h1_str)
+        for points in histories.values():
+            by_bucket: dict[str, list[dict[str, Any]]] = defaultdict(list)
+            for point in points:
+                if not _has_required(point, template):
+                    continue
+                dt = _local_datetime(point["timestamp"])
+                in_window = (h0 <= dt.hour < h1) if h0 < h1 else (dt.hour >= h0 or dt.hour < h1)
+                if in_window:
+                    by_bucket[dt.date().isoformat()].append(point)
+            for bucket_points in by_bucket.values():
+                report.trigger_count += len(bucket_points)
+                events = _flatten(bucket_points, template)[-template.max_events :]
                 emitted, reason = builder.emit_template_sequence(template, events, [])
                 report.record(emitted, reason)
 
@@ -581,6 +648,240 @@ class MaterializerRegistry:
             events = _flatten(points, template)[-template.max_events :]
             emitted, reason = builder.emit_template_sequence(
                 template, events, ["PERMUTATION_INVARIANT_SET"]
+            )
+            report.record(emitted, reason)
+
+    def _crossfarm_by_hour(
+        self, builder: SequenceEmitter, template: NarrativeTemplate, report: MatchReport,
+        histories: Mapping[tuple[str, str], list[dict[str, Any]]],
+    ) -> None:
+        """같은 지역시각(hour-of-day)에서 여러 농장을 비교한다.
+
+        `_crosszone`은 한 농장 안의 여러 구역을 같은 절대 timestamp로 묶지만,
+        농장 간에는 관측 기간(캘린더 날짜)이 거의 겹치지 않는다(실측: 정확히
+        같은 절대 timestamp를 공유하는 농장이 최대 9개뿐, 55개 중). 그래서
+        절대 시각 대신 "하루 중 같은 시각"(0~23시)으로 정렬해 비교한다 —
+        이 기준으로는 55개 농장 전부가 매 시각에 데이터를 갖고 있다(실측 확인).
+        """
+        by_hour: dict[int, dict[str, dict[str, Any]]] = defaultdict(dict)
+        for (farm, _zone), points in histories.items():
+            for point in points:
+                if not _has_required(point, template):
+                    continue
+                hour = _local_datetime(point["timestamp"]).hour
+                by_hour[hour].setdefault(farm, point)
+        min_farms = 20
+        for by_farm in by_hour.values():
+            if len(by_farm) < min_farms:
+                continue
+            selected = list(by_farm.values())[: template.max_events]
+            report.trigger_count += len(selected)
+            events = _flatten(selected, template)
+            emitted, reason = builder.emit_template_sequence(
+                template, events, ["PERMUTATION_INVARIANT_SET"]
+            )
+            report.record(emitted, reason)
+
+    def _crossfarm_by_survey_index(
+        self, builder: SequenceEmitter, template: NarrativeTemplate, report: MatchReport,
+        histories: Mapping[tuple[str, str], list[dict[str, Any]]],
+    ) -> None:
+        """생육 조사 "몇 번째 회차인지"(survey_idx: 0=첫 조사, 1=둘째 조사, 약
+        13일 뒤)로 여러 농장을 비교한다 — growth도 마찬가지로 농장마다 조사일
+        캘린더가 다르므로(실측: 모든 농장이 정확히 2회 조사, survey_idx 0/1에
+        55개 농장 전부 존재) 절대 날짜 대신 순번으로 정렬한다."""
+        by_index: dict[int, dict[str, dict[str, Any]]] = defaultdict(dict)
+        for (farm, _zone), points in histories.items():
+            for index, point in enumerate(points):
+                if not _has_required(point, template):
+                    continue
+                by_index[index].setdefault(farm, point)
+        min_farms = 20
+        for by_farm in by_index.values():
+            if len(by_farm) < min_farms:
+                continue
+            selected = list(by_farm.values())[: template.max_events]
+            report.trigger_count += len(selected)
+            events = _flatten(selected, template)
+            emitted, reason = builder.emit_template_sequence(
+                template, events, ["PERMUTATION_INVARIANT_SET"]
+            )
+            report.record(emitted, reason)
+
+    def _zone_outlier_hourly(
+        self, builder: SequenceEmitter, template: NarrativeTemplate, report: MatchReport,
+        histories: Mapping[tuple[str, str], list[dict[str, Any]]],
+    ) -> None:
+        """`_crosszone`(4개 구역 전체를 하나의 SET_COMPARISON 시퀀스로 묶음)와
+        달리, 이건 "한 구역이 같은 농장·같은 시각의 다른 구역들과 다르다"는
+        걸 그 구역 하나의 STRICT_CHRONOLOGICAL 트리거로 만든다 — 서사가
+        가리키는 개체는 여전히 (farm, zone) 하나뿐이고, 판단 기준(median
+        absolute deviation from sibling zones)만 구역 간 비교에서 가져온다."""
+        grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+        for (farm, _zone), points in histories.items():
+            for point in points:
+                grouped[(farm, point["timestamp"])].append(point)
+        for (farm, timestamp), points in grouped.items():
+            valid = [point for point in points if _has_required(point, template)]
+            if len({point["zone"] for point in valid}) < 4:
+                continue
+            for feature in template.required_columns:
+                by_zone = {
+                    point["zone"]: value
+                    for point in valid
+                    if (value := _number(point, feature)) is not None
+                }
+                if len(by_zone) < 4:
+                    continue
+                for zone, value in by_zone.items():
+                    siblings = [v for z, v in by_zone.items() if z != zone]
+                    med = median(siblings)
+                    mad = median([abs(v - med) for v in siblings]) or 1e-9
+                    if abs(value - med) < 6 * mad:
+                        continue
+                    outlier_point = next(p for p in valid if p["zone"] == zone)
+                    report.trigger_count += 1
+                    events = _flatten([outlier_point], template)
+                    emitted, reason = builder.emit_template_sequence(
+                        template, events, ["ZONE_OUTLIER_VS_SIBLINGS"]
+                    )
+                    report.record(emitted, reason)
+
+    def _trend_intervention(
+        self, builder: SequenceEmitter, template: NarrativeTemplate, report: MatchReport,
+        histories: Mapping[tuple[str, str], list[dict[str, Any]]],
+        jumps: Mapping[tuple[str, str, str], float],
+        key: str,
+    ) -> None:
+        """"두 측정값이 같은 구간 안에서 함께 의미 있게 움직였다" — 트리거
+        시점까지의 과거 window만 보므로 미래정보 사용 금지 원칙을 안 어긴다.
+        원래는 col2를 액추에이터 이진 전환(0↔양수)으로만 다뤘지만(`trend_intervention:`),
+        col2가 연속값이어도 "그 컬럼 자체의 평소 스텝 점프 크기" 기준으로 같은
+        판정을 쓰면 자연히 일반화된다(액추에이터는 0→201처럼 스텝이 커서 이
+        기준으로도 여전히 걸림) — 그래서 `co_trend:`(양쪽 다 연속값, 방향 무관:
+        환경↔관수, 관수↔근권, 환경↔근권 전부 가능)와 같은 로직을 공유한다.
+        "A가 B를 유발했다"가 아니라 "A와 B가 같은 구간에서 함께 변했다"는
+        방향 중립적 공기(co-occurrence) 주장이다."""
+        _, col1, col2, hours_str = key.split(":")
+        hours = int(hours_str)
+        for points in histories.values():
+            for index, point in enumerate(points):
+                if not _has_required(point, template):
+                    continue
+                window = points[max(0, index - hours + 1) : index + 1]
+                if len(window) < 2:
+                    continue
+                vals1 = [v for p in window if (v := _number(p, col1)) is not None]
+                vals2 = [v for p in window if (v := _number(p, col2)) is not None]
+                if len(vals1) < 2 or len(vals2) < 2:
+                    continue
+                limit1 = _jump_limit(jumps, point, col1)
+                limit2 = _jump_limit(jumps, point, col2)
+                if limit1 is None or limit1 <= 0 or limit2 is None or limit2 <= 0:
+                    continue
+                if (max(vals1) - min(vals1)) < limit1 or (max(vals2) - min(vals2)) < limit2:
+                    continue
+                _emit_window(builder, template, report, points, index, ["CO_TREND_WINDOW"])
+
+    def _multi_trend(
+        self, builder: SequenceEmitter, template: NarrativeTemplate, report: MatchReport,
+        histories: Mapping[tuple[str, str], list[dict[str, Any]]],
+        jumps: Mapping[tuple[str, str, str], float],
+        key: str,
+    ) -> None:
+        """`_trend_intervention`(co_trend)의 다자간(N≥2) 일반화 — "여러 지표가
+        같은 구간 안에서 전부 유의미하게 변화했다". 키 형식은
+        `multi_trend:col1+col2+col3:hours`(컬럼 구분자로 `:` 대신 `+`를 써서
+        기존 콜론 위치 파싱과 충돌하지 않게 함)."""
+        _, cols_joined, hours_str = key.split(":")
+        cols = cols_joined.split("+")
+        hours = int(hours_str)
+        for points in histories.values():
+            for index, point in enumerate(points):
+                if not _has_required(point, template):
+                    continue
+                window = points[max(0, index - hours + 1) : index + 1]
+                if len(window) < 2:
+                    continue
+                all_moved = True
+                for col in cols:
+                    vals = [v for p in window if (v := _number(p, col)) is not None]
+                    if len(vals) < 2:
+                        all_moved = False
+                        break
+                    limit = _jump_limit(jumps, point, col)
+                    if limit is None or limit <= 0 or (max(vals) - min(vals)) < limit:
+                        all_moved = False
+                        break
+                if not all_moved:
+                    continue
+                _emit_window(builder, template, report, points, index, ["MULTI_TREND_WINDOW"])
+
+    def _lag_response(
+        self, builder: SequenceEmitter, template: NarrativeTemplate, report: MatchReport,
+        histories: Mapping[tuple[str, str], list[dict[str, Any]]],
+        jumps: Mapping[tuple[str, str, str], float],
+        key: str,
+    ) -> None:
+        """trend_intervention/multi_trend(co_trend)은 "같은 구간 안 어딘가"에서
+        둘 다 움직이면 매칭되는 방향 중립적 공존 주장이라, "제어기가 켜진 뒤 몇
+        시간 뒤에 센서가 반응했다"는 실제 지연(lag)을 요구하지 못한다(사용자 지적,
+        실측 확인: multi_trend 인스턴스가 원인/결과 순서 구분 없이 window 전체를
+        컬럼별로 다 이벤트화함). 이 매처는 트리거 컬럼이 0에서 양수로 전환된
+        시점 대비 정확히 lag_hours 뒤 시점에서 반응 컬럼이 자신의 평소 점프폭
+        이상 움직였는지를 요구한다(C06/C07처럼 손으로 만든 트리거+비대칭 window
+        서사의 일반화). 키 형식: `lag_response:trigger_col:response_col:lag_hours`
+        -- trend_intervention/multi_trend와 동일하게 트리거 이전 기준선을 얼마나
+        담을지는 별도 파라미터 없이 template.max_events(카탈로그 spec)가 정한다."""
+        _, trig_col, resp_col, lag_str = key.split(":")
+        lag = int(lag_str)
+        for points in histories.values():
+            for index, point in enumerate(points):
+                if index == 0 or not _has_required(point, template):
+                    continue
+                trig_prev = _number(points[index - 1], trig_col)
+                trig_now = _number(point, trig_col)
+                if trig_prev is None or trig_now is None or not (trig_prev <= 0 < trig_now):
+                    continue
+                lag_idx = index + lag
+                if lag_idx >= len(points) or not _has_required(points[lag_idx], template):
+                    continue
+                resp_now = _number(point, resp_col)
+                resp_lag = _number(points[lag_idx], resp_col)
+                if resp_now is None or resp_lag is None:
+                    continue
+                limit = _jump_limit(jumps, point, resp_col)
+                if limit is None or limit <= 0 or abs(resp_lag - resp_now) < limit:
+                    continue
+                _emit_window(builder, template, report, points, lag_idx, ["LAG_RESPONSE_WINDOW"])
+
+    def _image_longitudinal_pair(
+        self, builder: SequenceEmitter, template: NarrativeTemplate, report: MatchReport,
+    ) -> None:
+        """농장별 최초·최근 이미지를 페어링해 관측기간 전체(최대 13일)를
+        아우르는 이미지 기반 장기 서사를 만든다 — 기존 `image_*` 3종(X08-X10)은
+        전부 이미지 한 장 + 과거 센서 맥락이라 "이미지 자체의 시간 변화"는
+        담지 못했다. 이미지 이벤트는 토큰이 `IMAGE_EMBED_SLOT` 1개뿐이라
+        이미지 두 장만으로는 최소 유효 토큰 수(16)를 못 채운다(실측 확인:
+        16건 후보 전부 TOO_SHORT로 드롭) — 각 이미지 직전 환경 맥락을 소량
+        붙여 최초/최근 시점을 구분 가능하게 한다."""
+        for (farm, modality), images in builder.event_index.items():
+            if modality != "I_images" or len(images) < 2:
+                continue
+            ordered = sorted(images, key=lambda event: (event["timestamp"], event["id"]))
+            first, last = ordered[0], ordered[-1]
+            if first["id"] == last["id"]:
+                continue
+            context = builder.event_index.get((farm, "E_environment"), [])
+            context_before_first = [c for c in context if c["timestamp"] <= first["timestamp"]][-3:]
+            context_before_last = [c for c in context if c["timestamp"] <= last["timestamp"]][-3:]
+            report.trigger_count += 1
+            merged: dict[str, dict[str, Any]] = {}
+            for event in context_before_first + [first] + context_before_last + [last]:
+                merged[event["id"]] = event
+            events = list(merged.values())
+            emitted, reason = builder.emit_template_sequence(
+                template, events, ["PERIOD_ALIGNED", "EMBEDDING_PENDING", "LONGITUDINAL_PAIR"]
             )
             report.record(emitted, reason)
 

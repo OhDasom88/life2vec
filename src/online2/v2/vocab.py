@@ -21,7 +21,6 @@ SPECIAL = [
     "[SEQ_SEP]",
     "[GROUP_SEP]",
     "[EVENT_SEP]",
-    "[MEAS_SEP]",
     "[IMAGE_SLOT]",
     "[TEXT_SLOT]",
     "[MISSING]",
@@ -31,21 +30,12 @@ SPECIAL = [
 VIEWS = ["ENVIRONMENT", "ROOTZONE", "ACTUATOR", "GROWTH", "IMAGE", "INTERPRETATION"]
 EVENT_KINDS = ["OBSERVATION", "STATE_CHANGE", "DERIVED", "IMAGE", "INTERPRETATION"]
 IMAGE_ROLES = ["HISTORY", "QUERY", "UNRESOLVED"]
-LITERAL_STATES = [
-    "OBSERVED_VALUE|ZERO",
-    "OBSERVED_VALUE|POSITIVE",
-    "OBSERVED_VALUE|NEGATIVE",
-    "OBSERVED_VALUE|NULL",
-    "RAW_CODE_CLASS|INTEGER",
-    "RAW_CODE_CLASS|FRACTIONAL",
-    "STATE_SEMANTICS|UNRESOLVED",
-]
 COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 DELTA_T = ["1H", "3H", "6H", "12H", "1D", "3D", "7D", "GT_7D"]
 DAY_FROM_START = ["D00_02", "D03_07", "D08_14", "D15_21", "D22_PLUS"]
 LOCAL_HOURS = [f"H{h:02d}" for h in range(24)]
-QUALITY = ["OK", "MISSING", "INVALID", "CLAMPED"]
-SPATIAL = [f"FARM_LOCAL|{i}" for i in range(8)] + [f"ZONE_LOCAL|{i}" for i in range(8)]
+FARM_LOCAL_SLOTS = 24  # crossfarm_hourly/crossfarm_growth 서사는 max_events=20까지 서로 다른 농장을 한 시퀀스에 담는다(기존 8칸으로는 부족)
+SPATIAL = [f"FARM_LOCAL|{i}" for i in range(FARM_LOCAL_SLOTS)] + [f"ZONE_LOCAL|{i}" for i in range(8)]
 DYNAMIC = [
     "STATE_TRANSITION|OFF_TO_ON",
     "STATE_TRANSITION|ON_TO_OFF",
@@ -229,39 +219,43 @@ def build_vocab_v2(
     *,
     code_commit_hash: str = "",
     corpus_scope: str = "transductive_public_pretrain_pool",
+    narrative_ids: Iterable[str] = (),
 ) -> VocabV2:
     tokens: list[str] = []
     tokens.extend(SPECIAL)
+    for narrative_id in sorted(set(narrative_ids)):
+        tokens.append(f"NARRATIVE|{narrative_id}")
     for view in VIEWS:
         tokens.append(f"VIEW|{view}")
     for kind in EVENT_KINDS:
         tokens.append(f"EVENT_KIND|{kind}")
     for role in IMAGE_ROLES:
         tokens.append(f"IMAGE_ROLE|{role}")
-    for state in LITERAL_STATES:
-        tokens.append(state)
-    for c in COMPASS:
-        tokens.append(f"WIND_DIR|{c}")
     for item in DELTA_T:
         tokens.append(f"DELTA_T|{item}")
     for item in DAY_FROM_START:
         tokens.append(f"DAY_FROM_START|{item}")
     for item in LOCAL_HOURS:
         tokens.append(f"LOCAL_HOUR|{item}")
-    for q in QUALITY:
-        tokens.append(f"QUALITY|{q}")
     tokens.extend(SPATIAL)
     tokens.extend(DYNAMIC)
     tokens.append("STATIC_SEMANTICS|UNRESOLVED")
     tokens.append("STATIC_OBSERVED_VALUE|ZERO")
     tokens.append("STATIC_OBSERVED_VALUE|POSITIVE")
 
-    # Feature identity + value buckets from binning rules
+    # 2026-07-26: 셀 토큰이 이제 전부 "{FEATURE}|{value}" 하나뿐이라, 바깥의 bare
+    # FEATURE|{name} 식별 토큰은 안 쓴다(STATIC_FEATURE는 별개 메커니즘이라 유지).
+    # circular feature(compass8)는 binning.rules에 안 잡히므로 여기서 직접
+    # {FEATURE}|{방위}(+NULL) 조합 토큰을 만들어 준다 -- ABS/GLOBAL_REL/FARM_REL
+    # bin 토큰과 같은 "combined" 패턴.
     for name, spec in sorted(schema.features.items()):
         if spec.type in {"identifier", "image", "text"}:
             continue
-        tokens.append(f"FEATURE|{name.upper()}")
         tokens.append(f"STATIC_FEATURE|{name.upper()}")
+        if spec.circular_encoding == "compass8":
+            for c in COMPASS:
+                tokens.append(f"{name.upper()}|{c}")
+            tokens.append(f"{name.upper()}|NULL")
 
     value_family_tokens: set[str] = set()
     combined_tokens: set[str] = set()

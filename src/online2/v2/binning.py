@@ -65,6 +65,7 @@ class BinningPolicy:
         n_values: int = 0,
         n_unique: int = 0,
         schema_n_bins: Optional[int] = None,
+        default_bins_override: Optional[int] = None,
     ) -> ChannelBinPlan:
         feat = self.features.get(feature, {})
         tier_name = str(feat.get("tier") or _default_tier(feature_type))
@@ -96,10 +97,14 @@ class BinningPolicy:
         elif tier.get(key) is not None:
             requested = int(tier[key])
         else:
-            requested = self.default_bins()
+            # feature/tier YAML overrides (checked above) always win; only fall through to
+            # the registry-level bins=N override (BinningRegistryV2(bins=...)) when neither
+            # specifies a count, and only then fall back to the policy file's own default.
+            base_default = default_bins_override if default_bins_override is not None else self.default_bins()
+            requested = base_default
             if channel == "FARM_REL":
                 scale = float(self.meta.get("farm_bins_scale", 0.5))
-                abs_bins = int(feat.get("abs_bins") or tier.get("abs_bins") or self.default_bins())
+                abs_bins = int(feat.get("abs_bins") or tier.get("abs_bins") or base_default)
                 requested = max(DEFAULT_MIN_BINS, int(round(abs_bins * scale)))
 
         min_bins = int(self.meta.get("min_bins", DEFAULT_MIN_BINS))
@@ -379,6 +384,7 @@ class BinningRegistryV2:
                     n_values=int(array.size),
                     n_unique=n_unique,
                     schema_n_bins=getattr(spec, "n_bins_abs", None),
+                    default_bins_override=self.bins,
                 )
                 rule = self._make_rule(feature, "ABS", array, plan, scope_id=None)
                 self.rules[(feature, "ABS", None)] = rule
@@ -398,6 +404,7 @@ class BinningRegistryV2:
                     n_values=int(array.size),
                     n_unique=n_unique,
                     schema_n_bins=getattr(spec, "n_bins_global_rel", None),
+                    default_bins_override=self.bins,
                 )
                 rule = self._make_rule(feature, "GLOBAL_REL", array, plan, scope_id=None)
                 self.rules[(feature, "GLOBAL_REL", None)] = rule
@@ -423,6 +430,7 @@ class BinningRegistryV2:
                 n_values=int(array.size),
                 n_unique=int(np.unique(array).size),
                 schema_n_bins=getattr(spec, "n_bins_farm_rel", None),
+                default_bins_override=self.bins,
             )
             rule = self._make_rule(
                 feature,

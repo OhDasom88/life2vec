@@ -98,30 +98,32 @@ def build_feature_schema_from_audit(audit_csv: Path) -> FeatureSchema:
         name = str(row.feature_name)
         ftype = str(row.proposed_v2_type)
         conf = str(row.unit_confidence)
-        continuous_like = ftype in {"continuous", "circular", "counter", "flow", "ordinal_actuator"}
-        abs_enc = continuous_like and conf in {"CONFIRMED", "HIGH", "MEDIUM"}
-        # unresolved actuators/flow: literal observed encoding only (no ON/OFF)
-        if ftype in {"boolean", "categorical", "ordinal_actuator", "flow"} and conf in {"LOW", "UNRESOLVED"}:
+        # 2026-07-26 사용자 결정: binning 여부를 unit_confidence(단위 라벨 확신도)로 가르던
+        # 기존 게이트를 없앤다. equal-frequency binning은 물리 단위를 전혀 안 쓰고 그 feature
+        # 자체의 관측 분포 안에서의 상대적 위치만 표현하므로, "이 숫자가 정확히 몇 %/어떤
+        # 스케일인지 확신 없음"(LOW/UNRESOLVED)이 binning 자체를 막을 이유가 안 된다.
+        # 대신 binning.py의 _clip_bins()가 이미 n_unique로 자동으로 bin 수를 제한하므로
+        # (예: 고유값 2개인 boolean은 자동으로 2 bin = raw 값과 동등한 해상도, 고유값
+        # 수천 개인 ordinal_actuator는 제대로 압축됨) 사람이 type/confidence로 미리
+        # binning 여부를 나눌 필요가 없다. identifier/image/text(측정값이 아님)와
+        # circular(각도, 등빈도 binning이 의미 없음 -- compass8 유지)만 예외.
+        if ftype == "circular":
             abs_enc = False
-            global_enc = False
-            farm_enc = False
-            circular = "none"
-            zero_sem = "OBSERVED_VALUE_CLASS"
-        elif ftype == "circular":
-            abs_enc = False
-            global_enc = False
-            farm_enc = False
             circular = "compass8"
             zero_sem = "N/A"
         elif ftype in {"identifier", "image", "text"}:
-            abs_enc = global_enc = farm_enc = False
+            abs_enc = False
             circular = "none"
             zero_sem = "N/A"
         else:
-            global_enc = continuous_like
-            farm_enc = continuous_like
+            abs_enc = True
             circular = "none"
             zero_sem = "PHYSICAL_ZERO" if conf in {"CONFIRMED", "HIGH"} else "UNRESOLVED"
+        # GLOBAL_REL/FARM_REL 상대 bin은 tokenizer.py Phase 2b에서 이미 안 쓰게 됐으므로
+        # (VALUE_ABS combined 토큰 하나만 유지) 여기서도 계산 자체를 끈다 -- FARM_REL은
+        # 농장별로 반복 계산되는 비용이 커서, 안 쓰는 걸 계속 fit하는 낭비를 없앤다.
+        global_enc = False
+        farm_enc = False
 
         noise = None
         if bool(getattr(row, "noise_epsilon_ready", False)):
@@ -138,8 +140,8 @@ def build_feature_schema_from_audit(audit_csv: Path) -> FeatureSchema:
             zero_semantics=zero_sem,
             noise_epsilon=noise,
             absolute_encoding=abs_enc,
-            global_relative_encoding=global_enc if continuous_like else False,
-            farm_relative_encoding=farm_enc if continuous_like else False,
+            global_relative_encoding=global_enc,
+            farm_relative_encoding=farm_enc,
             circular_encoding=circular,
             threshold_tokens_enabled=bool(getattr(row, "threshold_ready", False)),
             domain_threshold_ready=bool(getattr(row, "threshold_ready", False)),
