@@ -19,15 +19,28 @@ from sklearn.metrics import (
 )
 
 
-def fine_metrics(y_true: Sequence[int], y_pred: Sequence[int], n_classes: int) -> Dict[str, float]:
+def fine_metrics(y_true: Sequence[int], y_pred: Sequence[int], n_classes: int) -> Dict[str, Any]:
     yt = np.asarray(y_true)
     yp = np.asarray(y_pred)
+    class_ids = list(range(n_classes))
+    per_class_f1 = (
+        f1_score(yt, yp, labels=class_ids, average=None, zero_division=0).tolist()
+        if len(yt)
+        else [float("nan")] * n_classes
+    )
+    confmat = (
+        confusion_matrix(yt, yp, labels=class_ids).tolist()
+        if len(yt)
+        else [[0] * n_classes for _ in class_ids]
+    )
     return {
         "acc": float((yt == yp).mean()) if len(yt) else float("nan"),
         "balanced_acc": float(balanced_accuracy_score(yt, yp)) if len(yt) else float("nan"),
         "macro_f1": float(
-            f1_score(yt, yp, labels=list(range(n_classes)), average="macro", zero_division=0)
+            f1_score(yt, yp, labels=class_ids, average="macro", zero_division=0)
         ),
+        "per_class_f1": per_class_f1,
+        "confusion_matrix": confmat,
     }
 
 
@@ -54,6 +67,28 @@ def _ece(yt: np.ndarray, ys: np.ndarray, n_bins: int = 10) -> float:
             continue
         ece += abs(float(yt[m].mean()) - float(ys[m].mean())) * float(m.mean())
     return float(ece)
+
+
+def reliability_bins(
+    y_true: Sequence[float], y_score: Sequence[float], n_bins: int = 10
+) -> List[Dict[str, float]]:
+    yt = np.asarray(y_true, dtype=np.float64)
+    ys = np.asarray(y_score, dtype=np.float64)
+    edges = np.linspace(0.0, 1.0, n_bins + 1)
+    out: List[Dict[str, float]] = []
+    for i in range(n_bins):
+        lo, hi = edges[i], edges[i + 1]
+        m = (ys >= lo) & (ys < hi if i < n_bins - 1 else ys <= hi)
+        out.append(
+            {
+                "bin_lo": float(lo),
+                "bin_hi": float(hi),
+                "mean_pred": float(ys[m].mean()) if np.any(m) else float("nan"),
+                "mean_true": float(yt[m].mean()) if np.any(m) else float("nan"),
+                "count": int(m.sum()),
+            }
+        )
+    return out
 
 
 def binary_metrics_at_threshold(
@@ -114,6 +149,7 @@ def binary_metrics(
     except Exception:
         out["brier"] = float("nan")
     out["ece"] = _ece(yt, ys)
+    out["reliability_bins"] = reliability_bins(yt, ys)
     # NLL of Bernoulli
     eps = 1e-7
     ys_c = np.clip(ys, eps, 1 - eps)

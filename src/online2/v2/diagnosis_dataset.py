@@ -109,6 +109,7 @@ class DiagnosisEventDataset(Dataset):
             "farm_id": farm_id,
             "label": int(label),
             "diagnosis_normalized": diag,
+            "event_ids": df["event_id"].astype(str).tolist(),
             "event_mean": means,  # [T, H]
             "event_max": maxes,
             "case_age_hours": ages.astype(np.float32),

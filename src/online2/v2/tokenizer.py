@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
-from typing import Any, Optional
-from uuid import uuid4
-
-import numpy as np
+from typing import Optional
 
 from .binning import BinningRegistryV2
-from .feature_schema import FeatureSchema, FeatureSpec
+from .feature_schema import FeatureSchema
 from .vocab import VocabV2
 from ..canonical import stable_id
 
@@ -22,29 +18,12 @@ def wind_compass(deg: float) -> str:
     return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][idx]
 
 
-def literal_state(value: Optional[float], raw: str) -> list[str]:
-    if value is None or raw == "":
-        return ["OBSERVED_VALUE|NULL", "STATE_SEMANTICS|UNRESOLVED"]
-    tokens = ["STATE_SEMANTICS|UNRESOLVED"]
-    if value == 0:
-        tokens.insert(0, "OBSERVED_VALUE|ZERO")
-    elif value > 0:
-        tokens.insert(0, "OBSERVED_VALUE|POSITIVE")
-    else:
-        tokens.insert(0, "OBSERVED_VALUE|NEGATIVE")
-    if abs(value - round(value)) < 1e-9:
-        tokens.append("RAW_CODE_CLASS|INTEGER")
-    else:
-        tokens.append("RAW_CODE_CLASS|FRACTIONAL")
-    return tokens
-
-
 @dataclass
 class MeasurementTokens:
     measurement_group_id: str
     feature: str
     tokens: list[str]
-    roles: list[str]  # feature_identity | value_abs | value_global | value_farm | literal | quality | circular
+    roles: list[str]  # value_abs_combined | circular | unk
     source_cell_id: str
     source_atomic_value_id: str
     raw_value: Optional[float]
@@ -93,60 +72,37 @@ class TokenizerV2:
                 "atomic": atomic_value_id,
             },
         )
-        tokens: list[str] = []
-        roles: list[str] = []
-        tokens.append(f"FEATURE|{feature.upper()}")
-        roles.append("feature_identity")
 
-        if value is None:
-            tokens.append("OBSERVED_VALUE|NULL")
-            roles.append("literal")
-            tokens.append("QUALITY|MISSING")
-            roles.append("quality")
-            return MeasurementTokens(mg, feature, tokens, roles, cell_id, atomic_value_id, None)
+        # 2026-07-26: 셀 하나 = 토큰 하나(`FEATURE|value`)로 단순화. 이전에는
+        # FEATURE(식별)+OBSERVED_VALUE+STATE_SEMANTICS+RAW_CODE_CLASS+QUALITY를
+        # 따로 냈는데, STATE_SEMANTICS는 항상 상수(UNRESOLVED)라 정보가 없었고
+        # QUALITY는 OBSERVED_VALUE가 NULL인지 아닌지로 이미 100% 유도되는
+        # 중복이었다. RAW_CODE_CLASS(정수/소수 구분)는 정보가 있었지만
+        # 사용자가 "심플하게"를 택해 같이 제거하기로 함. feature 식별 토큰을
+        # 값 토큰과 분리해서 항상 보이게 하던 것도(GroupedMLM이 feature
+        # 정체성은 마스킹 안 하고 값만 마스킹하게 하려던 설계) 없앤다 —
+        # life2vec 원본 MLM(tasks_mlm.py)은 애초에 그런 구분 없이
+        # 평평한 토큰 시퀀스를 그냥 80/10/10 규칙으로 마스킹하므로, 이 쪽이
+        # 오히려 life2vec 원본에 더 가깝다.
+        #
+        # missing/circular/binned 셋 다 결국 "{FEATURE}|{suffix}" 한 토큰으로
+        # 귀결된다. binned 경로는 이제 거의 모든 feature type에 적용된다 —
+        # unit_confidence(LOW/UNRESOLVED)로 binning 여부를 가르던 게이트를
+        # feature_schema.py에서 없앴다(binning은 물리 단위를 안 쓰므로 confidence
+        # 문제와 무관하고, binning.py의 _clip_bins()가 고유값 적은 feature는
+        # 알아서 raw값과 동등한 해상도로 자동 축소한다).
+        has_abs_rule = (feature, "ABS", None) in self.binning.rules
+        if spec.circular_encoding == "compass8" and value is not None:
+            suffix = wind_compass(value)
+            role = "circular"
+        elif has_abs_rule:
+            suffix = self.binning.encode_suffix(feature, value, "ABS")  # value=None -> "ABS_NULL"
+            role = "value_abs_combined"
+        else:
+            # 방어적 fallback(정상 스키마라면 여기 안 옴): binning 규칙이 없는
+            # feature는 raw 문자열을 그대로 값으로 쓴다.
+            suffix = raw if raw else "NULL"
+            role = "value_abs_combined"
 
-        if spec.type == "circular" or spec.circular_encoding == "compass8":
-            tokens.append(f"WIND_DIR|{wind_compass(value)}")
-            roles.append("circular")
-            tokens.append("QUALITY|OK")
-            roles.append("quality")
-            return MeasurementTokens(mg, feature, tokens, roles, cell_id, atomic_value_id, value)
-
-        if spec.type in {"boolean", "categorical", "ordinal_actuator", "flow"} and not (
-            spec.absolute_encoding or spec.global_relative_encoding
-        ):
-            for lit in literal_state(value, raw):
-                tokens.append(lit)
-                roles.append("literal")
-            tokens.append("QUALITY|OK")
-            roles.append("quality")
-            return MeasurementTokens(mg, feature, tokens, roles, cell_id, atomic_value_id, value)
-
-        # continuous-like multi-channel encoding
-        if spec.absolute_encoding and (feature, "ABS", None) in self.binning.rules:
-            suffix = self.binning.encode_suffix(feature, value, "ABS")
-            tokens.append(f"VALUE_ABS|{suffix}")
-            roles.append("value_abs")
-            tokens.append(f"{feature.upper()}|{suffix}")
-            roles.append("value_abs_combined")
-        if spec.global_relative_encoding and (feature, "GLOBAL_REL", None) in self.binning.rules:
-            suffix = self.binning.encode_suffix(feature, value, "GLOBAL_REL")
-            tokens.append(f"VALUE_GLOBAL_REL|{suffix}")
-            roles.append("value_global")
-            tokens.append(f"{feature.upper()}|{suffix}")
-            roles.append("value_global_combined")
-        if (
-            self.farm_relative_enabled
-            and spec.farm_relative_encoding
-            and farm_id
-            and (feature, "FARM_REL", farm_id) in self.binning.rules
-        ):
-            suffix = self.binning.encode_suffix(feature, value, "FARM_REL", farm_id)
-            tokens.append(f"VALUE_FARM_REL|{suffix}")
-            roles.append("value_farm")
-            tokens.append(f"{feature.upper()}|{suffix}")
-            roles.append("value_farm_combined")
-
-        tokens.append("QUALITY|OK")
-        roles.append("quality")
-        return MeasurementTokens(mg, feature, tokens, roles, cell_id, atomic_value_id, value)
+        token = f"{feature.upper()}|{suffix}"
+        return MeasurementTokens(mg, feature, [token], [role], cell_id, atomic_value_id, value)
