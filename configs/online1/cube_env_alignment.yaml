@@ -1,0 +1,9 @@
+cube_env_alignment:
+  exact_match_preferred: true
+  max_backward_distance_minutes: 5
+  future_match_allowed: false
+  multiple_match_policy: nearest_past
+  unmatched_policy: quality_token_or_exclude
+  same_minute_tie_break: ENV_THEN_CUBE
+  pretrain_bidirectional_allowed: true
+  regression_future_match_allowed: false

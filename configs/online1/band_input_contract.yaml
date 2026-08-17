@@ -1,0 +1,20 @@
+band_input_contract:
+  source_dtype: uint16
+  expected_shape: [1024, 1280, 10]
+  wavelengths_nm: [713, 736, 759, 782, 805, 828, 851, 874, 897, 920]
+  invalid_pixel_policy: header_nodata_and_dead_pixel_mask
+  dead_pixel_value: 0
+  percentile_scope: scope_specific_global
+  percentile_low: 2.0
+  percentile_high: 98.0
+  channel_mapping: replicate_1_to_3
+  resize_method: bicubic
+  input_size: [224, 224]
+  normalization: imagenet
+  interpolation_antialias: true
+  capture_timestamp_policy: conservative_capture_end_equals_folder_hhmmss
+  image_encoder:
+    name: torchvision.models.resnet18
+    weights: IMAGENET1K_V1
+    frozen: true
+    output: avgpool_flatten
