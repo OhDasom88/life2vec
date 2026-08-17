@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" style="background-color: #FDFBF7; font-family: 'Inter', 'Noto Sans KR', sans-serif;">
+  <defs>
+    <style>
+      .t-title { font-size: 28px; font-weight: 800; fill: #FFFFFF; }
+      .t-sub { font-size: 16px; font-weight: 500; fill: #F3E8EE; }
+      .t-badge { font-size: 16px; font-weight: 800; fill: #800020; }
+      .box-head { font-size: 18px; font-weight: 700; fill: #0F172A; }
+      .box-sub { font-size: 14px; font-weight: 500; fill: #475569; }
+      .txt { font-size: 14px; font-weight: 500; fill: #334155; }
+      .txt-bold { font-size: 14px; font-weight: 700; fill: #1E293B; }
+      .tag-2026 { font-size: 11px; font-weight: 800; fill: #FFFFFF; }
+      .tag-2025 { font-size: 11px; font-weight: 700; fill: #1E293B; }
+      .tag-exp { font-size: 11px; font-weight: 700; fill: #475569; }
+      .tag-chk { font-size: 11px; font-weight: 800; fill: #78350F; }
+      .footer-txt { font-size: 13px; font-weight: 500; fill: #64748B; }
+    </style>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563EB" />
+    </marker>
+    <marker id="arr-burgundy" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#800020" />
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#16A34A" />
+    </marker>
+    <marker id="arr-orange" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#D97706" />
+    </marker>
+    <marker id="arr-grey" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748B" />
+    </marker>
+  </defs>
+
+  <!-- Banner -->
+  <rect x="0" y="0" width="1920" height="110" fill="#800020" />
+  <rect x="60" y="28" width="110" height="34" rx="6" fill="#FDFBF7" />
+  <text x="115" y="51" text-anchor="middle" class="t-badge">C-08</text>
+  <text x="190" y="52" class="t-title">C-08 모델 업데이트 게이트 및 안전 배포 체계</text>
+  <text x="190" y="84" class="t-sub">최대 6회 배분 제한, 후보 학습, Shadow 평가, 승인 배포 및 롤백 경로 | 분류: 생육단계별 작기 수행안</text>
+
+  <!-- Legend -->
+  <g transform="translate(1320, 18)">
+    <rect x="0" y="0" width="540" height="76" rx="8" fill="#580016" opacity="0.9" />
+    <line x1="20" y1="24" x2="55" y2="24" stroke="#FFFFFF" stroke-width="3.5" />
+    <text x="63" y="28" fill="#FFF" font-size="12" font-weight="bold">2026 확정</text>
+    <line x1="155" y1="24" x2="190" y2="24" stroke="#38BDF8" stroke-width="2" />
+    <text x="198" y="28" fill="#FFF" font-size="12">2025 참고</text>
+    <line x1="285" y1="24" x2="320" y2="24" stroke="#FDBA74" stroke-width="2" stroke-dasharray="5 3" />
+    <text x="328" y="28" fill="#FFF" font-size="12">팀 예상안</text>
+    <rect x="405" y="14" width="115" height="20" rx="4" fill="#FEF08A" stroke="#CA8A04" stroke-width="1.5" />
+    <text x="462" y="28" fill="#854D0E" font-size="11" font-weight="bold" text-anchor="middle">현장 확인 필요</text>
+
+    <line x1="20" y1="54" x2="55" y2="54" stroke="#60A5FA" stroke-width="2.5" marker-end="url(#arr-blue)" />
+    <text x="63" y="58" fill="#FFF" font-size="11">Data Read</text>
+    <line x1="155" y1="54" x2="190" y2="54" stroke="#F43F5E" stroke-width="2.5" marker-end="url(#arr-burgundy)" />
+    <text x="198" y="58" fill="#FFF" font-size="11">Control Cmd</text>
+    <line x1="285" y1="54" x2="320" y2="54" stroke="#4ADE80" stroke-width="2.5" marker-end="url(#arr-green)" />
+    <text x="328" y="58" fill="#FFF" font-size="11">Verify/Status</text>
+    <line x1="415" y1="54" x2="450" y2="54" stroke="#94A3B8" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arr-grey)" />
+    <text x="458" y="58" fill="#FFF" font-size="11">Update/Maint</text>
+  </g>
+
+  <g id="Model-Update-Gate" transform="translate(80, 160)">
+    <!-- Top 6 Updates Allocation Box -->
+    <g transform="translate(0, 0)">
+      <rect x="0" y="0" width="1760" height="100" rx="10" fill="#800020" />
+      <text x="30" y="40" fill="#FFF" font-size="20" font-weight="bold">본선 규칙: AI 모델 업데이트 최대 6회 사전 배분 명세</text>
+      <text x="30" y="70" fill="#F3E8EE" font-size="14">무분별한 연속 실시간 학습을 금지하고, 검증된 시점에 한하여 오프라인 승인 배포 수행</text>
+      
+      <g transform="translate(850, 18)">
+        <rect x="0" y="0" width="270" height="64" rx="6" fill="#FDFBF7" />
+        <text x="135" y="30" fill="#800020" font-size="14" font-weight="bold" text-anchor="middle">개시 직후 (Initial)</text>
+        <text x="135" y="52" fill="#800020" font-size="16" font-weight="800" text-anchor="middle">업데이트 2회 배분</text>
+      </g>
+
+      <g transform="translate(1140, 18)">
+        <rect x="0" y="0" width="290" height="64" rx="6" fill="#FDFBF7" />
+        <text x="145" y="30" fill="#800020" font-size="14" font-weight="bold" text-anchor="middle">생육 단계 전환기 (Stage)</text>
+        <text x="145" y="52" fill="#800020" font-size="16" font-weight="800" text-anchor="middle">업데이트 3회 배분</text>
+      </g>
+
+      <g transform="translate(1450, 18)">
+        <rect x="0" y="0" width="280" height="64" rx="6" fill="#FDFBF7" />
+        <text x="140" y="30" fill="#800020" font-size="14" font-weight="bold" text-anchor="middle">예비 / 긴급보정 (Buffer)</text>
+        <text x="140" y="52" fill="#800020" font-size="16" font-weight="800" text-anchor="middle">업데이트 1회 배분</text>
+      </g>
+    </g>
+
+    <!-- Pipeline Flow -->
+    <g transform="translate(0, 140)">
+      <!-- Step 1: Data Accumulation -->
+      <g transform="translate(0, 0)">
+        <rect x="0" y="0" width="310" height="340" rx="10" fill="#FFFFFF" stroke="#2563EB" stroke-width="2" />
+        <text x="20" y="35" class="box-head">1. 현장 데이터 축적</text>
+        <text x="20" y="60" class="box-sub">Local Data Accumulation</text>
+        <line x1="20" y1="75" x2="290" y2="75" stroke="#E2E8F0" />
+        <text x="20" y="110" class="txt">ㆍ 5분 단위 시계열 수집</text>
+        <text x="20" y="140" class="txt">ㆍ 생육/근권 데이터 정제</text>
+        <text x="20" y="170" class="txt">ㆍ 이미지 엽면적/초세 특징</text>
+        <text x="20" y="200" class="txt">ㆍ 농작업 이력 라벨링</text>
+        <text x="20" y="240" class="txt-bold" fill="#2563EB">ㆍ 폐쇄망 NVMe 내부 저장</text>
+      </g>
+
+      <path d="M 310 170 L 360 170" fill="none" stroke="#2563EB" stroke-width="3" marker-end="url(#arr-blue)" />
+
+      <!-- Step 2: Off-line Candidate Training -->
+      <g transform="translate(360, 0)">
+        <rect x="0" y="0" width="310" height="340" rx="10" fill="#FFFFFF" stroke="#7C3AED" stroke-width="2" />
+        <text x="20" y="35" class="box-head">2. 후보 모델 학습</text>
+        <text x="20" y="60" class="box-sub">Candidate Head Training</text>
+        <line x1="20" y1="75" x2="290" y2="75" stroke="#E2E8F0" />
+        <text x="20" y="110" class="txt">ㆍ Downstream Head 오프라인</text>
+        <text x="20" y="140" class="txt">ㆍ 로컬 GPU 자원 활용</text>
+        <text x="20" y="170" class="txt">ㆍ 모델 양자화 &amp; 경량화</text>
+        <text x="20" y="200" class="txt">ㆍ 하이퍼파라미터 최적화</text>
+        <text x="20" y="240" class="txt-bold" fill="#5B21B6">ㆍ 신규 후보 버전 생성</text>
+      </g>
+
+      <path d="M 670 170 L 720 170" fill="none" stroke="#7C3AED" stroke-width="3" marker-end="url(#arr-burgundy)" />
+
+      <!-- Step 3: Shadow & Backtest -->
+      <g transform="translate(720, 0)">
+        <rect x="0" y="0" width="320" height="340" rx="10" fill="#FFFFFF" stroke="#D97706" stroke-width="2" />
+        <text x="20" y="35" class="box-head">3. Shadow &amp; 백테스트</text>
+        <text x="20" y="60" class="box-sub">Shadow Evaluation &amp; Backtest</text>
+        <line x1="20" y1="75" x2="300" y2="75" stroke="#E2E8F0" />
+        <text x="20" y="110" class="txt">ㆍ 실시간 Shadow 모드 검증</text>
+        <text x="20" y="140" class="txt">ㆍ 최근 14일 백테스트 수행</text>
+        <text x="20" y="170" class="txt">ㆍ RMSE / 체류율 / 비용 비교</text>
+        <text x="20" y="200" class="txt">ㆍ 기존 모델 대비 성능 향상입증</text>
+        <text x="20" y="240" class="txt-bold" fill="#B45309">ㆍ 오탐률 0% 조건 충족 검토</text>
+      </g>
+
+      <path d="M 1040 170 L 1090 170" fill="none" stroke="#D97706" stroke-width="3" marker-end="url(#arr-orange)" />
+
+      <!-- Step 4: Safety Gate & Approval -->
+      <g transform="translate(1090, 0)">
+        <rect x="0" y="0" width="330" height="340" rx="10" fill="#FFF1F2" stroke="#800020" stroke-width="2.5" />
+        <text x="20" y="35" class="box-head" fill="#800020">4. 안전 검증 &amp; 승인</text>
+        <text x="20" y="60" class="box-sub">Safety Gate &amp; Approval</text>
+        <line x1="20" y1="75" x2="310" y2="75" stroke="#FECDD3" />
+        <text x="20" y="110" class="txt">ㆍ 하드룰 가드레일 적합성</text>
+        <text x="20" y="140" class="txt">ㆍ 비상상황 대응 절차 검증</text>
+        <text x="20" y="170" class="txt">ㆍ 잔여 배분 횟수 확인 (Count &lt; 6)</text>
+        <text x="20" y="200" class="txt">ㆍ 관리자/팀장 배포 승인</text>
+        <text x="20" y="240" class="txt-bold" fill="#800020">ㆍ 지정 유지보수 시점 배포</text>
+      </g>
+
+      <path d="M 1420 170 L 1470 170" fill="none" stroke="#16A34A" stroke-width="3" marker-end="url(#arr-green)" />
+
+      <!-- Step 5: Deployment & Rollback -->
+      <g transform="translate(1470, 0)">
+        <rect x="0" y="0" width="290" height="340" rx="10" fill="#F0FDF4" stroke="#16A34A" stroke-width="2.5" />
+        <text x="20" y="35" class="box-head" fill="#15803D">5. 배포 &amp; 롤백 감시</text>
+        <text x="20" y="60" class="box-sub">Deployment &amp; Rollback Monitor</text>
+        <line x1="20" y1="75" x2="270" y2="75" stroke="#BBF7D0" />
+        <text x="20" y="110" class="txt">ㆍ 운영 환경 적용 (v2.0)</text>
+        <text x="20" y="140" class="txt">ㆍ 실시간 성능 모니터링</text>
+        <text x="20" y="170" class="txt">ㆍ 이상 징후/신뢰구간 이탈 시:</text>
+        <text x="30" y="200" class="txt-bold" fill="#B45309">  "이전 버전 스냅샷 롤백"</text>
+        <text x="20" y="240" class="txt-bold" fill="#15803D">ㆍ 제어 연속성 및 안전 보장</text>
+      </g>
+    </g>
+
+    <!-- Bottom Rollback Path -->
+    <g transform="translate(0, 500)">
+      <rect x="0" y="0" width="1760" height="110" rx="10" fill="#FFFBEB" stroke="#D97706" stroke-width="2" />
+      <text x="30" y="35" class="txt-bold" fill="#B45309">자동 롤백 및 안전 가드레일 백업 작동 조건 (Safety &amp; Rollback Trigger):</text>
+      <text x="30" y="65" class="txt">1. 모델 업데이트 후 24시간 이내 제어 추종 RMSE 급증 또는 하드룰 임계 이탈 감지 시 ➔ [이전 버전 롤백 실행]</text>
+      <text x="30" y="90" class="txt">2. 통신 장애 또는 구동기 물리 반응 미검출 지속 시 ➔ [규칙 기반 안전 밴드 가드레일 단독 운전 모드] 즉시 전환</text>
+    </g>
+  </g>
+
+  <!-- Footer -->
+  <line x1="60" y1="1020" x2="1860" y2="1020" stroke="#CBD5E1" stroke-width="1" />
+  <text x="60" y="1050" class="footer-txt">주석: 2025 참고 기술문서 기반 예상 구성으로, 2026 본선 사양 및 현장 배치 확인 후 갱신 예정</text>
+  <text x="1860" y="1050" text-anchor="end" class="footer-txt">베리디시전 (BerryDecision) · 2026 스마트농업 AI 경진대회 본선 아키텍처</text>
+</svg>

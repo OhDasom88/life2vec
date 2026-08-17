@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" style="background-color: #FDFBF7; font-family: 'Inter', 'Noto Sans KR', sans-serif;">
+  <defs>
+    <style>
+      .t-title { font-size: 28px; font-weight: 800; fill: #FFFFFF; }
+      .t-sub { font-size: 16px; font-weight: 500; fill: #F3E8EE; }
+      .t-badge { font-size: 16px; font-weight: 800; fill: #800020; }
+      .box-head { font-size: 18px; font-weight: 700; fill: #0F172A; }
+      .box-sub { font-size: 14px; font-weight: 500; fill: #475569; }
+      .txt { font-size: 14px; font-weight: 500; fill: #334155; }
+      .txt-bold { font-size: 14px; font-weight: 700; fill: #1E293B; }
+      .tag-2026 { font-size: 11px; font-weight: 800; fill: #FFFFFF; }
+      .tag-2025 { font-size: 11px; font-weight: 700; fill: #1E293B; }
+      .tag-exp { font-size: 11px; font-weight: 700; fill: #475569; }
+      .tag-chk { font-size: 11px; font-weight: 800; fill: #78350F; }
+      .footer-txt { font-size: 13px; font-weight: 500; fill: #64748B; }
+    </style>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563EB" />
+    </marker>
+    <marker id="arr-burgundy" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#800020" />
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#16A34A" />
+    </marker>
+    <marker id="arr-orange" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#D97706" />
+    </marker>
+    <marker id="arr-grey" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748B" />
+    </marker>
+  </defs>
+
+  <!-- Banner -->
+  <rect x="0" y="0" width="1920" height="110" fill="#800020" />
+  <rect x="60" y="28" width="110" height="34" rx="6" fill="#FDFBF7" />
+  <text x="115" y="51" text-anchor="middle" class="t-badge">A-04</text>
+  <text x="190" y="52" class="t-title">A-04 Unit 4 구동기 배치 및 제어 구역</text>
+  <text x="190" y="84" class="t-sub">참가팀 제어 가능 구동기 및 사무국 관할 설비 구분 명세 | 분류: 센서·구동기 예상 배치도</text>
+
+  <!-- Legend -->
+  <g transform="translate(1320, 18)">
+    <rect x="0" y="0" width="540" height="76" rx="8" fill="#580016" opacity="0.9" />
+    <line x1="20" y1="24" x2="55" y2="24" stroke="#FFFFFF" stroke-width="3.5" />
+    <text x="63" y="28" fill="#FFF" font-size="12" font-weight="bold">2026 확정</text>
+    <line x1="155" y1="24" x2="190" y2="24" stroke="#38BDF8" stroke-width="2" />
+    <text x="198" y="28" fill="#FFF" font-size="12">2025 참고</text>
+    <line x1="285" y1="24" x2="320" y2="24" stroke="#FDBA74" stroke-width="2" stroke-dasharray="5 3" />
+    <text x="328" y="28" fill="#FFF" font-size="12">팀 예상안</text>
+    <rect x="405" y="14" width="115" height="20" rx="4" fill="#FEF08A" stroke="#CA8A04" stroke-width="1.5" />
+    <text x="462" y="28" fill="#854D0E" font-size="11" font-weight="bold" text-anchor="middle">현장 확인 필요</text>
+
+    <line x1="20" y1="54" x2="55" y2="54" stroke="#60A5FA" stroke-width="2.5" marker-end="url(#arr-blue)" />
+    <text x="63" y="58" fill="#FFF" font-size="11">Data Read</text>
+    <line x1="155" y1="54" x2="190" y2="54" stroke="#F43F5E" stroke-width="2.5" marker-end="url(#arr-burgundy)" />
+    <text x="198" y="58" fill="#FFF" font-size="11">Control Cmd</text>
+    <line x1="285" y1="54" x2="320" y2="54" stroke="#4ADE80" stroke-width="2.5" marker-end="url(#arr-green)" />
+    <text x="328" y="58" fill="#FFF" font-size="11">Verify/Status</text>
+    <line x1="415" y1="54" x2="450" y2="54" stroke="#94A3B8" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arr-grey)" />
+    <text x="458" y="58" fill="#FFF" font-size="11">Update/Maint</text>
+  </g>
+
+  <g id="Actuator-Layout" transform="translate(80, 160)">
+    <!-- Header Banner Inside -->
+    <rect x="0" y="0" width="1760" height="60" rx="8" fill="#1E293B" />
+    <text x="880" y="38" fill="#FFF" font-size="20" font-weight="bold" text-anchor="middle">Unit 4 환경 구동기 구역별 제어 및 물리 배치 명세 (Unit ID = 4)</text>
+
+    <!-- Controlled Actuators Grid -->
+    <g transform="translate(0, 90)">
+      <!-- Roof Vent Windows -->
+      <g transform="translate(0, 0)">
+        <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFF1F2" stroke="#800020" stroke-width="2.5" />
+        <rect x="300" y="12" width="95" height="22" rx="4" fill="#FFE4E6" stroke="#800020" stroke-width="1" />
+        <text x="347" y="27" text-anchor="middle" class="tag-2025">2025 참고</text>
+        <text x="20" y="35" class="box-head">좌/우 천창 개폐기</text>
+        <text x="20" y="60" class="box-sub">Left/Right Roof Vent Openers</text>
+        <line x1="20" y1="75" x2="390" y2="75" stroke="#FECDD3" />
+        <text x="20" y="105" class="txt">ㆍ 제어 방식: 개도율 (0 ~ 100 %)</text>
+        <text x="20" y="135" class="txt">ㆍ 레지스터: Modbus Reg 117 (좌), 118 (우)</text>
+        <text x="20" y="165" class="txt">ㆍ 환기 및 고온/과습 억제 핵심 구동기</text>
+        <text x="20" y="195" class="txt">ㆍ 강풍/돌풍 예보 시 사전 긴급 폐쇄</text>
+        <text x="20" y="235" class="txt-bold" fill="#800020">ㆍ 1차: OPID 일치 / 2차: 개도율 딜레이 검증</text>
+      </g>
+
+      <!-- FCU & Circulation Fan -->
+      <g transform="translate(450, 0)">
+        <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFF1F2" stroke="#800020" stroke-width="2.5" />
+        <rect x="300" y="12" width="95" height="22" rx="4" fill="#FFE4E6" stroke="#800020" stroke-width="1" />
+        <text x="347" y="27" text-anchor="middle" class="tag-2025">2025 참고</text>
+        <text x="20" y="35" class="box-head">FCU (팬코일유닛) 냉난방</text>
+        <text x="20" y="60" class="box-sub">Fan Coil Unit (Heating/Cooling)</text>
+        <line x1="20" y1="75" x2="390" y2="75" stroke="#FECDD3" />
+        <text x="20" y="105" class="txt">ㆍ 구동 요소: FCU 팬 (스위치) &amp; 순환 펌프</text>
+        <text x="20" y="135" class="txt">ㆍ 전력 스펙: 팬 1710W (380V), 펌프 858.8W</text>
+        <text x="20" y="165" class="txt">ㆍ 야간 난방 및 야간 저온 억제 수행</text>
+        <text x="20" y="195" class="txt">ㆍ 축열 예보 연동 선제 가동으로 전기절감</text>
+        <text x="20" y="235" class="txt-bold" fill="#800020">ㆍ 가동 시간 산정이 경제성 점수에 직결</text>
+      </g>
+
+      <!-- CO2 & Fog System -->
+      <g transform="translate(900, 0)">
+        <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFF1F2" stroke="#800020" stroke-width="2.5" />
+        <rect x="300" y="12" width="95" height="22" rx="4" fill="#FFE4E6" stroke="#800020" stroke-width="1" />
+        <text x="347" y="27" text-anchor="middle" class="tag-2025">2025 참고</text>
+        <text x="20" y="35" class="box-head">CO₂ 시비 &amp; 포그 시스템</text>
+        <text x="20" y="60" class="box-sub">CO2 Injection &amp; Fogging System</text>
+        <line x1="20" y1="75" x2="390" y2="75" stroke="#FECDD3" />
+        <text x="20" y="105" class="txt">ㆍ CO₂ 공급: 광량 충분 + 천창 닫힘 시 시비</text>
+        <text x="20" y="135" class="txt">ㆍ CO₂ 목표: 700 ~ 800 ppm 밴드 유지</text>
+        <text x="20" y="165" class="txt">ㆍ 포그 시스템: 고온 건조 시 습도 보충</text>
+        <text x="20" y="195" class="txt">ㆍ 밸브 오픈 시간으로 CO₂/물 비용 간접 추산</text>
+        <text x="20" y="235" class="txt-bold" fill="#800020">ㆍ 낭비 방지를 위한 시간 제한 제어</text>
+      </g>
+
+      <!-- Circulation Fan 1 Group -->
+      <g transform="translate(1350, 0)">
+        <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFFBEB" stroke="#D97706" stroke-width="2.5" />
+        <rect x="290" y="12" width="105" height="22" rx="4" fill="#FEF08A" stroke="#CA8A04" stroke-width="1" />
+        <text x="342" y="27" text-anchor="middle" class="tag-chk">확인 필요</text>
+        <text x="20" y="35" class="box-head" fill="#B45309">유동팬 [12대 1그룹]</text>
+        <text x="20" y="60" class="box-sub">Air Circulation Fans (Batch 1 Group)</text>
+        <line x1="20" y1="75" x2="390" y2="75" stroke="#FDE68A" />
+        <text x="20" y="105" class="txt">ㆍ 제어 방식: 12대 독립제어 아닌 [1그룹 일괄]</text>
+        <text x="20" y="135" class="txt">ㆍ 제어 신호: ON / OFF 또는 일정시간 가동</text>
+        <text x="20" y="165" class="txt">ㆍ 근거 없는 60% 비례출력 제어 금지</text>
+        <text x="20" y="195" class="txt">ㆍ 꽃 주변 결로 억제 및 습도 균일화</text>
+        <text x="20" y="235" class="txt-bold" fill="#B45309">ㆍ [확인필요] 627W 소비전력 (1대/전체)</text>
+      </g>
+    </g>
+
+    <!-- Shading & Thermal Curtains -->
+    <g transform="translate(0, 420)">
+      <g transform="translate(0, 0)">
+        <rect x="0" y="0" width="860" height="320" rx="10" fill="#FFF1F2" stroke="#800020" stroke-width="2" />
+        <rect x="740" y="12" width="95" height="22" rx="4" fill="#FFE4E6" stroke="#800020" stroke-width="1" />
+        <text x="787" y="27" text-anchor="middle" class="tag-2025">2025 참고</text>
+        <text x="20" y="35" class="box-head">상부 차광 스크린 &amp; 상부 보온 커튼</text>
+        <text x="20" y="60" class="box-sub">Top Shading Screen &amp; Top Thermal Curtain</text>
+        <line x1="20" y1="75" x2="840" y2="75" stroke="#FECDD3" />
+        <text x="20" y="110" class="txt">ㆍ 제어 방식: 개도율 (0 ~ 100 %) 제어 (Modbus Reg 119, 120)</text>
+        <text x="20" y="145" class="txt">ㆍ 차광 스크린: 여름철/초가을 강광차단 및 온실 내부 고온 억제</text>
+        <text x="20" y="180" class="txt">ㆍ 보온 커튼: 야간 복사에열 방지, 야간 저온기 에너지를 보존</text>
+        <text x="20" y="215" class="txt">ㆍ 판단 기준: 외기 일사량, 시간대, 주야간 ADT 목표 밴드 연동</text>
+        <text x="20" y="260" class="txt-bold" fill="#800020">ㆍ 1차: OPID 일치 확인 / 2차: 개도율 및 야간 온습도 보존 물리 반응 확인</text>
+      </g>
+
+      <!-- Non-controlled Rail Pipe & Side Curtain -->
+      <g transform="translate(900, 0)">
+        <rect x="0" y="0" width="860" height="320" rx="10" fill="#F8FAFC" stroke="#64748B" stroke-width="2" stroke-dasharray="6 4" />
+        <rect x="730" y="12" width="110" height="22" rx="4" fill="#E2E8F0" stroke="#475569" stroke-width="1" />
+        <text x="785" y="27" text-anchor="middle" class="tag-exp">팀 제어 불가 영역</text>
+        <text x="20" y="35" class="box-head" fill="#334155">참가팀 제어 불가 설비 (회색 표기 영역)</text>
+        <text x="20" y="60" class="box-sub">Organizer Controlled Facilities</text>
+        <line x1="20" y1="75" x2="840" y2="75" stroke="#CBD5E1" />
+        <text x="20" y="110" class="txt-bold" fill="#475569">1. 레일 파이프 냉난방 시스템:</text>
+        <text x="35" y="135" class="txt">ㆍ 참가팀 제어 대상 제외. 필요 시 운영사무국에서 일괄 ON/OFF 수행</text>
+        <text x="35" y="160" class="txt">ㆍ 튜브레일 전력량: 펌프 380V (실제 전력계 측정치 별도)</text>
+        <text x="20" y="200" class="txt-bold" fill="#475569">2. 측면 보온 커튼:</text>
+        <text x="35" y="225" class="txt">ㆍ 참가팀 제어 대상에서 명확히 제외된 현장 고정 설비</text>
+        <text x="20" y="270" class="txt-bold" fill="#0F172A">※ 주의: 제어 불가능한 장치에 AI 제어 명령 송신 시 오류 및 제어 충돌 발생</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Footer -->
+  <line x1="60" y1="1020" x2="1860" y2="1020" stroke="#CBD5E1" stroke-width="1" />
+  <text x="60" y="1050" class="footer-txt">주석: 2025 참고 기술문서 기반 예상 구성으로, 2026 본선 사양 및 현장 배치 확인 후 갱신 예정</text>
+  <text x="1860" y="1050" text-anchor="end" class="footer-txt">베리디시전 (BerryDecision) · 2026 스마트농업 AI 경진대회 본선 아키텍처</text>
+</svg>

@@ -1,0 +1,263 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" style="background-color: #FAF6F0; font-family: 'Malgun Gothic', 'Noto Sans KR', sans-serif;">
+  <defs>
+    <style>
+      .t-title { font-size: 26px; font-weight: 900; fill: #FFFFFF; }
+      .t-sub { font-size: 15px; font-weight: 500; fill: #F6E9EC; }
+      .t-badge { font-size: 16px; font-weight: 800; fill: #6D2E46; }
+      .card-title { font-size: 17px; font-weight: 800; fill: #6D2E46; }
+      .card-sub { font-size: 13px; font-weight: 600; fill: #5A4A50; }
+      .body-txt { font-size: 13px; font-weight: 500; fill: #2B2B2B; }
+      .body-bold { font-size: 13px; font-weight: 700; fill: #2B2B2B; }
+      .code-tag { font-family: 'Consolas', monospace; font-size: 12px; fill: #6D2E46; font-weight: bold; }
+      .math-txt { font-family: 'Cambria Math', 'Times New Roman', serif; font-size: 15px; font-weight: bold; fill: #6D2E46; }
+    </style>
+
+    <!-- Clean Arrow Markers -->
+    <marker id="arr-burgundy" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6D2E46" />
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0563C1" />
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4F7942" />
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ED7D31" />
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#B04A4A" />
+    </marker>
+  </defs>
+
+  <!-- PPT Header Banner (Soft Burgundy #6D2E46) -->
+  <rect x="0" y="0" width="1920" height="96" fill="#6D2E46" />
+  <rect x="50" y="24" width="100" height="34" rx="6" fill="#FAF6F0" />
+  <text x="100" y="47" text-anchor="middle" class="t-badge">B-00</text>
+  <text x="170" y="46" class="t-title">데이터 수집·추론·제어 5단계 공정 계층 아키텍처</text>
+  <text x="170" y="74" class="t-sub">1단계 수집 ➔ 2단계 품질게이트 ➔ 3단계 추정·CQR ➔ 4단계 편차진단 ➔ 5단계 3계층 제어 &amp; OPID 이중 검증</text>
+
+  <!-- PPT Style Legend -->
+  <g transform="translate(1360, 16)">
+    <rect x="0" y="0" width="510" height="66" rx="8" fill="#4A3A40" opacity="0.95" />
+    <line x1="20" y1="20" x2="50" y2="20" stroke="#0563C1" stroke-width="2.5" marker-end="url(#arr-blue)" />
+    <text x="58" y="24" fill="#FFFFFF" font-size="12">데이터 수집</text>
+
+    <line x1="145" y1="20" x2="175" y2="20" stroke="#6D2E46" stroke-width="2.5" marker-end="url(#arr-burgundy)" />
+    <text x="183" y="24" fill="#FFFFFF" font-size="12">제어 명령</text>
+
+    <line x1="265" y1="20" x2="295" y2="20" stroke="#4F7942" stroke-width="2.5" marker-end="url(#arr-green)" />
+    <text x="303" y="24" fill="#FFFFFF" font-size="12">상태 검증</text>
+
+    <line x1="385" y1="20" x2="415" y2="20" stroke="#ED7D31" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arr-amber)" />
+    <text x="423" y="24" fill="#FFFFFF" font-size="12">물리 반응</text>
+
+    <text x="20" y="52" fill="#F6E9EC" font-size="11">베리디시전 2026 본선 운영 시스템</text>
+  </g>
+
+  <g transform="translate(50, 115)">
+    <!-- 5 Hierarchical Process Swimlanes (Horizontal Flow) -->
+    
+    <!-- Stage 1: Data Ingestion (x=0, width=340) -->
+    <g transform="translate(0, 0)">
+      <rect x="0" y="0" width="340" height="880" rx="12" fill="#FFFFFF" stroke="#0563C1" stroke-width="2.5" />
+      <rect x="15" y="15" width="310" height="42" rx="8" fill="#0563C1" />
+      <text x="170" y="42" fill="#FFFFFF" font-size="16" font-weight="900" text-anchor="middle">1단계: 데이터 수집 (Data Ingestion)</text>
+
+      <g transform="translate(15, 75)">
+        <rect x="0" y="0" width="280" height="135" rx="8" fill="#F6E9EC" stroke="#0563C1" />
+        <text x="15" y="28" fill="#0563C1" font-size="14" font-weight="bold">Unit 2 외부 기상대 센서</text>
+        <text x="15" y="52" class="body-txt">ㆍ 외기 온·습도, 일사량(W/m²)</text>
+        <text x="15" y="74" class="body-txt">ㆍ 풍향·풍속 (돌풍 사전 감지)</text>
+        <text x="15" y="96" class="body-txt">ㆍ Modbus RTU ➔ TCP 중계</text>
+        <text x="15" y="118" class="code-tag">unit_id = 2 (5분 수집)</text>
+      </g>
+
+      <g transform="translate(15, 225)">
+        <rect x="0" y="0" width="280" height="155" rx="8" fill="#F6E9EC" stroke="#0563C1" />
+        <text x="15" y="28" fill="#0563C1" font-size="14" font-weight="bold">Unit 3 온실 내부 &amp; 근권 센서</text>
+        <text x="15" y="52" class="body-txt">ㆍ Zones 1~7 온·습도, CO2 ppm</text>
+        <text x="15" y="74" class="body-txt">ㆍ 배지 수분(함수율), 배지 EC/지온</text>
+        <text x="15" y="96" class="body-txt">※ 배액 센서 부재 ➔ 배지 EC 활용</text>
+        <text x="15" y="118" class="code-tag">unit_id = 3 (Reg 101~276)</text>
+        <text x="15" y="138" fill="#B04A4A" font-size="11" font-weight="bold">ㆍ Zone 7 Worst Zone 집중 관측</text>
+      </g>
+
+      <g transform="translate(15, 395)">
+        <rect x="0" y="0" width="280" height="135" rx="8" fill="#F6E9EC" stroke="#0563C1" />
+        <text x="15" y="28" fill="#0563C1" font-size="14" font-weight="bold">Unit 4·5 구동기 및 양액기 상태</text>
+        <text x="15" y="52" class="body-txt">ㆍ 천창 개도율 (0~100%) 센싱</text>
+        <text x="15" y="74" class="body-txt">ㆍ FCU 난방 / 유동팬 전력계 전류</text>
+        <text x="15" y="96" class="body-txt">ㆍ 양액기 EC, pH, 유량, 관수구역</text>
+        <text x="15" y="118" class="code-tag">unit_id = 4, 5 (상태 반환)</text>
+      </g>
+
+      <g transform="translate(15, 545)">
+        <rect x="0" y="0" width="280" height="135" rx="8" fill="#F6E9EC" stroke="#0563C1" />
+        <text x="15" y="28" fill="#0563C1" font-size="14" font-weight="bold">영상 &amp; 기상예보 REST API</text>
+        <text x="15" y="52" class="body-txt">ㆍ 8MP 스테레오 비전 (1일 2회)</text>
+        <text x="15" y="74" class="body-txt">ㆍ GET /image (좌·우 RGB)</text>
+        <text x="15" y="96" class="body-txt">ㆍ GET /forecast (기상청 예보 API)</text>
+        <text x="15" y="118" fill="#B04A4A" font-size="11" font-weight="bold">※ 전력량계 AI 미제공 (수동산출)</text>
+      </g>
+
+      <g transform="translate(15, 695)">
+        <rect x="0" y="0" width="280" height="170" rx="8" fill="#FAF6F0" stroke="#5A4A50" />
+        <text x="15" y="28" fill="#2B2B2B" font-size="13" font-weight="bold">📌 폐쇄망 온프레미스 원칙</text>
+        <text x="15" y="52" class="body-txt">ㆍ 엣지 장비 완결형 수집</text>
+        <text x="15" y="74" class="body-txt">ㆍ 외부 인터넷 &amp; LLM 통신 차단</text>
+        <text x="15" y="96" class="body-txt">ㆍ 5분 단위 로컬 NVMe TSDB 저장</text>
+      </g>
+    </g>
+
+    <!-- Arrow 1 -> 2 -->
+    <path d="M 340 440 L 370 440" fill="none" stroke="#0563C1" stroke-width="3" marker-end="url(#arr-blue)" />
+
+    <!-- Stage 2: Quality Gate (x=370, width=340) -->
+    <g transform="translate(370, 0)">
+      <rect x="0" y="0" width="340" height="880" rx="12" fill="#FFFFFF" stroke="#6D2E46" stroke-width="2.5" />
+      <rect x="15" y="15" width="310" height="42" rx="8" fill="#6D2E46" />
+      <text x="170" y="42" fill="#FFFFFF" font-size="16" font-weight="900" text-anchor="middle">2단계: 품질 게이트 (Quality Gate)</text>
+
+      <g transform="translate(15, 75)">
+        <rect x="0" y="0" width="280" height="175" rx="8" fill="#F6E9EC" stroke="#6D2E46" />
+        <text x="15" y="28" fill="#6D2E46" font-size="14" font-weight="bold">센서 결측 &amp; 이상치 검출</text>
+        <text x="15" y="54" class="body-txt">ㆍ 범위/변화율 임계 초과 플래그</text>
+        <text x="15" y="78" class="body-txt">ㆍ 1차: 이동중앙값 보정 적용</text>
+        <text x="15" y="102" class="body-txt">ㆍ 2차: 대체 인접 센서 전환</text>
+        <text x="15" y="126" class="body-txt">ㆍ 지속 결측 시 해당 센서 배제</text>
+        <text x="15" y="152" fill="#6D2E46" font-size="12" font-weight="bold">➔ 하류 AI 모델에 차단 플래그 전달</text>
+      </g>
+
+      <g transform="translate(15, 265)">
+        <rect x="0" y="0" width="280" height="600" rx="8" fill="#FAF6F0" stroke="#5A4A50" />
+        <text x="15" y="30" fill="#2B2B2B" font-size="14" font-weight="bold">📌 신뢰성 차단 장치</text>
+        <text x="15" y="60" class="body-txt">오염되거나 튀는 입력값이</text>
+        <text x="15" y="85" class="body-txt">하류 AI 제어 판단을 가로채지</text>
+        <text x="15" y="110" class="body-txt">못하도록 선제 차단</text>
+      </g>
+    </g>
+
+    <!-- Arrow 2 -> 3 -->
+    <path d="M 710 440 L 740 440" fill="none" stroke="#6D2E46" stroke-width="3" marker-end="url(#arr-burgundy)" />
+
+    <!-- Stage 3: AI Estimation & Uncertainty (x=740, width=350) -->
+    <g transform="translate(740, 0)">
+      <rect x="0" y="0" width="350" height="880" rx="12" fill="#E4EFE9" stroke="#4F7942" stroke-width="2.5" />
+      <rect x="15" y="15" width="320" height="42" rx="8" fill="#4F7942" />
+      <text x="175" y="42" fill="#FFFFFF" font-size="16" font-weight="900" text-anchor="middle">3단계: AI 모델 추정 &amp; 불확실성</text>
+
+      <g transform="translate(15, 75)">
+        <rect x="0" y="0" width="290" height="150" rx="8" fill="#FFFFFF" stroke="#4F7942" />
+        <text x="15" y="28" fill="#4F7942" font-size="14" font-weight="bold">근권 수치 예측 (ODE + LightGBM)</text>
+        <text x="15" y="52" class="body-txt">ㆍ 뉴턴냉각 ODE 베이스 + LightGBM 잔차</text>
+        <text x="15" y="74" class="body-txt">ㆍ 함수율, EC, 지온 다중시점 예측</text>
+        <text x="15" y="96" class="body-txt">ㆍ 30분, 1h, 3h, 6h 후 동시 예측</text>
+        <text x="15" y="122" fill="#4F7942" font-size="12" font-weight="bold">ㆍ 배지 EC를 근권 축적 대리지표로 환산</text>
+      </g>
+
+      <g transform="translate(15, 240)">
+        <rect x="0" y="0" width="290" height="150" rx="8" fill="#FFFFFF" stroke="#ED7D31" />
+        <text x="15" y="28" fill="#ED7D31" font-size="14" font-weight="bold">불확실성 Conformal 구간 (CQR)</text>
+        <text x="15" y="52" class="body-txt">ㆍ 단순 점 추정 대신 예측 구간 산출</text>
+        <text x="15" y="74" class="body-txt">ㆍ 신뢰 구간이 임계보다 넓은 경우:</text>
+        <text x="25" y="98" fill="#B04A4A" font-size="12" font-weight="bold">  "해당 판단 자동 보류 및 가드레일 전환"</text>
+        <text x="15" y="122" fill="#ED7D31" font-size="12" font-weight="bold">ㆍ 미측정 항목 추론 단정 차단</text>
+      </g>
+
+      <g transform="translate(15, 405)">
+        <rect x="0" y="0" width="290" height="145" rx="8" fill="#FFFFFF" stroke="#4F7942" />
+        <text x="15" y="28" fill="#4F7942" font-size="14" font-weight="bold">영상 생육 지표 (RGB 계산식)</text>
+        <text x="15" y="52" class="body-txt">ㆍ 엽각, 초세, 엽색, 병반율 산출</text>
+        <text x="15" y="74" class="body-txt">ㆍ 라벨 부족으로 CNN 대신 계산식 사용</text>
+        <text x="15" y="96" class="body-txt">ㆍ 1일 2회 느린 루프 판정에 활용</text>
+      </g>
+
+      <g transform="translate(15, 565)">
+        <rect x="0" y="0" width="290" height="300" rx="8" fill="#FFFFFF" stroke="#4F7942" />
+        <text x="15" y="28" fill="#4F7942" font-size="14" font-weight="bold">⚡ 에너지 수지 추정 (빠른/느린 루프)</text>
+        <text x="15" y="55" class="body-txt">ㆍ 빠른 루프 (분): 광합성 잉여 동화산물</text>
+        <text x="15" y="80" class="body-txt">ㆍ 느린 루프 (1일 2회): 초세 vs 과실 배분</text>
+      </g>
+    </g>
+
+    <!-- Arrow 3 -> 4 -->
+    <path d="M 1090 440 L 1120 440" fill="none" stroke="#4F7942" stroke-width="3" marker-end="url(#arr-green)" />
+
+    <!-- Stage 4: Gap Diagnosis Rules Engine (x=1120, width=340) -->
+    <g transform="translate(1120, 0)">
+      <rect x="0" y="0" width="340" height="880" rx="12" fill="#FFFFFF" stroke="#6D2E46" stroke-width="2.5" />
+      <rect x="15" y="15" width="310" height="42" rx="8" fill="#6D2E46" />
+      <text x="170" y="42" fill="#FFFFFF" font-size="16" font-weight="900" text-anchor="middle">4단계: 편차 진단 규칙엔진</text>
+
+      <g transform="translate(15, 75)">
+        <rect x="0" y="0" width="280" height="175" rx="8" fill="#F6E9EC" stroke="#6D2E46" />
+        <text x="15" y="28" fill="#6D2E46" font-size="14" font-weight="bold">목표 밴드 편차 진단 규칙 (13종)</text>
+        <text x="15" y="52" class="body-txt">ㆍ 동일 입력에 항상 동일 출력 (결정론)</text>
+        <text x="15" y="74" class="body-txt">ㆍ 주/야간 ADT, DIF, VPD, EC 편차 계산</text>
+        <text x="15" y="96" class="body-txt">ㆍ 제어 우선순위 및 영향도 산정</text>
+        <text x="15" y="122" fill="#6D2E46" font-size="12" font-weight="bold">➔ 3계층 제어 명령 생성</text>
+      </g>
+
+      <g transform="translate(15, 265)">
+        <rect x="0" y="0" width="280" height="600" rx="8" fill="#FDF2F2" stroke="#B04A4A" />
+        <text x="15" y="28" fill="#B04A4A" font-size="14" font-weight="bold">⚠️ 병해 예방 위험 진단 규칙</text>
+        <text x="15" y="55" fill="#B04A4A" font-size="12" font-weight="bold">ㆍ 저온다습 (습도≥94% 4h 지속):</text>
+        <text x="25" y="78" class="body-txt">  잿빛곰팡이 선행 위험 감지</text>
+        <text x="25" y="100" class="body-txt">  ➔ 유동팬/FCU 결로 차단</text>
+        <text x="25" y="122" class="body-txt">  ➔ 익주 방제 슬롯 사전 예약</text>
+        <text x="15" y="155" fill="#ED7D31" font-size="12" font-weight="bold">ㆍ 고광저습 (일사↑ 습도↓):</text>
+        <text x="25" y="178" class="body-txt">  총채벌레/응애 위험 ➔ 포그 제어</text>
+      </g>
+    </g>
+
+    <!-- Arrow 4 -> 5 -->
+    <path d="M 1460 440 L 1490 440" fill="none" stroke="#6D2E46" stroke-width="3" marker-end="url(#arr-burgundy)" />
+
+    <!-- Stage 5: 3-Layer Control & Verify (x=1490, width=330) -->
+    <g transform="translate(1490, 0)">
+      <rect x="0" y="0" width="330" height="880" rx="12" fill="#FFFFFF" stroke="#6D2E46" stroke-width="2.5" />
+      <rect x="15" y="15" width="300" height="42" rx="8" fill="#6D2E46" />
+      <text x="165" y="42" fill="#FFFFFF" font-size="16" font-weight="900" text-anchor="middle">5단계: 3계층 자율제어 &amp; 검증</text>
+
+      <g transform="translate(15, 75)">
+        <rect x="0" y="0" width="270" height="235" rx="8" fill="#F6E9EC" stroke="#6D2E46" />
+        <text x="15" y="28" fill="#6D2E46" font-size="14" font-weight="bold">3계층 자율제어 체계 실행</text>
+        <text x="15" y="55" fill="#6D2E46" font-size="12" font-weight="bold">ㆍ Layer 3: AI 목표 정하기 (일 단위)</text>
+        <text x="25" y="76" class="body-txt">  초세/시세 보고 목표 밴드 생성</text>
+        <text x="15" y="102" fill="#6D2E46" font-size="12" font-weight="bold">ㆍ Layer 2: 규칙 밴드 맞추기 (분 단위)</text>
+        <text x="25" y="124" class="body-txt">  천창/팬/커튼/양액기 복귀 제어</text>
+        <text x="15" y="150" fill="#B04A4A" font-size="12" font-weight="bold">ㆍ Layer 1: 선 지키기 (상시 고정)</text>
+        <text x="25" y="172" fill="#B04A4A" font-size="11" font-weight="bold">  7℃ 미만 난방 / 33℃ 초과 천창 개방</text>
+        <text x="25" y="192" fill="#B04A4A" font-size="11" font-weight="bold">  (감점 기준 5/35℃보다 2℃ 선제 대응)</text>
+      </g>
+
+      <g transform="translate(15, 325)">
+        <rect x="0" y="0" width="270" height="150" rx="8" fill="#FFFFFF" stroke="#4F7942" stroke-width="1.5" />
+        <text x="15" y="28" fill="#4F7942" font-size="13" font-weight="bold">OPID Write-Verify 이중 검증</text>
+        <text x="15" y="52" class="body-txt">ㆍ 0x10 Write ➔ Reg 20x Read</text>
+        <text x="15" y="74" fill="#4F7942" font-size="12" font-weight="bold">ㆍ 1차: OPID 일치 논리 확인</text>
+        <text x="15" y="96" fill="#ED7D31" font-size="12" font-weight="bold">ㆍ 2차: 개도율/전류 상승 물리 검증</text>
+        <text x="15" y="122" class="code-tag">POST /target, POST /heartbeat</text>
+      </g>
+
+      <g transform="translate(15, 490)">
+        <rect x="0" y="0" width="270" height="375" rx="8" fill="#FDF2F2" stroke="#B04A4A" />
+        <text x="15" y="28" fill="#B04A4A" font-size="13" font-weight="bold">⚠️ 비상 대응 (통신단절/고장)</text>
+        <text x="15" y="55" fill="#B04A4A" font-size="11" font-weight="bold">ㆍ 통신 단절 시: 목표값 유지 +</text>
+        <text x="25" y="75" fill="#B04A4A" font-size="11" font-weight="bold">  Layer 1 가드레일 단독 가동</text>
+        <text x="15" y="102" class="body-txt">ㆍ 설비 고장 시: 재배 판단 중단,</text>
+        <text x="25" y="122" class="body-txt">  시설 정상화 최우선 승격</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Bottom Closed Loop Line -->
+  <path d="M 1625 995 L 1625 1015 L 170 1015 L 170 995" fill="none" stroke="#4F7942" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#arr-green)" />
+  <text x="900" y="1010" text-anchor="middle" fill="#4F7942" font-size="12" font-weight="bold">↺ 실행 결과가 다시 센서로 관측되어 다음 진단의 입력이 되는 5분 주기 무인 폐루프 (Closed Loop Feedback)</text>
+
+  <!-- PPT Style Footer -->
+  <line x1="50" y1="1025" x2="1870" y2="1025" stroke="#E3D8DC" stroke-width="1.5" />
+  <text x="50" y="1052" fill="#6E6167" font-size="13" font-weight="500">베리디시전 (BerryDecision) · 스마트농업 AI 경진대회 본선 운영 체계</text>
+  <text x="1870" y="1052" text-anchor="end" fill="#6E6167" font-size="13" font-weight="500">페이지 1 / 1</text>
+</svg>

@@ -1,0 +1,339 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" style="background-color: #FAF6F0; font-family: 'Malgun Gothic', 'Noto Sans KR', sans-serif;">
+  <defs>
+    <style>
+      .t-title { font-size: 26px; font-weight: 900; fill: #FFFFFF; }
+      .t-sub { font-size: 15px; font-weight: 500; fill: #F6E9EC; }
+      .t-badge { font-size: 16px; font-weight: 800; fill: #6D2E46; }
+      .card-title { font-size: 17px; font-weight: 800; fill: #6D2E46; }
+      .card-sub { font-size: 13px; font-weight: 600; fill: #5A4A50; }
+      .body-txt { font-size: 13px; font-weight: 500; fill: #2B2B2B; }
+      .body-bold { font-size: 13px; font-weight: 700; fill: #2B2B2B; }
+      .code-tag { font-family: 'Consolas', monospace; font-size: 12px; fill: #6D2E46; font-weight: bold; }
+      .math-txt { font-family: 'Cambria Math', 'Times New Roman', serif; font-size: 15px; font-weight: bold; fill: #6D2E46; }
+    </style>
+
+    <!-- Clean Arrow Markers -->
+    <marker id="arr-burgundy" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6D2E46" />
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0563C1" />
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4F7942" />
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ED7D31" />
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#B04A4A" />
+    </marker>
+  </defs>
+
+  <!-- PPT Header Banner (Soft Burgundy #6D2E46) -->
+  <rect x="0" y="0" width="1920" height="96" fill="#6D2E46" />
+  <rect x="50" y="24" width="100" height="34" rx="6" fill="#FAF6F0" />
+  <text x="100" y="47" text-anchor="middle" class="t-badge">C-00</text>
+  <text x="170" y="46" class="t-title">경영적 의사결정을 위한 목적함수 J 최적화 &amp; 작기별 수행안</text>
+  <text x="170" y="74" class="t-sub">목적함수 J 최대화 (수익 - 전기/물/비료/인건비) 및 7개 생육단계별 경영 의사결정 레인</text>
+
+  <!-- PPT Style Legend -->
+  <g transform="translate(1360, 16)">
+    <rect x="0" y="0" width="510" height="66" rx="8" fill="#4A3A40" opacity="0.95" />
+    <line x1="20" y1="20" x2="50" y2="20" stroke="#0563C1" stroke-width="2.5" marker-end="url(#arr-blue)" />
+    <text x="58" y="24" fill="#FFFFFF" font-size="12">데이터 수집</text>
+
+    <line x1="145" y1="20" x2="175" y2="20" stroke="#6D2E46" stroke-width="2.5" marker-end="url(#arr-burgundy)" />
+    <text x="183" y="24" fill="#FFFFFF" font-size="12">제어 명령</text>
+
+    <line x1="265" y1="20" x2="295" y2="20" stroke="#4F7942" stroke-width="2.5" marker-end="url(#arr-green)" />
+    <text x="303" y="24" fill="#FFFFFF" font-size="12">상태 검증</text>
+
+    <line x1="385" y1="20" x2="415" y2="20" stroke="#ED7D31" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arr-amber)" />
+    <text x="423" y="24" fill="#FFFFFF" font-size="12">물리 반응</text>
+
+    <text x="20" y="52" fill="#F6E9EC" font-size="11">베리디시전 2026 본선 운영 시스템</text>
+  </g>
+
+  <g transform="translate(50, 110)">
+    <!-- Top Objective Function & Constraints Banner -->
+    <rect x="0" y="0" width="1820" height="100" rx="12" fill="#FFFFFF" stroke="#6D2E46" stroke-width="2.5" />
+    <rect x="15" y="12" width="220" height="30" rx="6" fill="#6D2E46" />
+    <text x="125" y="32" fill="#FFFFFF" font-size="14" font-weight="bold" text-anchor="middle">🎯 경영적 최적화 목표</text>
+    
+    <text x="255" y="33" class="math-txt" font-size="16.5">최대화 J = Σ (주차별 시세 × 상품과 중량) − [ 전기 + 물 + 비료 + 농약 + CO₂ + 인건비 + (장비비 ÷ 5년) ]</text>
+    
+    <g transform="translate(15, 52)">
+      <rect x="0" y="0" width="1790" height="36" rx="6" fill="#F6E9EC" stroke="#6D2E46" stroke-width="1" />
+      <text x="15" y="23" fill="#6D2E46" font-size="12.5" font-weight="bold">제약 조건:</text>
+      <text x="100" y="23" fill="#B04A4A" font-size="12.5" font-weight="bold">① 온실 내부온도 ∈ [5℃, 35℃] 준수</text>
+      <text x="440" y="23" fill="#0563C1" font-size="12.5" font-weight="bold">② AI 모델 업데이트 ≤ 6회 승인 배포</text>
+      <text x="760" y="23" fill="#4F7942" font-size="12.5" font-weight="bold">③ 주간 농작업 신청 ≤ 3건 (목요일 정오)</text>
+      <text x="1130" y="23" fill="#ED7D31" font-size="12.5" font-weight="bold">④ RMSE (온도≤0.5℃, 습도≤5%, CO2≤100ppm, VPD 체류율≥80%)</text>
+    </g>
+
+    <!-- Aligned Management Strategy Cards (x=212, width=1608 grid) -->
+    <!-- Card 1: x=212 to 723 (width=511) -> Aligned with Col 1 & 2 -->
+    <!-- Card 2: x=733 to 1416 (width=683) -> Aligned with Col 3, 4 & 5 -->
+    <!-- Card 3: x=1426 to 1820 (width=394) -> Aligned with Col 6 & 7 -->
+    <g transform="translate(0, 112)">
+      <rect x="0" y="0" width="200" height="78" rx="8" fill="#6D2E46" />
+      <text x="100" y="34" fill="#FFFFFF" font-size="14" font-weight="900" text-anchor="middle">💡 경영적 3대 전략</text>
+      <text x="100" y="56" fill="#F6E9EC" font-size="11.5" text-anchor="middle">(수익 / 전력 / 인건비)</text>
+
+      <!-- Card 1: Revenue -->
+      <g transform="translate(212, 0)">
+        <rect x="0" y="0" width="511" height="78" rx="8" fill="#FFFFFF" stroke="#0563C1" stroke-width="2" />
+        <text x="15" y="26" fill="#0563C1" font-size="14" font-weight="bold">💰 1. 매출 극대화 (Revenue)</text>
+        <text x="15" y="48" class="body-txt">주차별 딸기 시세 연동 동화산물 과실 집중 배분, 당도·경도 및 적기 수확</text>
+        <text x="15" y="66" fill="#0563C1" font-size="11" font-weight="bold">➔ 정식기~영양생장기 초세 기반 확립 후 과실 비대 전환</text>
+      </g>
+
+      <!-- Card 2: Power -->
+      <g transform="translate(733, 0)">
+        <rect x="0" y="0" width="683" height="78" rx="8" fill="#FFFFFF" stroke="#6D2E46" stroke-width="2" />
+        <text x="15" y="26" fill="#6D2E46" font-size="14" font-weight="bold">⚡ 2. 전력/동력비 절감 (Power Cost Management)</text>
+        <text x="15" y="48" class="body-txt">야간 보온 커튼(258.4W) 우선 Closed ➔ 지중 축열 활용 ➔ FCU(2.57kW) 저비용 순 차등 소진</text>
+        <text x="15" y="66" fill="#6D2E46" font-size="11" font-weight="bold">➔ 출뢰기~비대기 주야간 ADT / DIF 밴드 최적 유지</text>
+      </g>
+
+      <!-- Card 3: Labor -->
+      <g transform="translate(1426, 0)">
+        <rect x="0" y="0" width="394" height="78" rx="8" fill="#FFFFFF" stroke="#ED7D31" stroke-width="2" />
+        <text x="15" y="26" fill="#ED7D31" font-size="14" font-weight="bold">👷 3. 인건비/작업지시 절감 (Labor)</text>
+        <text x="15" y="48" class="body-txt">목요일 정오 3슬롯 신청, 기여도 순 배정</text>
+        <text x="15" y="66" fill="#ED7D31" font-size="11" font-weight="bold">➔ 적화/적과 ➔ 방제 ➔ 적엽 ➔ 수확</text>
+      </g>
+    </g>
+
+    <!-- PERFECT 7-COLUMN GRID HEADERS (x=212 to 1820) -->
+    <!-- Column Width: 220px, Gap: 11px -->
+    <!-- Col 1: 212, Col 2: 443, Col 3: 674, Col 4: 905, Col 5: 1136, Col 6: 1367, Col 7: 1598 (width=222) -->
+    <g transform="translate(0, 202)">
+      <rect x="0" y="0" width="200" height="42" rx="6" fill="#4A3A40" />
+      <text x="100" y="26" fill="#FFFFFF" font-size="14" font-weight="900" text-anchor="middle">작기 생육 단계</text>
+
+      <g transform="translate(212, 0)">
+        <rect x="0" y="0" width="220" height="42" rx="6" fill="#6D2E46" />
+        <text x="110" y="26" fill="#FFF" font-size="13.5" font-weight="bold" text-anchor="middle">1. 정식기</text>
+      </g>
+
+      <g transform="translate(443, 0)">
+        <rect x="0" y="0" width="220" height="42" rx="6" fill="#6D2E46" />
+        <text x="110" y="26" fill="#FFF" font-size="13.5" font-weight="bold" text-anchor="middle">2. 활착·영양생장기</text>
+      </g>
+
+      <g transform="translate(674, 0)">
+        <rect x="0" y="0" width="220" height="42" rx="6" fill="#6D2E46" />
+        <text x="110" y="26" fill="#FFF" font-size="13.5" font-weight="bold" text-anchor="middle">3. 출뢰기</text>
+      </g>
+
+      <g transform="translate(905, 0)">
+        <rect x="0" y="0" width="220" height="42" rx="6" fill="#B04A4A" />
+        <text x="110" y="26" fill="#FFF" font-size="13.5" font-weight="bold" text-anchor="middle">4. 개화기</text>
+      </g>
+
+      <g transform="translate(1136, 0)">
+        <rect x="0" y="0" width="220" height="42" rx="6" fill="#B04A4A" />
+        <text x="110" y="26" fill="#FFF" font-size="13.5" font-weight="bold" text-anchor="middle">5. 착과기</text>
+      </g>
+
+      <g transform="translate(1367, 0)">
+        <rect x="0" y="0" width="220" height="42" rx="6" fill="#B04A4A" />
+        <text x="110" y="26" fill="#FFF" font-size="13.5" font-weight="bold" text-anchor="middle">6. 비대기</text>
+      </g>
+
+      <g transform="translate(1598, 0)">
+        <rect x="0" y="0" width="222" height="42" rx="6" fill="#991B1B" />
+        <text x="111" y="26" fill="#FFF" font-size="13.5" font-weight="bold" text-anchor="middle">7. 수확기 (연속)</text>
+      </g>
+    </g>
+
+    <!-- 4 PERFECTLY ALIGNED SWIMLANES (y=254) -->
+    
+    <!-- Lane 1: 생육 진단 (Slow Loop 1일 2회) -->
+    <g transform="translate(0, 254)">
+      <rect x="0" y="0" width="200" height="155" rx="8" fill="#FFFFFF" stroke="#0563C1" stroke-width="2" />
+      <text x="100" y="48" fill="#0563C1" font-size="15" font-weight="900" text-anchor="middle">1. 생육 진단 레인</text>
+      <text x="100" y="72" class="card-sub" text-anchor="middle">(Slow Loop 1일 2회)</text>
+      <text x="100" y="94" fill="#0563C1" font-size="11" font-weight="bold" text-anchor="middle">엽각·초세·근권 추세</text>
+      <text x="100" y="116" fill="#5A4A50" font-size="10.5" text-anchor="middle">8MP 스테레오 RGB</text>
+
+      <rect x="206" y="0" width="1618" height="155" rx="8" fill="#F6E9EC" stroke="#E3D8DC" />
+
+      <!-- 7 Aligned Cards inside Swimlane 1 -->
+      <g transform="translate(212, 12)">
+        <g transform="translate(0, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#0563C1" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ 활착 관찰 / 결주 보식</text>
+        </g>
+        <g transform="translate(231, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#0563C1" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ 신엽 전개 / LAI 2.3</text>
+        </g>
+        <g transform="translate(462, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#0563C1" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ 화경 거동 / LAI 2.5</text>
+        </g>
+        <g transform="translate(693, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#B04A4A" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ 개화율 / 엽각 진단</text>
+        </g>
+        <g transform="translate(924, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#B04A4A" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ 착과부담 / 초세 추세</text>
+        </g>
+        <g transform="translate(1155, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#B04A4A" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ 과실 비대 / 기형과</text>
+        </g>
+        <g transform="translate(1386, 0)">
+          <rect x="0" y="0" width="222" height="48" rx="4" fill="#FFFFFF" stroke="#991B1B" />
+          <text x="111" y="28" text-anchor="middle" class="body-bold">ㆍ 당도 · 경도 · PHI 점검</text>
+        </g>
+      </g>
+      <line x1="216" y1="74" x2="1814" y2="74" stroke="#E3D8DC" />
+      <text x="220" y="112" fill="#0563C1" font-size="12.5" font-weight="bold">진단 수단: 8MP 스테레오 1일 2회 ➔ 엽각·화경 거동 및 배지 EC 대리지표 추적으로 영양/생식 배분 판정</text>
+    </g>
+
+    <!-- Lane 2: 농작업 지시 (주 3슬롯 작업신청) -->
+    <g transform="translate(0, 420)">
+      <rect x="0" y="0" width="200" height="155" rx="8" fill="#FFFFFF" stroke="#4F7942" stroke-width="2" />
+      <text x="100" y="48" fill="#4F7942" font-size="15" font-weight="900" text-anchor="middle">2. 농작업 지시 레인</text>
+      <text x="100" y="72" class="card-sub" text-anchor="middle">(주 3건 작업 신청)</text>
+      <text x="100" y="94" fill="#4F7942" font-size="11" font-weight="bold" text-anchor="middle">인건비 최적화 배정</text>
+      <text x="100" y="116" fill="#5A4A50" font-size="10.5" text-anchor="middle">목요일 정오 예약</text>
+
+      <rect x="206" y="0" width="1618" height="155" rx="8" fill="#E4EFE9" stroke="#A5D6A7" />
+
+      <!-- 7 Aligned Cards inside Swimlane 2 -->
+      <g transform="translate(212, 12)">
+        <g transform="translate(0, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#4F7942" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ 결주보식 / 예방방제</text>
+        </g>
+        <g transform="translate(231, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#4F7942" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ 액아·측아제거/LAI 2.3</text>
+        </g>
+        <g transform="translate(462, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#4F7942" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ 수정벌 투입 준비</text>
+        </g>
+        <g transform="translate(693, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#4F7942" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ 수정벌 투입/약한꽃적화</text>
+        </g>
+        <g transform="translate(924, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#4F7942" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ 적극적 적화/런너제거</text>
+        </g>
+        <g transform="translate(1155, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#4F7942" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ 추가적과/소과제거</text>
+        </g>
+        <g transform="translate(1386, 0)">
+          <rect x="0" y="0" width="222" height="48" rx="4" fill="#FFFFFF" stroke="#4F7942" />
+          <text x="111" y="28" text-anchor="middle" class="body-bold">ㆍ 수확 / 긴급 방제</text>
+        </g>
+      </g>
+      <line x1="216" y1="74" x2="1814" y2="74" stroke="#A5D6A7" />
+      <text x="220" y="112" fill="#4F7942" font-size="12.5" font-weight="bold">작업지시 수칙: 목요일 정오 3슬롯 예약, 기여도 순(적화/적과 ➔ 방제 ➔ 적엽 ➔ 수확) 순 우선 배정하여 인건비 최소화</text>
+    </g>
+
+    <!-- Lane 3: 목표 밴드 (Fast Loop 분 단위) -->
+    <g transform="translate(0, 586)">
+      <rect x="0" y="0" width="200" height="155" rx="8" fill="#FFFFFF" stroke="#6D2E46" stroke-width="2" />
+      <text x="100" y="48" fill="#6D2E46" font-size="15" font-weight="900" text-anchor="middle">3. 목표 밴드 레인</text>
+      <text x="100" y="72" class="card-sub" text-anchor="middle">(Fast Loop 분 단위)</text>
+      <text x="100" y="94" fill="#6D2E46" font-size="11" font-weight="bold" text-anchor="middle">ADT · VPD · EC 추종</text>
+      <text x="100" y="116" fill="#5A4A50" font-size="10.5" text-anchor="middle">RMSE 0.5 이내</text>
+
+      <rect x="206" y="0" width="1618" height="155" rx="8" fill="#F6E9EC" stroke="#E3D8DC" />
+
+      <!-- 7 Aligned Cards inside Swimlane 3 -->
+      <g transform="translate(212, 12)">
+        <g transform="translate(0, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#6D2E46" />
+          <text x="110" y="28" text-anchor="middle" class="code-tag">ADT 21~22 / EC 0.8</text>
+        </g>
+        <g transform="translate(231, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#6D2E46" />
+          <text x="110" y="28" text-anchor="middle" class="code-tag">ADT 18~20 / EC 1.0~1.2</text>
+        </g>
+        <g transform="translate(462, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#6D2E46" />
+          <text x="110" y="28" text-anchor="middle" class="code-tag">ADT 16~18 / EC 1.2</text>
+        </g>
+        <g transform="translate(693, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#6D2E46" />
+          <text x="110" y="28" text-anchor="middle" class="code-tag">ADT 14~15 / EC 1.2~1.3</text>
+        </g>
+        <g transform="translate(924, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#6D2E46" />
+          <text x="110" y="28" text-anchor="middle" class="code-tag">ADT 14~15.5 / EC 1.3~1.5</text>
+        </g>
+        <g transform="translate(1155, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#6D2E46" />
+          <text x="110" y="28" text-anchor="middle" class="code-tag">ADT 14~15 / EC 1.3~1.5</text>
+        </g>
+        <g transform="translate(1386, 0)">
+          <rect x="0" y="0" width="222" height="48" rx="4" fill="#FFFFFF" stroke="#6D2E46" />
+          <text x="111" y="28" text-anchor="middle" class="code-tag">ADT 13.5~15 / 야간저온</text>
+        </g>
+      </g>
+      <line x1="216" y1="74" x2="1814" y2="74" stroke="#E3D8DC" />
+      <text x="220" y="112" fill="#6D2E46" font-size="12.5" font-weight="bold">정량 기술목표: 온습도/CO2 추종 RMSE 0.5 이내, 주간 VPD 밴드(0.6~1.2 kPa) 체류율 80% 이상 달성</text>
+    </g>
+
+    <!-- Lane 4: 모델 운용 & 비용 모니터링 (업데이트 ≤ 6회) -->
+    <g transform="translate(0, 752)">
+      <rect x="0" y="0" width="200" height="155" rx="8" fill="#FFFFFF" stroke="#ED7D31" stroke-width="2" />
+      <text x="100" y="48" fill="#ED7D31" font-size="15" font-weight="900" text-anchor="middle">4. 모델/비용 레인</text>
+      <text x="100" y="72" class="card-sub" text-anchor="middle">(업데이트 ≤ 6회)</text>
+      <text x="100" y="94" fill="#ED7D31" font-size="11" font-weight="bold" text-anchor="middle">자원 / 전력량 관리</text>
+      <text x="100" y="116" fill="#5A4A50" font-size="10.5" text-anchor="middle">FCU 전력 최소화</text>
+
+      <rect x="206" y="0" width="1618" height="155" rx="8" fill="#FFF5EB" stroke="#ED7D31" />
+
+      <!-- 7 Aligned Cards inside Swimlane 4 -->
+      <g transform="translate(212, 12)">
+        <g transform="translate(0, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#ED7D31" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ 초기 모델 v1.0 동결</text>
+        </g>
+        <g transform="translate(231, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#ED7D31" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ [Upd #1,#2] 개시 직후</text>
+        </g>
+        <g transform="translate(462, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#ED7D31" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ 데이터 축적 및 보정</text>
+        </g>
+        <g transform="translate(693, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#ED7D31" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ [Upd #3] 개화기 전환</text>
+        </g>
+        <g transform="translate(924, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#ED7D31" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ [Upd #4] 착과기 전환</text>
+        </g>
+        <g transform="translate(1155, 0)">
+          <rect x="0" y="0" width="220" height="48" rx="4" fill="#FFFFFF" stroke="#ED7D31" />
+          <text x="110" y="28" text-anchor="middle" class="body-bold">ㆍ [Upd #5] 비대기 전환</text>
+        </g>
+        <g transform="translate(1386, 0)">
+          <rect x="0" y="0" width="222" height="48" rx="4" fill="#FFFFFF" stroke="#ED7D31" />
+          <text x="111" y="28" text-anchor="middle" class="body-bold">ㆍ [Upd #6] 예비 / 롤백 관리</text>
+        </g>
+      </g>
+      <line x1="216" y1="74" x2="1814" y2="74" stroke="#ED7D31" />
+      <text x="220" y="112" fill="#ED7D31" font-size="12.5" font-weight="bold">비용 절감 수칙: FCU(2.57kW) 전력 최소화 ➔ 보온커튼 우선 closed, 양액/관수/CO2 과다투입 방지로 생산원가 최소화</text>
+    </g>
+  </g>
+
+  <!-- PPT Style Footer -->
+  <line x1="50" y1="1025" x2="1870" y2="1025" stroke="#E3D8DC" stroke-width="1.5" />
+  <text x="50" y="1052" fill="#6E6167" font-size="13" font-weight="500">베리디시전 (BerryDecision) · 스마트농업 AI 경진대회 본선 운영 체계</text>
+  <text x="1870" y="1052" text-anchor="end" fill="#6E6167" font-size="13" font-weight="500">페이지 1 / 1</text>
+</svg>

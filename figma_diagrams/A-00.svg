@@ -1,0 +1,302 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" style="background-color: #FAF6F0; font-family: 'Malgun Gothic', 'Noto Sans KR', sans-serif;">
+  <defs>
+    <style>
+      .t-title { font-size: 26px; font-weight: 900; fill: #FFFFFF; }
+      .t-sub { font-size: 15px; font-weight: 500; fill: #F6E9EC; }
+      .t-badge { font-size: 16px; font-weight: 800; fill: #6D2E46; }
+      .card-title { font-size: 17px; font-weight: 800; fill: #6D2E46; }
+      .card-sub { font-size: 13px; font-weight: 600; fill: #5A4A50; }
+      .body-txt { font-size: 13px; font-weight: 500; fill: #2B2B2B; }
+      .body-bold { font-size: 13px; font-weight: 700; fill: #2B2B2B; }
+      .code-tag { font-family: 'Consolas', monospace; font-size: 12px; fill: #6D2E46; font-weight: bold; }
+      .math-txt { font-family: 'Cambria Math', 'Times New Roman', serif; font-size: 15px; font-weight: bold; fill: #6D2E46; }
+    </style>
+
+    <!-- Clean Arrow Markers -->
+    <marker id="arr-burgundy" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6D2E46" />
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0563C1" />
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4F7942" />
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ED7D31" />
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#B04A4A" />
+    </marker>
+  </defs>
+
+  <!-- PPT Header Banner (Soft Burgundy #6D2E46) -->
+  <rect x="0" y="0" width="1920" height="96" fill="#6D2E46" />
+  <rect x="50" y="24" width="100" height="34" rx="6" fill="#FAF6F0" />
+  <text x="100" y="47" text-anchor="middle" class="t-badge">A-00</text>
+  <text x="170" y="46" class="t-title">온실 전체 공간 배치 및 센서·구동기 구역 청사진</text>
+  <text x="170" y="74" class="t-sub">관리동 로컬 AI 서버, 통합제어기 Gateway, 외부 기상대 및 온실 B동 구역 배치도</text>
+
+  <!-- PPT Style Legend -->
+  <g transform="translate(1360, 16)">
+    <rect x="0" y="0" width="510" height="66" rx="8" fill="#4A3A40" opacity="0.95" />
+    <line x1="20" y1="20" x2="50" y2="20" stroke="#0563C1" stroke-width="2.5" marker-end="url(#arr-blue)" />
+    <text x="58" y="24" fill="#FFFFFF" font-size="12">데이터 수집</text>
+
+    <line x1="145" y1="20" x2="175" y2="20" stroke="#6D2E46" stroke-width="2.5" marker-end="url(#arr-burgundy)" />
+    <text x="183" y="24" fill="#FFFFFF" font-size="12">제어 명령</text>
+
+    <line x1="265" y1="20" x2="295" y2="20" stroke="#4F7942" stroke-width="2.5" marker-end="url(#arr-green)" />
+    <text x="303" y="24" fill="#FFFFFF" font-size="12">상태 검증</text>
+
+    <line x1="385" y1="20" x2="415" y2="20" stroke="#ED7D31" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arr-amber)" />
+    <text x="423" y="24" fill="#FFFFFF" font-size="12">물리 반응</text>
+
+    <text x="20" y="52" fill="#F6E9EC" font-size="11">베리디시전 2026 본선 운영 시스템</text>
+  </g>
+
+  <g transform="translate(50, 115)">
+    <!-- Admin Building (Left Column: x=0, width=410) -->
+    <g transform="translate(0, 0)">
+      <rect x="0" y="0" width="410" height="880" rx="14" fill="#FFFFFF" stroke="#6D2E46" stroke-width="2" />
+      <rect x="15" y="15" width="380" height="42" rx="8" fill="#6D2E46" />
+      <text x="205" y="42" fill="#FFFFFF" font-size="18" font-weight="900" text-anchor="middle">관리동 (Control Center)</text>
+
+      <!-- Local AI Server Card (y=70) -->
+      <g transform="translate(15, 70)">
+        <rect x="0" y="0" width="380" height="380" rx="10" fill="#F6E9EC" stroke="#6D2E46" stroke-width="2" />
+        <text x="20" y="35" class="card-title">로컬 AI 서버 (Local AI Edge Server)</text>
+        <text x="20" y="58" class="card-sub">상시 폐쇄망 온프레미스 운용 (외부 LLM/인터넷 없음)</text>
+        <line x1="20" y1="72" x2="360" y2="72" stroke="#E3D8DC" />
+
+        <g transform="translate(15, 85)">
+          <rect x="0" y="0" width="350" height="70" rx="6" fill="#FFFFFF" stroke="#6D2E46" stroke-width="1.2" />
+          <text x="15" y="28" fill="#6D2E46" font-size="13" font-weight="bold">💻 CPU / NVMe 시계열 저장소 (TSDB)</text>
+          <text x="15" y="50" class="body-txt">ㆍ Modbus/REST 5분 주기 수집, 결측치 보정, TSDB 저장</text>
+        </g>
+
+        <g transform="translate(15, 170)">
+          <rect x="0" y="0" width="350" height="85" rx="6" fill="#FFFFFF" stroke="#4F7942" stroke-width="1.5" />
+          <text x="15" y="28" fill="#4F7942" font-size="13" font-weight="bold">🧠 GPU Engine (추론 &amp; 목적함수 최적화)</text>
+          <text x="15" y="50" class="body-txt">ㆍ ODE + LightGBM 근권 예측, CQR 불확실성 산출</text>
+          <text x="15" y="70" fill="#4F7942" font-size="12" font-weight="bold">ㆍ 목적함수 J 최적 제어 &amp; 13종 편차 진단 규칙엔진</text>
+        </g>
+
+        <g transform="translate(15, 270)">
+          <rect x="0" y="0" width="350" height="95" rx="6" fill="#FFFFFF" stroke="#B04A4A" stroke-width="1.5" />
+          <text x="15" y="28" fill="#B04A4A" font-size="13" font-weight="bold">🛡️ 3계층 자율제어 안전 가드레일 (Layer 1~3)</text>
+          <text x="15" y="50" fill="#B04A4A" font-size="12" font-weight="bold">ㆍ Layer 1 (선 지키기): 7℃/33℃ 독립 선제 차단</text>
+          <text x="15" y="70" class="body-txt">ㆍ Layer 2 목표 맞추기 / Layer 3 AI 목표 생성</text>
+        </g>
+      </g>
+
+      <!-- Integrated Controller Gateway (y=470) -->
+      <g transform="translate(15, 470)">
+        <rect x="0" y="0" width="380" height="395" rx="10" fill="#E4EFE9" stroke="#4F7942" stroke-width="2.5" />
+        <text x="20" y="35" fill="#4F7942" font-size="17" font-weight="900">통합제어기 (Unit 1 Gateway)</text>
+        <text x="20" y="58" class="card-sub">Modbus TCP Master (Port 502) / RS-485 통신</text>
+        <line x1="20" y1="72" x2="360" y2="72" stroke="#A5D6A7" />
+
+        <g transform="translate(15, 85)">
+          <rect x="0" y="0" width="350" height="290" rx="6" fill="#FFFFFF" stroke="#4F7942" />
+          <rect x="0" y="0" width="350" height="32" rx="6" fill="#4F7942" />
+          <text x="15" y="22" fill="#FFFFFF" font-size="13" font-weight="bold">Reg 101~276 노드 정보 영역 (Modbus Map)</text>
+
+          <text x="15" y="58" class="body-txt">ㆍ Unit 2 (외기상대) RTU ➔ Modbus TCP 중계</text>
+          <text x="15" y="90" class="body-txt">ㆍ Unit 3 (내부/근권 센서) 5분 주기 데이터 수집</text>
+          <text x="15" y="122" class="body-txt">ㆍ Unit 4 (환경 구동기) 천창/FCU/CO2/유동팬 제어</text>
+          <text x="15" y="154" class="body-txt">ㆍ Unit 5 (양액기) 관수시간/EC/pH 설정 명령</text>
+          <line x1="15" y1="175" x2="335" y2="175" stroke="#E3D8DC" />
+          <text x="15" y="202" fill="#6D2E46" font-size="12" font-weight="bold">ㆍ 0x10 Write (Reg 50x) ➔ 0x03 Read (Reg 20x)</text>
+          <text x="15" y="230" fill="#4F7942" font-size="12" font-weight="bold">ㆍ OPID Write-Verify 1차 논리 확인</text>
+          <text x="15" y="258" fill="#ED7D31" font-size="12" font-weight="bold">ㆍ 2차 개도율/전력 물리 반응 추적 감시</text>
+        </g>
+      </g>
+    </g>
+
+    <!-- Weather Station Unit 2 (Center Channel: x=440, width=400) -->
+    <g transform="translate(440, 0)">
+      <rect x="0" y="0" width="400" height="210" rx="10" fill="#FFFFFF" stroke="#0563C1" stroke-width="2" />
+      <text x="20" y="35" fill="#0563C1" font-size="17" font-weight="900">외부 기상대 (Unit 2)</text>
+      <text x="20" y="58" class="card-sub">Modbus RTU Node (unit_id = 2)</text>
+      <line x1="20" y1="72" x2="380" y2="72" stroke="#E3D8DC" />
+
+      <g transform="translate(20, 85)">
+        <rect x="0" y="0" width="170" height="46" rx="6" fill="#F6E9EC" stroke="#0563C1" />
+        <text x="85" y="28" text-anchor="middle" fill="#0563C1" font-size="12" font-weight="bold">🌡️ 외기 온·습도</text>
+      </g>
+      <g transform="translate(210, 85)">
+        <rect x="0" y="0" width="170" height="46" rx="6" fill="#F6E9EC" stroke="#0563C1" />
+        <text x="85" y="28" text-anchor="middle" fill="#0563C1" font-size="12" font-weight="bold">☀️ 일사량 (W/m²)</text>
+      </g>
+      <g transform="translate(20, 142)">
+        <rect x="0" y="0" width="360" height="46" rx="6" fill="#F6E9EC" stroke="#0563C1" />
+        <text x="180" y="28" text-anchor="middle" fill="#0563C1" font-size="12" font-weight="bold">💨 풍향 / 풍속 센서 (돌풍 사전 압력 감지)</text>
+      </g>
+    </g>
+
+    <!-- Greenhouse B-Dong Blueprint Plan (Right Side: x=880, width=940) -->
+    <g transform="translate(880, 0)">
+      <rect x="0" y="0" width="940" height="880" rx="14" fill="#FFFFFF" stroke="#6D2E46" stroke-width="2.5" />
+      <rect x="20" y="15" width="900" height="42" rx="8" fill="#6D2E46" />
+      <text x="470" y="42" fill="#FFFFFF" font-size="18" font-weight="900" text-anchor="middle">온실 B동 공간 배치 및 구역 (Zones 1 ~ 7)</text>
+
+      <!-- Unit 3 Internal Sensors Block (height expanded to 260 for clean multi-line camera block) -->
+      <g transform="translate(20, 68)">
+        <rect x="0" y="0" width="900" height="260" rx="10" fill="#F6E9EC" stroke="#6D2E46" stroke-width="2" />
+        <text x="20" y="32" fill="#6D2E46" font-size="16" font-weight="900">Unit 3 온실 내부 &amp; 근권 센서 구역 (Zones 1 ~ 7)</text>
+        <text x="20" y="54" class="card-sub">내부 온습도, CO2 ppm, 배지 온습도/EC 센서 (※ 온실 내 배액 센서 부재 ➔ 배지 EC를 근권 축적 대리지표로 활용)</text>
+
+        <!-- 7 Zone Sub-Cards -->
+        <g transform="translate(20, 68)">
+          <g transform="translate(0, 0)">
+            <rect x="0" y="0" width="112" height="60" rx="6" fill="#FFFFFF" stroke="#6D2E46" />
+            <text x="56" y="26" text-anchor="middle" class="body-bold">Zone 1</text>
+            <text x="56" y="45" text-anchor="middle" class="code-tag">Temp/EC</text>
+          </g>
+
+          <g transform="translate(124, 0)">
+            <rect x="0" y="0" width="112" height="60" rx="6" fill="#FFFFFF" stroke="#6D2E46" />
+            <text x="56" y="26" text-anchor="middle" class="body-bold">Zone 2</text>
+            <text x="56" y="45" text-anchor="middle" class="code-tag">Temp/EC</text>
+          </g>
+
+          <g transform="translate(248, 0)">
+            <rect x="0" y="0" width="112" height="60" rx="6" fill="#FFFFFF" stroke="#6D2E46" />
+            <text x="56" y="26" text-anchor="middle" class="body-bold">Zone 3</text>
+            <text x="56" y="45" text-anchor="middle" class="code-tag">Temp/EC</text>
+          </g>
+
+          <g transform="translate(372, 0)">
+            <rect x="0" y="0" width="112" height="60" rx="6" fill="#FFFFFF" stroke="#6D2E46" />
+            <text x="56" y="26" text-anchor="middle" class="body-bold">Zone 4</text>
+            <text x="56" y="45" text-anchor="middle" class="code-tag">Temp/EC</text>
+          </g>
+
+          <g transform="translate(496, 0)">
+            <rect x="0" y="0" width="112" height="60" rx="6" fill="#FFFFFF" stroke="#6D2E46" />
+            <text x="56" y="26" text-anchor="middle" class="body-bold">Zone 5</text>
+            <text x="56" y="45" text-anchor="middle" class="code-tag">Temp/EC</text>
+          </g>
+
+          <g transform="translate(620, 0)">
+            <rect x="0" y="0" width="112" height="60" rx="6" fill="#FFFFFF" stroke="#6D2E46" />
+            <text x="56" y="26" text-anchor="middle" class="body-bold">Zone 6</text>
+            <text x="56" y="45" text-anchor="middle" class="code-tag">Temp/EC</text>
+          </g>
+
+          <g transform="translate(744, 0)">
+            <rect x="0" y="0" width="116" height="60" rx="6" fill="#FFFFFF" stroke="#B04A4A" stroke-width="2" />
+            <text x="58" y="26" text-anchor="middle" fill="#B04A4A" font-size="12" font-weight="bold">Zone 7</text>
+            <text x="58" y="45" text-anchor="middle" fill="#B04A4A" font-size="10" font-weight="bold">Worst Zone</text>
+          </g>
+        </g>
+
+        <!-- Camera System Block with Separate Multi-Lines to PREVENT Hik-Connect OVERLAP -->
+        <g transform="translate(20, 140)">
+          <rect x="0" y="0" width="860" height="105" rx="6" fill="#FFFFFF" stroke="#A79AA0" />
+          <text x="20" y="28" class="body-bold">📷 카메라 관측 계통 (1일 2회 생육 이미지):</text>
+          <text x="20" y="54" class="body-txt">ㆍ 8MP 스테레오 비전 (엽각·초세·병반율 지표) ➔ 통합제어기 로컬 REST API (GET /image)</text>
+          <text x="20" y="80" fill="#ED7D31" font-size="12.5" font-weight="bold">ㆍ Hik-Connect CCTV ➔ 운영사무국 관할 / 외부 모바일 앱 직결 (AI 제어 계통과 독립 분리)</text>
+        </g>
+      </g>
+
+      <!-- Unit 4 Actuators Layout Block -->
+      <g transform="translate(20, 340)">
+        <rect x="0" y="0" width="900" height="295" rx="10" fill="#F6E9EC" stroke="#6D2E46" stroke-width="2" />
+        <text x="20" y="35" fill="#6D2E46" font-size="16" font-weight="900">Unit 4 제어 대상 환경 구동기</text>
+        <text x="20" y="58" class="card-sub">천창 개폐기(163W), FCU 난방(1,710W/858W), CO2 밸브, 포그, 유동팬 12대 3×4 격자(627W), 스크린/커튼(258.4W)</text>
+
+        <g transform="translate(20, 75)">
+          <g transform="translate(0, 0)">
+            <rect x="0" y="0" width="205" height="90" rx="6" fill="#FFFFFF" stroke="#6D2E46" />
+            <text x="15" y="28" fill="#6D2E46" font-size="13" font-weight="bold">🪟 좌/우 천창 (각 163W)</text>
+            <text x="15" y="50" class="body-txt">개도율 (0~100%) 제어</text>
+            <text x="15" y="72" class="code-tag">Reg 117, 118</text>
+          </g>
+
+          <g transform="translate(220, 0)">
+            <rect x="0" y="0" width="205" height="90" rx="6" fill="#FFFFFF" stroke="#6D2E46" />
+            <text x="15" y="28" fill="#6D2E46" font-size="13" font-weight="bold">❄️ FCU 냉난방</text>
+            <text x="15" y="50" class="body-txt">팬(1710W)+순환(858W)</text>
+            <text x="15" y="72" class="code-tag">Reg 101, 102</text>
+          </g>
+
+          <g transform="translate(440, 0)">
+            <rect x="0" y="0" width="205" height="90" rx="6" fill="#FFFFFF" stroke="#6D2E46" />
+            <text x="15" y="28" fill="#6D2E46" font-size="13" font-weight="bold">☁️ CO₂ &amp; 포그</text>
+            <text x="15" y="50" class="body-txt">밸브 시간제어 (700ppm)</text>
+            <text x="15" y="72" class="code-tag">Reg 103, 105</text>
+          </g>
+
+          <g transform="translate(660, 0)">
+            <rect x="0" y="0" width="200" height="90" rx="6" fill="#FFFFFF" stroke="#B04A4A" stroke-width="2" />
+            <text x="15" y="28" fill="#B04A4A" font-size="13" font-weight="bold">🌀 유동팬 12대 (627W)</text>
+            <text x="15" y="50" fill="#B04A4A" font-size="11" font-weight="bold">[12대 1그룹 일괄제어]</text>
+            <text x="15" y="72" class="code-tag">Reg 104 (ON/OFF)</text>
+          </g>
+
+          <g transform="translate(0, 105)">
+            <rect x="0" y="0" width="860" height="95" rx="6" fill="#FFFFFF" stroke="#6D2E46" />
+            <text x="20" y="28" class="body-bold">☀️ 상부 차광 스크린 (Reg 119) &amp; 🌙 상부 보온 커튼 (Reg 120, 각 258.4W)</text>
+            <text x="20" y="52" class="body-txt">외기 일사량 및 주야간 ADT 목표 밴드와 연동하여 0~100% 개도율 제어 수행</text>
+            <text x="20" y="76" fill="#4F7942" font-size="12" font-weight="bold">ㆍ 1차: OPID 일치 확인 / 2차: 개도율 및 야간 온습도 보존 물리 반응 확인</text>
+          </g>
+        </g>
+      </g>
+
+      <!-- Unit 5 & Uncontrolled Block -->
+      <g transform="translate(20, 650)">
+        <g transform="translate(0, 0)">
+          <rect x="0" y="0" width="440" height="215" rx="10" fill="#E4EFE9" stroke="#4F7942" stroke-width="2" />
+          <text x="20" y="35" fill="#4F7942" font-size="16" font-weight="900">Unit 5 양액공급기 (4,180W)</text>
+          <line x1="20" y1="52" x2="420" y2="52" stroke="#A5D6A7" />
+          <text x="20" y="80" class="body-txt">ㆍ 1구역 전용 양액기 (EC/pH 센서 1개)</text>
+          <text x="20" y="108" class="body-txt">ㆍ 관수 시작/종료 시간 및 관수시간(초) 제어</text>
+          <text x="20" y="136" class="body-txt">ㆍ EC 설정값 (dS/m) &amp; pH 설정값 (5.5~6.3)</text>
+          <text x="20" y="175" fill="#4F7942" font-size="13" font-weight="bold">ㆍ 원격 제어권 전환 후 관수·EC·pH 명령 전송</text>
+        </g>
+
+        <g transform="translate(460, 0)">
+          <rect x="0" y="0" width="440" height="215" rx="10" fill="#E7E6E6" stroke="#A79AA0" stroke-width="2" stroke-dasharray="6 4" />
+          <text x="20" y="35" fill="#5A4A50" font-size="16" font-weight="900">운영사무국 관할 설비 (회색)</text>
+          <line x1="20" y1="52" x2="420" y2="52" stroke="#A79AA0" />
+          <text x="20" y="80" fill="#5A4A50" font-size="12">ㆍ 레일 파이프 냉난방 (사무국 일괄 ON/OFF)</text>
+          <text x="20" y="108" fill="#5A4A50" font-size="12">ㆍ 측면 보온 커튼 (참가팀 제어 제외)</text>
+          <text x="20" y="136" fill="#5A4A50" font-size="12">ㆍ Hik-Connect CCTV (외부 앱 직결)</text>
+          <text x="20" y="175" fill="#B04A4A" font-size="13" font-weight="bold">※ 제어 불가 장치에 명령 송신 금지</text>
+        </g>
+      </g>
+    </g>
+
+    <!-- CLEAN ORTHOGONAL CONNECTORS -->
+    <path d="M 640 210 L 640 250 L 425 250 L 425 580 L 395 580" fill="none" stroke="#0563C1" stroke-width="2.5" marker-end="url(#arr-blue)" />
+    <g transform="translate(480, 235)">
+      <rect x="0" y="0" width="140" height="26" rx="4" fill="#FFFFFF" stroke="#0563C1" stroke-width="1" />
+      <text x="70" y="18" text-anchor="middle" fill="#0563C1" font-size="11" font-weight="bold">Modbus RTU (Unit 2)</text>
+    </g>
+
+    <path d="M 395 670 L 860 670 L 860 190 L 900 190" fill="none" stroke="#0563C1" stroke-width="2.5" marker-end="url(#arr-blue)" />
+    <g transform="translate(470, 655)">
+      <rect x="0" y="0" width="160" height="26" rx="4" fill="#FFFFFF" stroke="#0563C1" stroke-width="1" />
+      <text x="80" y="18" text-anchor="middle" fill="#0563C1" font-size="11" font-weight="bold">Modbus TCP Read (Unit 3)</text>
+    </g>
+
+    <path d="M 395 720 L 870 720 L 870 480 L 900 480" fill="none" stroke="#6D2E46" stroke-width="2.5" marker-end="url(#arr-burgundy)" />
+    <g transform="translate(660, 705)">
+      <rect x="0" y="0" width="170" height="26" rx="4" fill="#FFFFFF" stroke="#6D2E46" stroke-width="1" />
+      <text x="85" y="18" text-anchor="middle" fill="#6D2E46" font-size="11" font-weight="bold">Modbus TCP Control (Unit 4)</text>
+    </g>
+
+    <path d="M 395 760 L 880 760 L 880 750 L 900 750" fill="none" stroke="#4F7942" stroke-width="2.5" marker-end="url(#arr-green)" />
+    <g transform="translate(470, 745)">
+      <rect x="0" y="0" width="170" height="26" rx="4" fill="#FFFFFF" stroke="#4F7942" stroke-width="1" />
+      <text x="85" y="18" text-anchor="middle" fill="#4F7942" font-size="11" font-weight="bold">Modbus TCP Verify (Unit 5)</text>
+    </g>
+  </g>
+
+  <!-- PPT Style Footer -->
+  <line x1="50" y1="1025" x2="1870" y2="1025" stroke="#E3D8DC" stroke-width="1.5" />
+  <text x="50" y="1052" fill="#6E6167" font-size="13" font-weight="500">베리디시전 (BerryDecision) · 스마트농업 AI 경진대회 본선 운영 체계</text>
+  <text x="1870" y="1052" text-anchor="end" fill="#6E6167" font-size="13" font-weight="500">페이지 1 / 1</text>
+</svg>

@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" style="background-color: #0F172A; font-family: 'Inter', 'Malgun Gothic', 'Noto Sans KR', sans-serif;">
+  <defs>
+    <style>
+      .t-title { font-size: 26px; font-weight: 900; fill: #38BDF8; }
+      .t-sub { font-size: 15px; font-weight: 500; fill: #94A3B8; }
+      .t-badge { font-size: 16px; font-weight: 800; fill: #FFFFFF; }
+      .box-head { font-size: 17px; font-weight: 800; fill: #F8FAFC; }
+      .box-sub { font-size: 13px; font-weight: 600; fill: #CBD5E1; }
+      .txt { font-size: 13px; font-weight: 500; fill: #CBD5E1; }
+      .txt-bold { font-size: 13px; font-weight: 700; fill: #F1F5F9; }
+      .code { font-family: 'Consolas', 'Fira Code', monospace; font-size: 12px; fill: #FDE047; }
+      .tag-2026 { font-size: 11px; font-weight: 800; fill: #FFFFFF; }
+      .tag-2025 { font-size: 11px; font-weight: 700; fill: #0284C7; }
+      .tag-exp { font-size: 11px; font-weight: 700; fill: #A855F7; }
+      .tag-chk { font-size: 11px; font-weight: 800; fill: #78350F; }
+      .footer-txt { font-size: 13px; font-weight: 500; fill: #64748B; }
+    </style>
+
+    <!-- Arrow Markers -->
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#38BDF8" />
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#F43F5E" />
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34D399" />
+    </marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#F59E0B" />
+    </marker>
+    <marker id="arr-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#C084FC" />
+    </marker>
+  </defs>
+
+  <!-- Dark Tech Header -->
+  <rect x="0" y="0" width="1920" height="100" fill="#1E293B" stroke="#334155" stroke-width="1" />
+  <rect x="60" y="25" width="110" height="34" rx="6" fill="#0284C7" />
+  <text x="115" y="48" text-anchor="middle" class="t-badge">B-05</text>
+  <text x="190" y="48" class="t-title">B-05 OPID Write-Verify 및 이중 검증 무겹침 시퀀스</text>
+  <text x="190" y="78" class="t-sub">제어 명령 전송, 1차 OPID 논리 확인, 2차 물리 동작 반응 검증 및 예외 분기 | 카테고리: 데이터·추론·제어 경로</text>
+
+  <!-- Blueprint Legend Header -->
+  <g transform="translate(1320, 16)">
+    <rect x="0" y="0" width="540" height="72" rx="8" fill="#0F172A" stroke="#334155" stroke-width="1.5" />
+    <line x1="20" y1="22" x2="55" y2="22" stroke="#FFFFFF" stroke-width="3" />
+    <text x="63" y="26" fill="#FFF" font-size="12" font-weight="bold">2026 확정</text>
+    <line x1="155" y1="22" x2="190" y2="22" stroke="#38BDF8" stroke-width="2" />
+    <text x="198" y="26" fill="#38BDF8" font-size="12">2025 참고</text>
+    <line x1="285" y1="22" x2="320" y2="22" stroke="#C084FC" stroke-width="2" stroke-dasharray="5 3" />
+    <text x="328" y="26" fill="#C084FC" font-size="12">팀 예상안</text>
+    <rect x="410" y="12" width="110" height="20" rx="4" fill="#FEF08A" stroke="#CA8A04" stroke-width="1" />
+    <text x="465" y="26" fill="#854D0E" font-size="11" font-weight="bold" text-anchor="middle">현장 확인필요</text>
+
+    <line x1="20" y1="50" x2="55" y2="50" stroke="#38BDF8" stroke-width="2.5" marker-end="url(#arr-blue)" />
+    <text x="63" y="54" fill="#94A3B8" font-size="11">Modbus Read</text>
+    <line x1="155" y1="50" x2="190" y2="50" stroke="#F43F5E" stroke-width="2.5" marker-end="url(#arr-red)" />
+    <text x="198" y="54" fill="#94A3B8" font-size="11">Control Write</text>
+    <line x1="285" y1="50" x2="320" y2="50" stroke="#34D399" stroke-width="2.5" marker-end="url(#arr-green)" />
+    <text x="328" y="54" fill="#94A3B8" font-size="11">Status Verify</text>
+    <line x1="415" y1="50" x2="450" y2="50" stroke="#F59E0B" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arr-amber)" />
+    <text x="458" y="54" fill="#94A3B8" font-size="11">Safety/Physical</text>
+  </g>
+
+  <g transform="translate(60, 130)">
+    <!-- 4 Lifeline Headers -->
+    <g transform="translate(50, 0)">
+      <rect x="0" y="0" width="340" height="50" rx="8" fill="#1E293B" stroke="#A855F7" stroke-width="2" />
+      <text x="170" y="32" fill="#C084FC" font-size="16" font-weight="900" text-anchor="middle">🧠 로컬 AI 서버 (Local AI Engine)</text>
+      <line x1="170" y1="50" x2="170" y2="820" stroke="#475569" stroke-width="2" stroke-dasharray="6 4" />
+    </g>
+
+    <g transform="translate(520, 0)">
+      <rect x="0" y="0" width="360" height="50" rx="8" fill="#1E293B" stroke="#0284C7" stroke-width="2" />
+      <text x="180" y="32" fill="#38BDF8" font-size="16" font-weight="900" text-anchor="middle">🌐 통합제어기 (Unit 1 Gateway)</text>
+      <line x1="180" y1="50" x2="180" y2="820" stroke="#475569" stroke-width="2" stroke-dasharray="6 4" />
+    </g>
+
+    <g transform="translate(1020, 0)">
+      <rect x="0" y="0" width="360" height="50" rx="8" fill="#1E293B" stroke="#F43F5E" stroke-width="2" />
+      <text x="180" y="32" fill="#F43F5E" font-size="16" font-weight="900" text-anchor="middle">⚙️ 현장 구동기 노드 (Unit 4 / Unit 5)</text>
+      <line x1="180" y1="50" x2="180" y2="820" stroke="#475569" stroke-width="2" stroke-dasharray="6 4" />
+    </g>
+
+    <g transform="translate(1500, 0)">
+      <rect x="0" y="0" width="250" height="50" rx="8" fill="#1E293B" stroke="#34D399" stroke-width="2" />
+      <text x="125" y="32" fill="#34D399" font-size="16" font-weight="900" text-anchor="middle">📊 로그 &amp; 검증 DB</text>
+      <line x1="125" y1="50" x2="125" y2="820" stroke="#475569" stroke-width="2" stroke-dasharray="6 4" />
+    </g>
+
+    <!-- Step 1 Arrow (y=90) -->
+    <g transform="translate(0, 90)">
+      <line x1="220" y1="20" x2="700" y2="20" stroke="#F43F5E" stroke-width="3" marker-end="url(#arr-red)" />
+      <rect x="240" y="-8" width="440" height="32" rx="6" fill="#0F172A" stroke="#F43F5E" stroke-width="1.5" />
+      <text x="460" y="13" text-anchor="middle" font-size="13" font-weight="bold" fill="#F43F5E">1. Modbus TCP Write (Reg 50x, Target=45%, OPID=#102)</text>
+    </g>
+
+    <!-- Step 2 Arrow (y=170) -->
+    <g transform="translate(0, 170)">
+      <line x1="700" y1="20" x2="1200" y2="20" stroke="#F43F5E" stroke-width="3" marker-end="url(#arr-red)" />
+      <rect x="730" y="-8" width="440" height="32" rx="6" fill="#0F172A" stroke="#F43F5E" stroke-width="1.5" />
+      <text x="950" y="13" text-anchor="middle" font-size="13" font-weight="bold" fill="#F43F5E">2. RS-485 Modbus RTU Write (unit_id=4, Reg 501~575)</text>
+    </g>
+
+    <!-- Step 3 Arrow (y=250) -->
+    <g transform="translate(0, 250)">
+      <line x1="1200" y1="20" x2="700" y2="20" stroke="#34D399" stroke-width="3" marker-end="url(#arr-green)" />
+      <rect x="730" y="-8" width="440" height="32" rx="6" fill="#0F172A" stroke="#34D399" stroke-width="1.5" />
+      <text x="950" y="13" text-anchor="middle" font-size="13" font-weight="bold" fill="#34D399">3. Actuator Physical Execution &amp; Reg 20x Status Update</text>
+    </g>
+
+    <!-- Step 4 Arrow (y=330) -->
+    <g transform="translate(0, 330)">
+      <line x1="220" y1="20" x2="700" y2="20" stroke="#38BDF8" stroke-width="2.5" marker-end="url(#arr-blue)" />
+      <rect x="300" y="-8" width="340" height="32" rx="6" fill="#0F172A" stroke="#38BDF8" stroke-width="1.5" />
+      <text x="470" y="13" text-anchor="middle" font-size="13" font-weight="bold" fill="#38BDF8">4. Modbus TCP Read (Reg 20x Status Query)</text>
+    </g>
+
+    <!-- 1st Logical Verification Match Box (y=400, height=85) -->
+    <g transform="translate(180, 400)">
+      <rect x="0" y="0" width="1040" height="85" rx="10" fill="#064E3B" stroke="#34D399" stroke-width="2" />
+      <text x="25" y="32" fill="#34D399" font-size="16" font-weight="900">✅ 1차 논리 검증 완료 (Logical OPID Write-Verify Check Pass)</text>
+      <text x="25" y="60" fill="#A7F3D0" font-size="13">Condition: (Status_OPID == #102) &amp;&amp; (Status_Code == NORMAL_ACK) ➔ 통합제어기가 AI 명령 정상 접수 입증</text>
+    </g>
+
+    <!-- Step 5 Physical Arrow (y=525) -->
+    <g transform="translate(0, 525)">
+      <line x1="220" y1="20" x2="1200" y2="20" stroke="#F59E0B" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#arr-amber)" />
+      <rect x="420" y="-8" width="580" height="32" rx="6" fill="#0F172A" stroke="#F59E0B" stroke-width="1.5" />
+      <text x="710" y="13" text-anchor="middle" font-size="13" font-weight="bold" fill="#FBBF24">5. 2차 물리 동작 반응 추적 (천창 개도율 변화 / 전력계 전류 상승 감지)</text>
+    </g>
+
+    <!-- Step 6 Log Arrow (y=595) -->
+    <g transform="translate(0, 595)">
+      <line x1="220" y1="20" x2="1625" y2="20" stroke="#64748B" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arr-blue)" />
+      <rect x="800" y="-8" width="340" height="32" rx="6" fill="#0F172A" stroke="#64748B" stroke-width="1.5" />
+      <text x="970" y="13" text-anchor="middle" font-size="13" font-weight="bold" fill="#94A3B8">6. Log Record (OPID, Intention, 1차/2차 Verify Result)</text>
+    </g>
+
+    <!-- Exception & Failure Handling Box (y=675, height=115) -->
+    <g transform="translate(180, 675)">
+      <rect x="0" y="0" width="1570" height="115" rx="10" fill="#451A03" stroke="#F59E0B" stroke-width="2" />
+      <text x="25" y="32" fill="#FBBF24" font-size="15" font-weight="900">⚠️ 예외 처리 및 시간초과 타임아웃 분기 (Exception &amp; Retry Branch):</text>
+      <text x="25" y="62" fill="#FDE047" font-size="12">1. 1차 OPID 불일치/미도달 시: 3회 재전송 ➔ 지속 실패 시 [안전 가드레일 밴드 모드] 자동 전환</text>
+      <text x="25" y="88" fill="#FDE047" font-size="12">2. 2차 물리 반응 미검출 (상승 에지 미검출): "설비 고장" 최우선 승격 ➔ 원격 재배 판단 중단 및 수동 점검 알림</text>
+    </g>
+  </g>
+
+  <!-- Footer -->
+  <line x1="60" y1="1020" x2="1860" y2="1020" stroke="#334155" stroke-width="1" />
+  <text x="60" y="1050" class="footer-txt">주석: 2025 참고 기술문서 기반 예상 구성으로, 2026 본선 사양 및 현장 배치 확인 후 갱신 예정</text>
+  <text x="1860" y="1050" text-anchor="end" class="footer-txt">베리디시전 (BerryDecision) · 2026 스마트농업 AI 경진대회 본선 무겹침 청사진</text>
+</svg>
