@@ -58,8 +58,13 @@ def load_event_lookup(events_path: Path) -> dict[str, dict[str, Any]]:
         "SENTENCE",
         "measurement_group_ids",
         "token_roles",
+        "source_file_ids",
+        "source_row_ids",
         "embedding_status",
     ]
+    available = set(pq.ParquetFile(events_path).schema_arrow.names)
+    cols = [c for c in cols if c in available]
+    has_provenance = "source_file_ids" in available and "source_row_ids" in available
     table = pq.read_table(events_path, columns=cols)
     df = table.to_pandas()
     lookup: dict[str, dict[str, Any]] = {}
@@ -75,6 +80,8 @@ def load_event_lookup(events_path: Path) -> dict[str, dict[str, Any]]:
             if rec.measurement_group_ids is not None
             else "[]",
             "token_roles": rec.token_roles if rec.token_roles is not None else "[]",
+            "source_file_ids": (rec.source_file_ids if has_provenance and rec.source_file_ids is not None else "[]"),
+            "source_row_ids": (rec.source_row_ids if has_provenance and rec.source_row_ids is not None else "[]"),
             "embedding_status": str(rec.embedding_status or ""),
         }
     del df, table
@@ -113,6 +120,18 @@ def expand_sequence_rows(
         stats["all_events_unresolved"] += 1
         return [], stats
 
+    # Phase 2: 이벤트 내용이 같아도 어떤 narrative/farm/zone에 속하는지가
+    # 중요하다는 분석 결과(check_raw_narrative_time_location_diversity.py)를
+    # 반영 — 시퀀스 안에서 실제로 등장하는 farm/zone만 로컬 순서번호를 매겨
+    # 매 이벤트 SENTENCE 앞에 NARRATIVE/FARM_LOCAL/ZONE_LOCAL 토큰을 붙인다
+    # (vocab.py의 FARM_LOCAL_SLOTS=24는 crossfarm_hourly/growth 서사가 시퀀스
+    # 하나에 최대 20개 농장을 담는 것에 맞춘 것).
+    farms_in_seq = sorted({ev["farm_id"] for ev in resolved if ev["farm_id"]})
+    zones_in_seq = sorted({ev["zone_id"] for ev in resolved if ev["zone_id"]})
+    farm_local = {f: f"FARM_LOCAL|{i}" for i, f in enumerate(farms_in_seq)}
+    zone_local = {z: f"ZONE_LOCAL|{i}" for i, z in enumerate(zones_in_seq)}
+    narrative_tok = f"NARRATIVE|{rec.narrative_id}"
+
     # time_group_rank = order of first appearance of each same_time_group_id
     rank_map: dict[str, int] = {}
     for ev in resolved:
@@ -136,6 +155,25 @@ def expand_sequence_rows(
             start = ts.tz_localize(None) if ts.tzinfo is not None else ts
             age = float((ts - first_ts).total_seconds() / 3600.0)
         gid = ev["same_time_group_id"] or f"solo_{ev['event_id']}"
+        prefix_toks = [narrative_tok]
+        if ev["farm_id"] in farm_local:
+            prefix_toks.append(farm_local[ev["farm_id"]])
+        if ev["zone_id"] in zone_local:
+            prefix_toks.append(zone_local[ev["zone_id"]])
+        sentence = " ".join(prefix_toks) + " " + ev["SENTENCE"]
+        # measurement_group_ids/token_roles/source_file_ids/source_row_ids are all
+        # per-token arrays aligned to SENTENCE.split() -- prefix_toks add 1-3 tokens
+        # to SENTENCE that don't exist in ev's own (un-prefixed) arrays, so every
+        # side-channel array needs the same placeholder padding or every downstream
+        # index-based lookup silently shifts by len(prefix_toks) positions.
+        n_prefix = len(prefix_toks)
+        prefix_group_ids = ["NONE"] * n_prefix
+        prefix_roles = ["meta"] * n_prefix
+        prefix_source_refs = [""] * n_prefix
+        event_group_ids = _loads_list(ev["measurement_group_ids"])
+        event_roles = _loads_list(ev["token_roles"])
+        event_source_file_ids = _loads_list(ev.get("source_file_ids", "[]"))
+        event_source_row_ids = _loads_list(ev.get("source_row_ids", "[]"))
         rows.append(
             {
                 "PERSON_ID": int(rec.PERSON_ID),
@@ -146,7 +184,7 @@ def expand_sequence_rows(
                 "same_time_group_id": gid,
                 "START_DATE": start,
                 "AGE": age,
-                "SENTENCE": ev["SENTENCE"],
+                "SENTENCE": sentence,
                 "event_kind": ev["event_kind"],
                 "narrative_id": str(rec.narrative_id),
                 "order_semantics": "STRICT_CHRONOLOGICAL",
@@ -163,12 +201,10 @@ def expand_sequence_rows(
                 "shadow_split": str(getattr(rec, "shadow_split", "train") or "train"),
                 "canonical_context_id": str(getattr(rec, "canonical_context_id", "") or ""),
                 "split_group_id": str(getattr(rec, "split_group_id", "") or ""),
-                "measurement_group_ids": ev["measurement_group_ids"]
-                if isinstance(ev["measurement_group_ids"], str)
-                else json.dumps(ev["measurement_group_ids"]),
-                "token_roles": ev["token_roles"]
-                if isinstance(ev["token_roles"], str)
-                else json.dumps(ev["token_roles"]),
+                "measurement_group_ids": json.dumps(prefix_group_ids + event_group_ids),
+                "token_roles": json.dumps(prefix_roles + event_roles),
+                "source_file_ids": json.dumps(prefix_source_refs + event_source_file_ids),
+                "source_row_ids": json.dumps(prefix_source_refs + event_source_row_ids),
                 "training_mode": str(
                     getattr(rec, "training_mode", "transductive_public_pretraining")
                 ),
@@ -251,13 +287,24 @@ def export_event_grain(
                 smoke_seq_count += 1
             if not sentence_check and len(rows) >= 2:
                 # integrity sample: position i matches events_tokenized SENTENCE
+                # (Phase 2: NARRATIVE/FARM_LOCAL/ZONE_LOCAL prefix is now prepended,
+                # so check the suffix rather than exact equality.)
                 eid0 = rows[0]["event_id"]
-                assert rows[0]["SENTENCE"] == event_lookup[eid0]["SENTENCE"]
+                assert rows[0]["SENTENCE"].endswith(event_lookup[eid0]["SENTENCE"])
+                # alignment check: every per-token side-channel array must have
+                # exactly as many entries as SENTENCE has tokens, or bin-token /
+                # role lookups downstream (pipeline_explorer's parse_token_trace)
+                # silently read the wrong entry for every token after the prefix.
+                n_tok = len(rows[0]["SENTENCE"].split())
+                for key in ("measurement_group_ids", "token_roles", "source_file_ids", "source_row_ids"):
+                    n_arr = len(json.loads(rows[0][key]))
+                    assert n_arr == n_tok, f"{key} length {n_arr} != SENTENCE token count {n_tok}"
                 sentence_check = {
                     "sequence_id": rows[0]["sequence_id"],
                     "n_events": len(rows),
                     "event_ids_head": [r["event_id"] for r in rows[:3]],
                     "sentence_match_pos0": True,
+                    "token_arrays_aligned": True,
                     "n_same_time_groups": len({r["same_time_group_id"] for r in rows}),
                 }
         if chunk_rows:
@@ -331,7 +378,22 @@ def export_event_grain(
         "notes": [
             "SENTENCE is per-event from events_tokenized_v2 (not flat sequence).",
             "same_time_group_id comes from events table (sequences store unique STGs only).",
-            "BACKGROUND_TOKENS holds farm markers; NARRATIVE is not repeated into event SENTENCE.",
+            "Phase 2: each event SENTENCE is now prefixed with NARRATIVE|<id> plus "
+            "FARM_LOCAL/ZONE_LOCAL tokens local to that sequence's farm/zone set "
+            "(check_raw_narrative_time_location_diversity.py found these carry "
+            "distinguishable variance beyond raw sensor values).",
+            "2026-07-25: measurement_group_ids/token_roles are now padded with "
+            "NONE/meta placeholders for the NARRATIVE/FARM_LOCAL/ZONE_LOCAL prefix "
+            "tokens -- this Phase 2 prefix code had never actually been run against "
+            "real data before (corpus predated the edit), and without the padding "
+            "every index-based token lookup after the prefix would silently read "
+            "the wrong array entry.",
+            "2026-07-25: source_file_ids/source_row_ids added, per-token aligned "
+            "same as measurement_group_ids -- resolves to cell_occurrences.parquet's "
+            "own (source_file_id, source_row_id) for value/quality/literal/circular "
+            "tokens, empty string for separator/meta/slot tokens with no single raw "
+            "cell behind them. Empty [] if events_tokenized_v2.parquet predates this "
+            "field (backward-compat fallback in load_event_lookup).",
         ],
     }
     write_json(report_path, report)

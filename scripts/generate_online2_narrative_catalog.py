@@ -99,6 +99,8 @@ SPECS = [
     spec("D13", "일상재배", "배지 EC 일중 변화", "근권 염류 농도 리듬 학습", "R_rootzone;A_actuator", "farm_id;zone_id;timestamp;substrate_ec_ds_m;line_flow_rate", "ec_sensor;substrate_water_content_pct", "1시간", "하루 24시간", "00시", "23시", "EC일범위;관수전후차", "none", "고정 임계값 없이 변화량", "관수 전후 EC 희석 또는 농축", "근권 EC 반응 후보", "시간적 연관", "센서 보정;배액", "0.15에서 5 범위;점프", 24, "상", "높음", "change:substrate_ec_ds_m", "rootec"),
     spec("D14", "일상재배", "양액 EC와 pH 안정성", "공급 설정 센서의 일중 안정성 학습", "A_actuator", "farm_id;zone_id;timestamp;ec_sensor;ph_sensor", "nutrient_solution_system;line_flow_rate", "1시간", "하루 24시간", "00시", "23시", "일중 중앙값;MAD;범위", "empirical", "농장 구역별 MAD와 변화", "공급 시 설정값 유지 또는 변동", "양액 품질 관찰", "관찰", "센서값과 설정값 구분 불명", "pH 범위;EC 영값;고정값", 24, "중", "중간", "all_hourly"),
     spec("D15", "일상재배", "내외기 환경 차", "온실 완충 효과 학습", "E_environment", "farm_id;zone_id;timestamp;outside_temp_c;inside_temp_c;outside_humidity_pct;inside_humidity_pct", "roof_vent_left;thermal_curtain", "1시간", "하루 24시간", "00시", "23시", "내외온도차;내외습도차", "none", "시간별 차이", "외기 변동 대비 내부 완충", "온실 미기후", "관찰", "센서 위치;구역 공유 외기", "물리 범위;동시성", 24, "상", "높음", "all_hourly"),
+    spec("D16", "일상재배", "양액 시스템 전환 순간", "양액 시스템 상태가 바뀐 단일 시각만 포착", "A_actuator", "farm_id;zone_id;timestamp;nutrient_solution_system", "line_flow_rate;total_flow_rate", "1시간", "전환 시각 단일 관측", "직전값과 다른 값 관측", "동일 관측", "전환여부", "none", "직전 시각 대비 값 변화", "단일 시각 상태 전환", "즉시 반응 후보", "관찰", "관수 스케줄;센서 지연", "직전값 보존;중복 제거", 1, "중", "중간", "change:nutrient_solution_system"),
+    spec("D17", "일상재배", "순환팬 가동 순간", "순환팬이 켜진 단일 시각만 포착", "A_actuator", "farm_id;zone_id;timestamp;circulation_fan", "inside_temp_c;inside_humidity_pct", "1시간", "가동 시각 단일 관측", "circulation_fan 양수값 관측", "동일 관측", "가동여부", "none", "circulation_fan 양수", "단일 시각 가동 상태", "즉시 반응 후보", "관찰", "제어 로직;센서 지연", "직전값 보존;중복 제거", 1, "중", "중간", "positive:circulation_fan"),
     # 원인 반응 15
     spec("C01", "원인반응", "일사 상승 후 환기 반응", "일사와 온도 상승 뒤 천창 작동 후보 탐지", "E_environment;A_actuator", "farm_id;zone_id;timestamp;outside_solar_radiation;inside_temp_c;roof_vent_left;roof_vent_right", "inside_humidity_pct", "1시간", "일사 급증 전 2시간부터 후 6시간", "일사 양의 변화 상위 10분위", "시작 후 8시간", "일사변화;온도변화;환기지연", "empirical", "농장별 변화량 90분위", "일사와 온도 상승 후 환기 개도 증가", "제어 반응 후보", "시간적 연관", "시간대;자동설정;구름", "선후관계;미래 누수 금지", 9, "상", "중간", "solar_up"),
     spec("C02", "원인반응", "환기 후 온도 반응", "천창 개방 뒤 실내온도 변화 탐지", "A_actuator;E_environment", "farm_id;zone_id;timestamp;roof_vent_left;roof_vent_right;inside_temp_c;outside_temp_c", "wind_speed_m_s", "1시간", "개방 전 2시간부터 후 6시간", "천창 개도 증가", "시작 후 8시간", "개도변화;내외기온차;후속온도차", "none", "개도 증가 중심", "개방 뒤 실내온도 하강 또는 외기 접근", "환기 반응 후보", "시간적 연관", "난방;일사;풍속", "선후관계;동시 센서", 9, "상", "중간", "change:roof_vent_left"),
@@ -139,6 +141,8 @@ SPECS = [
     spec("S10", "스트레스위험", "오전 고습 수정벌 활동 저하 가능성", "오전 장시간 고습 구간 탐지", "E_environment", "farm_id;zone_id;timestamp;inside_humidity_pct;outside_solar_radiation", "inside_temp_c", "1시간", "06시부터 12시", "오전 RH 90 이상", "12시 또는 회복", "오전고습시간", "expert", "오전 RH 90 장시간 지속", "오전 고습 지속", "수정벌 활동 저하 가능성", "가능성", "벌통 상태;농약;계절", "벌 활동 직접 측정 아님", 7, "중", "중간", "run_ge:inside_humidity_pct:90:2", "condensation"),
     spec("S11", "스트레스위험", "주야 습도 반복 흰가루병 우호환경", "오전 다습과 한낮 저습 반복 탐지", "E_environment", "farm_id;zone_id;timestamp;inside_humidity_pct;inside_temp_c", "outside_solar_radiation", "1시간", "연속 2일", "오전 고습 후 주간 RH 50 이하", "둘째 날 종료", "습도진폭;반복횟수", "expert", "오전 다습과 한낮 RH 50 이하 반복", "큰 습도 진폭 반복", "흰가루병 우호환경", "우호환경", "포자 존재;초세", "배지 EC로 예측 금지;확진 금지", 48, "중", "중간", "le:inside_humidity_pct:50", "powdery"),
     spec("S12", "스트레스위험", "고온 강우 탄저병 위험환경", "25도 초과 지속과 강우 동시 조건 탐지", "E_environment", "farm_id;zone_id;timestamp;inside_temp_c;rain_detected", "outside_temp_c;inside_humidity_pct", "1시간", "주간 조건 전후 각 6시간", "온도 25 초과와 강우 검출", "조건 해제 후 6시간", "고온시간;강우시간", "expert", "주간 25도 초과 지속과 강우를 위험환경으로 사용", "고온 강우 동시 또는 인접", "탄저병 우호환경", "위험", "두상관수 미제공;육묘기 여부", "확진 금지;계절 확인", 24, "중", "중간", "and:inside_temp_c:25:rain_detected:0", "anthracnose"),
+    spec("S13", "스트레스위험", "강풍 순간", "농장 내 풍속 상위 10분위 단일 시각 포착", "E_environment", "farm_id;zone_id;timestamp;wind_speed_m_s", "wind_direction_deg;outside_temp_c", "1시간", "단일 시각", "농장 상위 10분위 풍속", "동일 관측", "풍속상대순위", "empirical", "농장별 상위 10분위", "단일 시각 강풍 후보", "환기·낙과 위험 후보", "관찰", "돌풍 순간성;센서 위치", "농장 내 상대 분포만 사용", 1, "중", "중간", "quantile_high:wind_speed_m_s"),
+    spec("S14", "스트레스위험", "배양액 pH 이상 순간", "농장 내 pH 상위 10분위 단일 시각 포착", "R_rootzone", "farm_id;zone_id;timestamp;ph_sensor", "ec_sensor;substrate_ec_ds_m", "1시간", "단일 시각", "농장 상위 10분위 pH", "동일 관측", "pH상대순위", "empirical", "농장별 상위 10분위", "단일 시각 pH 이상 후보", "양분흡수 저해 위험 후보", "위험", "센서 보정 주기;확진 불가", "농장 내 상대 분포만 사용;확진 금지", 1, "중", "중간", "quantile_high:ph_sensor"),
     # 센서 운영 이상 12
     spec("A01", "센서운영이상", "실내온도 급격한 점프", "작물 반응과 센서 이상 분리", "E_environment", "farm_id;zone_id;timestamp;inside_temp_c", "outside_temp_c;substrate_temp_c", "1시간", "점프 전후 각 3시간", "차분 robust z 6 초과", "시작 후 3시간", "차분;농장MAD;동반센서차분", "empirical", "농장 구역별 차분 median과 MAD 기반 robust z", "단일 시점 점프 후 복귀", "sensor_anomaly", "이상 후보", "실제 급변;환기", "원시값 보존;동반 변화 확인", 7, "상", "높음", "jump:inside_temp_c"),
     spec("A02", "센서운영이상", "근권온도 급격한 순간 변화", "비현실적 근권온도 점프 탐지", "R_rootzone;E_environment", "farm_id;zone_id;timestamp;substrate_temp_c", "inside_temp_c", "1시간", "점프 전후 각 3시간", "차분 robust z 6 초과", "시작 후 3시간", "차분;robust_z", "hybrid", "농장 구역별 차분 MAD;자정 점프 우선 점검", "순간 점프 또는 단계 변화", "sensor_anomaly", "이상 후보", "관수 온도 영향", "실내온도 동반 여부", 7, "상", "높음", "jump:substrate_temp_c", "sensorjump"),
@@ -176,6 +180,10 @@ SPECS.extend([
     spec("X09", "멀티모달", "이미지 근권 상태 기간 정렬", "farm image와 같은 case period의 근권 분포 연결", "I_images;R_rootzone", "farm_id;zone_id;timestamp;substrate_temp_c;substrate_water_content_pct;substrate_ec_ds_m", "", "period", "14일 근권 summary와 farm image", "period_start", "period image event", "근권분포;이상횟수", "none", "farm-period 일치만 허용", "기간 근권 뒤 이미지 관측", "multimodal_candidate", "후보", "촬영시각과 구역 불명", "farm-period alignment만 허용", 15, "하", "낮음", "period_images"),
     spec("X10", "멀티모달", "이미지 생육조사 기간 정렬", "farm image와 두 생육조사 변화를 기간 수준으로 연결", "I_images;G_growth", "farm_id;zone_id;observation_date;plant_height_cm;leaf_length_cm;leaf_width_cm;leaf_count", "crown_diameter_mm", "period", "두 조사와 farm image period event", "첫 조사", "period image event", "생육변화;이미지수", "none", "farm-period 일치만 허용", "조사 변화 뒤 이미지 관측", "multimodal_candidate", "후보", "사진 개체와 측정 개체 다름", "특정 zone image로 연결 금지", 10, "하", "낮음", "period_images"),
     spec("X11", "멀티모달", "example problem 공개관측 유사성 관계", "공개 센서 생육 요약 간 example problem 유사성 관계 학습", "E_environment;R_rootzone;G_growth;example_set;problem_set", "farm_id;zone_id;timestamp;inside_temp_c;inside_humidity_pct;substrate_temp_c;substrate_water_content_pct;substrate_ec_ds_m", "observation_date;plant_height_cm;leaf_count", "period", "각 case period 공개 관측 요약", "period_start", "period_end", "환경근권요약거리;생육요약거리", "empirical", "공개 관측 특징 거리만 사용", "example에서 problem으로 유사 관계", "관계 서사", "관계", "농장별 기간과 구역 차이", "problem interpretation과 corrected label 사용 금지", 16, "중", "낮음", "public_relation"),
+    spec("X12", "멀티모달", "농장 이미지 최초-최근 페어", "한 농장의 촬영기간 전체(최대 약 13일)를 두 이미지와 각 시점 환경 맥락으로 연결", "I_images;E_environment", "farm_id;zone_id;timestamp", "inside_temp_c;inside_humidity_pct", "period", "농장 관측기간 전체", "최초 이미지 직전 환경 맥락", "최근 이미지 직전 환경 맥락", "촬영간격", "none", "farm 내 이미지 2장 이상만 허용", "촬영기간 전체를 아우르는 두 이미지 쌍과 각 시점 환경", "multimodal_candidate", "후보", "촬영시각과 구역 불명;중간 이미지 미사용", "farm-period alignment만 허용;이미지 2장 미만 제외", 8, "하", "낮음", "image_longitudinal_pair"),
+    spec("X13", "환경비교", "동시각 농장 간 온습도 비교", "같은 지역시각의 여러 농장 내부 온습도를 병렬 비교", "E_environment", "farm_id;zone_id;timestamp;inside_temp_c;inside_humidity_pct", "outside_temp_c;outside_humidity_pct", "1시간", "동일 지역시각 다수 농장", "지역시각당 20개 농장 이상 관측", "동일 지역시각 관측 종료", "농장간범위;농장간표준편차", "empirical", "지역시각 단위로 농장을 병렬 비교", "농장별 관리·기후차로 인한 온습도 산포", "농장간 비교", "상대 비교", "농장별 캘린더 비동기;계절차", "20개 농장 이상 완전성", 20, "중", "중간", "crossfarm_hourly"),
+    spec("X14", "환경비교", "동시각 농장 간 CO2 일사 비교", "같은 지역시각의 여러 농장 CO2·일사를 병렬 비교", "E_environment", "farm_id;zone_id;timestamp;co2_ppm;outside_solar_radiation", "co2_supply", "1시간", "동일 지역시각 다수 농장", "지역시각당 20개 농장 이상 관측", "동일 지역시각 관측 종료", "농장간범위;농장간표준편차", "empirical", "지역시각 단위로 농장을 병렬 비교", "농장별 CO2 시비·환기 정책 차이", "농장간 비교", "상대 비교", "농장별 캘린더 비동기;계절차", "20개 농장 이상 완전성", 20, "중", "중간", "crossfarm_hourly"),
+    spec("X15", "환경비교", "동일 조사순번 농장 간 생육 비교", "같은 생육조사 순번(첫/둘째 조사)의 여러 농장 초장·엽수를 병렬 비교", "G_growth", "farm_id;zone_id;observation_date;plant_height_cm;leaf_count", "crown_diameter_mm", "1시간", "동일 조사 순번 다수 농장", "조사순번당 20개 농장 이상 관측", "동일 조사 순번 관측 종료", "농장간범위;농장간표준편차", "empirical", "조사 순번 단위로 농장을 병렬 비교", "농장별 재배환경차로 인한 생육 산포", "농장간 비교", "상대 비교", "농장별 정식일 비동기;품종차", "20개 농장 이상 완전성", 20, "중", "중간", "crossfarm_growth"),
 ])
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -183,7 +191,7 @@ IMAGE_FILES = sorted(
     p for p in BASE.rglob("*") if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS
 )
 if not IMAGE_FILES:
-    SPECS = [s for s in SPECS if s["narrative_id"] not in {"X08", "X09", "X10"}]
+    SPECS = [s for s in SPECS if s["narrative_id"] not in {"X08", "X09", "X10", "X12"}]
 
 MATERIALIZATION_KEYS = {
     "X01": "fan_pump_mismatch", "X02": "co2_high_off",
@@ -230,6 +238,11 @@ def occurrence(
     mask = pd.Series(False, index=hourly.index)
     if m == "all_hourly":
         mask[:] = True
+    elif m.startswith("window_summary:"):
+        _, h0, h1 = m.split(":")
+        h0, h1 = int(h0), int(h1)
+        hour = hourly["timestamp"].dt.hour
+        mask = (hour >= h0) & (hour < h1) if h0 < h1 else (hour >= h0) | (hour < h1)
     elif m == "solar_up":
         mask = hourly["outside_solar_radiation"].groupby([hourly.farm_id, hourly.zone_id]).diff() > 0
     elif m == "solar_down":
@@ -256,6 +269,66 @@ def occurrence(
         mask = (hourly[c1] > float(v1)) & (hourly[c2] < float(v2))
         if c2 == "rain_detected":
             mask = (hourly[c1] > float(v1)) & (hourly[c2] > float(v2))
+    elif m.startswith("and_gt:"):
+        _, c1, v1, c2, v2 = m.split(":")
+        mask = (hourly[c1] > float(v1)) & (hourly[c2] > float(v2))
+    elif m.startswith(("trend_intervention:", "co_trend:")):
+        _, col1, col2, hrs = m.split(":")
+        hrs = int(hrs)
+        g = hourly.sort_values(["farm_id", "zone_id", "timestamp"])
+
+        def _window_range(col: str) -> pd.Series:
+            gb = g.groupby(groups)[col]
+            return gb.transform(lambda x: x.rolling(hrs, min_periods=2).max() - x.rolling(hrs, min_periods=2).min())
+
+        def _jump_limit_series(col: str) -> pd.Series:
+            d = hourly.groupby(groups)[col].diff().abs()
+            med = d.groupby([hourly.farm_id, hourly.zone_id]).transform("median")
+            mad = (d - med).abs().groupby([hourly.farm_id, hourly.zone_id]).transform("median")
+            return med + 6 * mad.replace(0, np.nan)
+
+        range1, range2 = _window_range(col1), _window_range(col2)
+        limit1, limit2 = _jump_limit_series(col1).reindex(range1.index), _jump_limit_series(col2).reindex(range2.index)
+        mask = (range1 >= limit1) & (range2 >= limit2)
+    elif m.startswith("multi_trend:"):
+        _, cols_joined, hrs = m.split(":")
+        cols = cols_joined.split("+")
+        hrs = int(hrs)
+        g = hourly.sort_values(["farm_id", "zone_id", "timestamp"])
+
+        def _window_range2(col: str) -> pd.Series:
+            gb = g.groupby(groups)[col]
+            return gb.transform(lambda x: x.rolling(hrs, min_periods=2).max() - x.rolling(hrs, min_periods=2).min())
+
+        def _jump_limit_series2(col: str) -> pd.Series:
+            d = hourly.groupby(groups)[col].diff().abs()
+            med = d.groupby([hourly.farm_id, hourly.zone_id]).transform("median")
+            mad = (d - med).abs().groupby([hourly.farm_id, hourly.zone_id]).transform("median")
+            return med + 6 * mad.replace(0, np.nan)
+
+        mask = pd.Series(True, index=hourly.index)
+        for col in cols:
+            r = _window_range2(col)
+            lim = _jump_limit_series2(col).reindex(r.index)
+            mask = mask & (r >= lim)
+    elif m.startswith("lag_response:"):
+        # trend_intervention/multi_trend는 "같은 구간 안 어딘가"에서 둘 다
+        # 움직이면 매칭되는 방향 중립적 공존 주장이라 "트리거 후 정확히
+        # lag_hours 뒤에 반응했다"는 지연을 표현 못한다(사용자 지적) --
+        # 트리거 컬럼이 0에서 양수로 전환된 시점 대비 lag_hours 뒤 시점에서
+        # 반응 컬럼이 자기 평소 점프폭 이상 움직였는지를 요구한다.
+        _, trig_col, resp_col, lag = m.split(":")
+        lag = int(lag)
+        g = hourly.sort_values(["farm_id", "zone_id", "timestamp"])
+        trig_prev = g.groupby(groups)[trig_col].shift()
+        trig_on = (trig_prev <= 0) & (g[trig_col] > 0)
+        resp_lag = g.groupby(groups)[resp_col].shift(-lag)
+        d = g.groupby(groups)[resp_col].diff().abs()
+        med = d.groupby([g.farm_id, g.zone_id]).transform("median")
+        mad = (d - med).abs().groupby([g.farm_id, g.zone_id]).transform("median")
+        limit = med + 6 * mad.replace(0, np.nan)
+        diff = (resp_lag - g[resp_col]).abs()
+        mask = trig_on & diff.notna() & (diff >= limit)
     elif m.startswith("run_ge:"):
         _, col, val, run = m.split(":")
         raw = hourly[col] >= float(val)
@@ -277,6 +350,17 @@ def occurrence(
         q1 = hourly.groupby(groups)[c1].transform(lambda x: x.quantile(.9))
         q2 = hourly.groupby(groups)[c2].transform(lambda x: x.quantile(.9))
         mask = (hourly[c1] > q1) & (hourly[c2] > q2)
+    elif m.startswith(("tod_high:", "tod_low:")):
+        kind, col, h0, h1 = m.split(":")
+        h0, h1 = int(h0), int(h1)
+        hour = hourly["timestamp"].dt.hour
+        in_window = (hour >= h0) & (hour < h1) if h0 < h1 else (hour >= h0) | (hour < h1)
+        if kind == "tod_high":
+            q = hourly.groupby(groups)[col].transform(lambda x: x.quantile(.9))
+            mask = in_window & (hourly[col] >= q)
+        else:
+            q = hourly.groupby(groups)[col].transform(lambda x: x.quantile(.1))
+            mask = in_window & (hourly[col] <= q)
     elif m.startswith("jump:"):
         col = m.split(":")[1]
         d = hourly.groupby(groups)[col].diff().abs()
@@ -346,11 +430,53 @@ def occurrence(
         farms = sorted(set(example.farm_id) | set(problem.farm_id))
         # 각 problem case에 대해 적어도 하나의 example 이웃 관계를 생성한다.
         return len(example) * len(problem), len(problem), farms
+    elif m == "crossfarm_hourly":
+        # 농장 간 관측 캘린더가 거의 안 겹친다(실측: 같은 절대 timestamp를
+        # 공유하는 농장이 최대 9개). 절대 시각 대신 지역시각(hour-of-day)으로
+        # 묶는다 — 이 기준으로는 55개 농장 전부가 매 시각에 데이터를 가짐.
+        hour = hourly["timestamp"].dt.hour
+        counts = hourly.groupby(hour).farm_id.nunique()
+        ok_hours = counts[counts >= 20].index
+        farms = sorted(hourly.loc[hour.isin(set(ok_hours)), "farm_id"].unique())
+        return int(counts.loc[ok_hours].sum()), int(len(ok_hours)), farms
+    elif m == "crossfarm_growth":
+        # 생육 조사도 농장마다 조사일이 다르므로 절대 날짜 대신 조사 순번
+        # (survey_idx: 0=첫 조사, 1=둘째 조사)으로 묶는다.
+        g = growth.sort_values(["farm_id", "zone_id", "observation_date"])
+        survey_idx = g.groupby(["farm_id", "zone_id"]).cumcount()
+        counts = g.groupby(survey_idx).farm_id.nunique()
+        ok_idx = counts[counts >= 20].index
+        farms = sorted(g.loc[survey_idx.isin(set(ok_idx)), "farm_id"].unique())
+        return int(counts.loc[ok_idx].sum()), int(len(ok_idx)), farms
+    elif m == "zone_outlier_hourly":
+        col = spec_row["req"].split(";")[-1] if isinstance(spec_row["req"], str) else spec_row["req"][-1]
+        counts = hourly.groupby(["farm_id", "timestamp"]).zone_id.nunique()
+        valid_keys = set(counts[counts == 4].index)
+        sub = hourly[hourly.set_index(["farm_id", "timestamp"]).index.isin(valid_keys)]
+
+        def _outlier_flags(g: pd.DataFrame) -> pd.Series:
+            vals = g[col]
+            med = vals.median()
+            mad = (vals - med).abs().median() or 1e-9
+            return (vals - med).abs() >= 6 * mad
+
+        flags = sub.groupby(["farm_id", "timestamp"], group_keys=False).apply(_outlier_flags)
+        count = int(flags.sum())
+        farms = sorted(sub.loc[flags.reindex(sub.index, fill_value=False)].farm_id.unique()) if count else []
+        return count, count, farms
+    elif m == "image_longitudinal_pair":
+        counts_by_farm: Counter = Counter()
+        for p in IMAGE_FILES:
+            match = re.search(r"F\d{6}", str(p))
+            if match:
+                counts_by_farm[match.group(0)] += 1
+        farms = sorted(f for f, c in counts_by_farm.items() if c >= 2)
+        return len(IMAGE_FILES), len(farms), farms
     else:
         raise ValueError(m)
     mask = mask.fillna(False)
     row_count = int(mask.sum())
-    if m == "all_hourly":
+    if m == "all_hourly" or m.startswith("window_summary:"):
         unique_count = int(
             hourly.loc[mask].assign(date=hourly.loc[mask, "timestamp"].dt.date)
             .drop_duplicates(["farm_id", "zone_id", "date"]).shape[0]
@@ -406,6 +532,15 @@ def build_rows(hourly: pd.DataFrame, growth: pd.DataFrame, actual_columns: set[s
         if s["matcher"] == "period_images":
             event_def = "기간별 센서 또는 생육 summary event와 farm-level IMAGE_EMBED_SLOT event를 분리하고 image zone_id는 null로 유지"
             seq_def = "기간 summary event 오름차순 뒤 LOGICAL_ANCHOR image event;특정 zone 귀속 금지;OP 비활성화;미래 정보 사용 금지"
+        elif s["matcher"] == "image_longitudinal_pair":
+            event_def = "농장별 최초 이미지 event와 최근 이미지 event 두 개만 유지;중간 이미지는 사용하지 않음"
+            seq_def = "촬영시각 오름차순 최초→최근 이미지 두 노드;PERIOD_ALIGNED;LONGITUDINAL_PAIR;OP 비활성화;미래 정보 사용 금지"
+        elif s["matcher"] == "crossfarm_hourly":
+            event_def = "동일 지역시각(hour-of-day)의 서로 다른 farm_id 토큰을 농장별 하위 이벤트로 유지;절대 날짜는 무시"
+            seq_def = "동일 시각 안에서 farm_id 주소 오름차순;시간 SOP와 OP 비활성화;미래 정보 사용 금지;PERMUTATION_INVARIANT_SET"
+        elif s["matcher"] == "crossfarm_growth":
+            event_def = "동일 생육조사 순번(첫 조사 또는 둘째 조사)의 서로 다른 farm_id 토큰을 농장별 하위 이벤트로 유지;절대 조사일은 무시"
+            seq_def = "동일 조사 순번 안에서 farm_id 주소 오름차순;시간 SOP와 OP 비활성화;미래 정보 사용 금지;PERMUTATION_INVARIANT_SET"
         elif mixed:
             event_def = "시간자료는 farm_id+zone_id+timestamp;생육은 farm_id+zone_id+observation_date;원시 이벤트를 임의 병합하지 않고 둘째 조사시점에 과거 전용 집계 토큰만 결합"
             seq_def = "farm_id+zone_id별 시간 오름차순;첫 조사 초과 둘째 조사 이하만 집계;센서 요약 이벤트 2개와 둘째 생육 이벤트;좌측 패딩;오래된 센서부터 절단"
@@ -435,7 +570,7 @@ def build_rows(hourly: pd.DataFrame, growth: pd.DataFrame, actual_columns: set[s
         est = max(16, int(s["max_events"]) * (n_values + 3))
         evidence = EXPERT[s["evidence"]]
         narrative_id = s["narrative_id"]
-        if narrative_id in {"X08", "X09", "X10"}:
+        if narrative_id in {"X08", "X09", "X10", "X12"}:
             order_semantics = "PERIOD_LOGICAL_ALIGNMENT"
             alignment_policy = "farm_period_only"
         elif narrative_id == "X11":
@@ -444,9 +579,14 @@ def build_rows(hourly: pd.DataFrame, growth: pd.DataFrame, actual_columns: set[s
         elif narrative_id == "M06":
             order_semantics = "RELATION_ORDERED"
             alignment_policy = "public_observation_terminal_only"
-        elif narrative_id == "X04" or s["matcher"] in {"crosszone_hourly", "crosszone_growth"}:
+        elif narrative_id == "X04" or s["matcher"] in {
+            "crosszone_hourly", "crosszone_growth", "crossfarm_hourly", "crossfarm_growth",
+        }:
             order_semantics = "SET_COMPARISON"
-            alignment_policy = "same_farm_timestamp_zone_address"
+            alignment_policy = (
+                "same_hour_of_day_farm_address" if s["matcher"] in {"crossfarm_hourly", "crossfarm_growth"}
+                else "same_farm_timestamp_zone_address"
+            )
         else:
             order_semantics = "STRICT_CHRONOLOGICAL"
             alignment_policy = "entity_time_strict"
@@ -509,11 +649,11 @@ def build_rows(hourly: pd.DataFrame, growth: pd.DataFrame, actual_columns: set[s
             ) else "true",
             "order_semantics": order_semantics,
             "alignment_policy_id": alignment_policy,
-            "sampling_weight": "0.20" if narrative_id in {"X08", "X09", "X10"} else (
+            "sampling_weight": "0.20" if narrative_id in {"X08", "X09", "X10", "X12"} else (
                 "0.50" if narrative_id in {"X11", "M06"} else "1.00"
             ),
             "timestamp_precision": "period" if (
-                narrative_id in {"X08", "X09", "X10", "X11", "M06"}
+                narrative_id in {"X08", "X09", "X10", "X11", "M06", "X12"}
                 or "observation_date" in req
             ) else "1h",
         }

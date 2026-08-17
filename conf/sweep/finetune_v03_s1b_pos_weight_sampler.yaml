@@ -1,0 +1,112 @@
+# Sweep 1b — fine-grained pos_weight (0.05 steps) x WeightedRandomSampler (PLAN §12.1 follow-on)
+#
+# Follows up on `finetune_v03_s1_loss_binary.yaml`, which designed pos_weight as
+# ["auto","0.25","0.5","1.0"] but was launched (wandb sweep 8uhwp5w8) and never
+# finished -- no `sweep1_winner.json` was ever written, so all results to date
+# (including the official CV report, cv_20260715_104037_wandb) used the plain
+# default `pos_weight="auto"`, not a swept winner.
+#
+# life2vec paper cross-check (arXiv:2306.03009, Savcisens et al., 2023):
+#   - Sec 4.4.2 frames mortality prediction as Positive-Unlabeled learning with an
+#     "Asymmetrical Cross-Entropy Loss" -- NOT a pos_weight-style BCE reweighting.
+#     online2's pos_weight is a different (simpler) technique; there is no paper
+#     precedent for the exact value to use, so this stays an empirical search.
+#   - The paper's own `CLSDataModule.get_train_weights()` (this repo,
+#     src/data_new/datamodule.py) DOES use a WeightedRandomSampler to oversample
+#     the minority class, but this is NOT mentioned in the paper's main text --
+#     it is an implementation-only detail. online2's `--weighted-sampler` (added
+#     2026-07-24, src/online2/v2/finetune_v03/sample_weights.py) mirrors that
+#     code, not the paper narrative -- included here as a genuinely open question
+#     (does it help *in addition to* pos_weight, redundant with it, or fight it?).
+#   - The paper's data split is a plain random 70/15/15 split with NO
+#     stratification and NO grouping (Sec 4.2.5) -- online2's
+#     make_repeated_group_folds (farm-grouped, stratified) is already more
+#     conservative than the paper's own method, so no change is needed there.
+#
+# Search-phase tradeoff: n_repeats reduced from s1's 3 to 1 (grid size here is
+# 20 x 2 x 2 = 80 trials; at n_repeats=3 x n_folds=3 that would be ~9x slower
+# than necessary for a first pass -- rerun the winning corner with n_repeats=3
+# for a final confirmation number, don't trust this sweep's numbers as final).
+#
+#   export WANDB_GROUP=finetune_v03_improvement_r1
+#   wandb sweep --project Berry2Vec --entity dasom-oh conf/sweep/finetune_v03_s1b_pos_weight_sampler.yaml
+#   wandb agent dasom-oh/Berry2Vec/<ID>
+
+program: scripts/online2_v2/v03/run_diagnosis_finetune_v03.py
+method: grid
+metric:
+  name: cv/mean_best_macro_f1
+  goal: maximize
+command:
+  - /home/dasom/miniconda3/envs/life2vec/bin/python
+  - ${program}
+  - ${args}
+
+parameters:
+  mode:
+    value: cv_repeated
+  n_folds:
+    value: 3
+  n_repeats:
+    value: 1
+  epochs:
+    value: 150
+  monitor:
+    value: val_loss
+  wandb:
+    value: true
+  wandb_group:
+    value: finetune_v03_improvement_r1
+  wandb_job_type:
+    value: sweep_1b_pos_weight_sampler
+  wandb_tags:
+    value: v03,multitask,repeated3fold,open-set,attention-pooling,sweep1b,pos_weight_fine,weighted_sampler
+
+  # architecture fixed, same as sweep 1 (isolate loss/sampling effects only)
+  task_specific_query:
+    value: false
+  attention_residual:
+    value: false
+  token_attention_pool:
+    value: false
+  lambda_supcon:
+    value: 0.0
+  lambda_prototype:
+    value: 0.0
+  use_image_adapter:
+    value: true
+  lambda_binary:
+    value: 1.0
+  lambda_consistency:
+    value: 0.05
+
+  lr:
+    values: [1.0e-4, 3.0e-4]
+  weighted_sampler:
+    values: [true, false]
+  pos_weight:
+    values:
+      - "0.05"
+      - "0.10"
+      - "0.15"
+      - "0.20"
+      - "0.25"
+      - "0.30"
+      - "0.35"
+      - "0.40"
+      - "0.45"
+      - "0.50"
+      - "0.55"
+      - "0.60"
+      - "0.65"
+      - "0.70"
+      - "0.75"
+      - "0.80"
+      - "0.85"
+      - "0.90"
+      - "0.95"
+      - "1.00"
+  binary_threshold:
+    value: 0.5
+  binary_thresholds:
+    value: "0.25,0.5,0.75"

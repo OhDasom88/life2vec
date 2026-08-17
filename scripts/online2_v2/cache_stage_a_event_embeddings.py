@@ -167,6 +167,15 @@ def sentence_to_tokens(sentence: str) -> list[str]:
     return [t for t in str(sentence or "").split(" ") if t]
 
 
+MISSING_ZONE_VALUES = {"", "None", "nan"}
+
+
+def zone_present(zone: str) -> bool:
+    """IMAGE/INTERPRETATION 이벤트는 farm 단위라 zone_id가 없다(str(NaN)/빈 문자열) --
+    이런 이벤트는 ZONE_LOCAL 접두 토큰을 붙이지 않는다."""
+    return zone not in MISSING_ZONE_VALUES
+
+
 def cache_is_complete(path: Path) -> bool:
     if not path.exists():
         return False
@@ -258,6 +267,14 @@ def case_events_from_frame(
     out: list[CaseEvent] = []
     for i, row in df.iterrows():
         toks = sentence_to_tokens(row["SENTENCE"])
+        zone = str(row["zone_id"])
+        # +1 reserves a slot for the per-window ZONE_LOCAL prefix token added in
+        # window_to_tensors (the actual local index depends on which zones co-occur
+        # in that specific window, so it can't be assigned here -- only the COUNT is
+        # fixed per event: exactly 1 token for any event that has a real zone, 0 for
+        # farm-level events like IMAGE/INTERPRETATION). construct_target_window's
+        # greedy budget packing reads this count, so it must already reflect the
+        # token that will actually be emitted.
         out.append(
             CaseEvent(
                 event_id=str(row["event_id"]),
@@ -265,10 +282,10 @@ def case_events_from_frame(
                 same_time_group_id=str(row["same_time_group_id"] or ""),
                 timestamp=pd.Timestamp(row["_ts"]),
                 view=str(row["_view"]),
-                zone=str(row["zone_id"]),
+                zone=zone,
                 event_kind=str(row["event_kind"]),
                 sentence_tokens=toks,
-                token_count=len(toks),
+                token_count=len(toks) + (1 if zone_present(zone) else 0),
             )
         )
     return out
@@ -420,6 +437,15 @@ def window_to_tensors(
     segments = [((i % 3) + 1) for i in range(len(selected))]
     abspos = [h + 1 for h in start_hours]
 
+    # Mirrors export_training_events_v2_event_grain.py::expand_sequence_rows's
+    # NARRATIVE/FARM_LOCAL/ZONE_LOCAL prefix, scoped to ZONE_LOCAL only (FARM_LOCAL
+    # would be constant across a whole case -- Stage A always processes one farm at a
+    # time -- and there's no narrative_id for a plain diagnostic window). The local
+    # index is assigned per-window (only the zones that actually co-occur in THIS
+    # window get numbered), same convention pretraining uses per-sequence.
+    zones_in_window = sorted({ev.zone for ev in selected if zone_present(ev.zone)})
+    zone_local = {z: f"ZONE_LOCAL|{i}" for i, z in enumerate(zones_in_window)}
+
     bg = Background.get_sentence(DEFAULT_BACKGROUND)
     flat_tokens: list[str] = ["[CLS]", *bg, "[SEP]"]
     flat_abspos: list[int] = [abspos[0]] * (1 + len(bg) + 1)
@@ -427,7 +453,9 @@ def window_to_tensors(
     flat_seg: list[int] = [1] * (1 + len(bg) + 1)
 
     for si, ev in enumerate(selected):
-        flat_tokens.extend(ev.sentence_tokens)
+        ev_tokens = ([zone_local[ev.zone]] if ev.zone in zone_local else []) + ev.sentence_tokens
+        assert len(ev_tokens) == ev.token_count, (ev.event_id, len(ev_tokens), ev.token_count)
+        flat_tokens.extend(ev_tokens)
         flat_abspos.extend([abspos[si]] * ev.token_count)
         flat_age.extend([ages[si]] * ev.token_count)
         flat_seg.extend([segments[si]] * ev.token_count)

@@ -1,0 +1,56 @@
+# wandb Sweep config for scripts/online2_v2/run_v2_pretrain_loop.py.
+#
+# 이번 세션의 narrative_ablation 8-arm(6-arm + microevent_split + expanded88_phase2)을
+# 전부 개별 nohup 프로세스로 손으로 띄우고 로그를 grep해서 비교했다 — 이제 이걸
+# wandb Sweep으로 대체해서 (1) epoch 단위 학습+early stop을 기본값으로 쓰고
+# (2) 모든 run이 자동으로 wandb에 남고 한 데시보드에서 비교 가능하게 한다.
+#
+# 실행:
+#   wandb sweep scripts/online2_v2/wandb_sweep_v2_pretrain.yaml
+#   wandb agent <sweep_id 출력값>
+#
+# --run-dir/--build-dir/--parquet는 실험마다 다르므로 아래 command의 고정값을
+# 실제 대상 corpus에 맞게 바꿔서 쓴다(예: sop 재조정 sweep이면
+# outputs/online2/v2_build 고정, Phase 2 조합 실험이면
+# outputs/online2/v2_build_expanded88_phase2 고정). run_v2_pretrain_loop.py는
+# WANDB_SWEEP_ID가 감지되면 --run-dir에 자동으로 짧은 run id를 붙여 여러
+# trial이 체크포인트를 덮어쓰지 않게 한다(run_v2_pretrain_loop.py:471-476).
+
+program: scripts/online2_v2/run_v2_pretrain_loop.py
+method: grid
+metric:
+  name: val/loss
+  goal: minimize
+parameters:
+  sop-reverse:
+    values: [0.2, 0.33, 0.4]
+  sop-shuffle:
+    values: [0.2, 0.33, 0.4]
+  lr:
+    values: [0.0005, 0.0002]
+command:
+  - /home/dasom/miniconda3/envs/life2vec/bin/python
+  - ${program}
+  - --mode
+  - full
+  - --build-dir
+  - outputs/online2/v2_build
+  - --parquet
+  - outputs/online2/v2_build/training_events_v2.parquet
+  - --run-dir
+  - outputs/online2/v2_runs/sweeps/sop_lr_sweep
+  - --epochs
+  - "3"
+  - --max-length
+  - "1024"
+  - --batch-size
+  - "40"
+  - --ckpt-every
+  - "300"
+  - --skip-vram-calibrate
+  - --wandb
+  - --wandb-project
+  - Berry2Vec
+  - --wandb-tags
+  - online2_v2,sweep,sop_lr
+  - ${args}

@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
-"""SOP 재조정 + 서사 다양성 ablation으로 새로 학습한 6개 체크포인트를 비교한다.
+"""두 sweep(1479개 서사 corpus / 1517개 서사 corpus)에서 각각 찾은 최적
+하이퍼파라미터 체크포인트를, SAE dead_feature_ratio + effective rank로 비교한다.
 
-`run_narrative_ablation_pretrain_sweep.sh`가 만든 6개 체크포인트
-(control/sop_balanced/narrow_subset/single_table_only/multi_table_only/
-dedup_reduced, 전부 5000 step·batch=40·max_length=1024로 동일 조건) 각각에
-대해, 같은 14,544개 narrative-selected target으로 최종 encoder layer +
-MLM/SOP 디코더 변환의 PCA 유효 차원과 SAE dead_feature_ratio를 측정해
-한 표로 비교한다. `pilot_sae_layer_decoder_random_comparison.py`의
-`encode_all_positions`/`train_and_evaluate_sae`/`effective_rank`를 그대로
-재사용한다(계산 로직 중복 없음) — 이번엔 6개 layer 전부가 아니라
-final layer + 두 디코더 변환 3개 지점만 본다(6개 체크포인트 x 6개 layer는
-과함, 앞선 layer sweep에서 이미 "최종 layer가 최악"이라는 걸 확인했으므로
-여기서는 그 최종 layer가 조건마다 어떻게 달라지는지에 집중).
+`compare_narrative_ablation_checkpoints.py`와 같은 계산 로직(effective_rank,
+train_and_evaluate_sae, encode_all_positions)을 그대로 재사용하되, 이번엔
+두 체크포인트가 서로 다른 코퍼스(따라서 서로 다른 vocab/vocab_size)에서
+나왔으므로 각 체크포인트를 자기 자신의 corpus(vocab/events/training_events/
+abspos_reference)로 평가해야 한다 -- 하나의 공유 vocab을 쓰는 기존 스크립트의
+DEFAULT_ARMS 구조를 그대로는 못 쓴다.
 """
 
 from __future__ import annotations
@@ -53,40 +49,25 @@ from src.data_new.vocabulary import RegistryVocabulary  # noqa: E402
 
 POSITIONS = ["layer5", "mlm_transform", "sop_transform"]
 
-# Use the step-5000 snapshot for every arm, not best.ckpt: best.ckpt tracks
-# lowest val loss (checkpoint_every=100), which lands at a different step per
-# arm (observed: control=4200, sop_balanced=5000, narrow_subset=5000,
-# single_table_only=5500 (resumed with additive --steps, see below),
-# multi_table_only=4900, dedup_reduced=4800). Comparing representational
-# diversity across a different number of training steps would confound
-# "narrative content" with "how much training happened" — checkpoint_step_5000.pt
-# exists for all 6 arms and pins every comparison to an identical step budget.
-# (single_table_only was interrupted mid-run and resumed; --steps is additive on
-# resume in run_v2_pretrain_loop.py:687 `while step < start_step + steps`, so its
-# best/last.ckpt reflect 6200 total steps — checkpoint_step_5000.pt sidesteps that.)
-DEFAULT_ARMS = {
-    "control": "outputs/online2/v2_runs/narrative_ablation/control/checkpoint_step_5000.pt",
-    "sop_balanced": "outputs/online2/v2_runs/narrative_ablation/sop_balanced/checkpoint_step_5000.pt",
-    "narrow_subset": "outputs/online2/v2_runs/narrative_ablation/narrow_subset/checkpoint_step_5000.pt",
-    "single_table_only": "outputs/online2/v2_runs/narrative_ablation/single_table_only/checkpoint_step_5000.pt",
-    "multi_table_only": "outputs/online2/v2_runs/narrative_ablation/multi_table_only/checkpoint_step_5000.pt",
-    "dedup_reduced": "outputs/online2/v2_runs/narrative_ablation/dedup_reduced/checkpoint_step_5000.pt",
-    "microevent_split": "outputs/online2/v2_runs/narrative_ablation/microevent_split/checkpoint_step_5000.pt",
+ARMS = {
+    "expanded_full_1479_lr5e4": {
+        "build_dir": ROOT / "outputs/online2/v2_build_expanded_full",
+        "ckpt": ROOT / "outputs/online2/v2_runs/sweeps/expanded_full_sop_lr_sweep_kg5nv8zz/best.ckpt",
+        "hp": {"lr": 0.0005, "sop_reverse": 0.2, "sop_shuffle": 0.2},
+        "n_narratives": 1479,
+    },
+    "expanded_full1517_lr2e4": {
+        "build_dir": ROOT / "outputs/online2/v2_build_expanded_full1517",
+        "ckpt": ROOT / "outputs/online2/v2_runs/sweeps/expanded_full1517_sop_lr_sweep_arqqsci4/best.ckpt",
+        "hp": {"lr": 0.0002, "sop_reverse": 0.2, "sop_shuffle": 0.2},
+        "n_narratives": 1517,
+    },
 }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--training-events", type=Path, default=ROOT / "outputs/online2/v2_build/training_events_v2.parquet"
-    )
-    parser.add_argument(
-        "--events", type=Path, default=ROOT / "outputs/online2/v2_build/events_tokenized_v2.parquet"
-    )
-    parser.add_argument(
-        "--vocab", type=Path, default=ROOT / "outputs/online2/v2_build/life2vec_token_registry_v2.json"
-    )
-    parser.add_argument("--per-narrative-cap", type=int, default=250)
+    parser.add_argument("--per-narrative-cap", type=int, default=150)
     parser.add_argument("--max-length", type=int, default=1024)
     parser.add_argument("--batch-targets", type=int, default=16)
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
@@ -96,38 +77,41 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=15)
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--use-last-ckpt-if-missing", action="store_true")
     parser.add_argument(
-        "--out", type=Path, default=Path("outputs/online2/sae_pilot/report_narrative_ablation.json")
+        "--out", type=Path, default=Path("outputs/online2/sae_pilot/report_sweep_winners.json")
     )
     args = parser.parse_args()
     args.out.parent.mkdir(parents=True, exist_ok=True)
 
-    print("selecting narrative-template target events ...")
-    targets = find_narrative_targets(args.training_events)
-    sampled = stratified_sample_targets(targets, per_narrative_cap=args.per_narrative_cap, seed=args.seed)
-    print(f"  {len(sampled)} target events")
-
-    vocab = RegistryVocabulary(registry_path=str(args.vocab), registry_version="v2")
     device = torch.device(args.device)
-    abspos_reference = load_abspos_reference(ROOT / "outputs/online2/v2_build/abspos_reference.json")
-
-    farm_ids = {t.farm_id for t in sampled}
-    events_df = load_events_frame(args.events, farm_ids)
-    farm_events = build_farm_event_lists(events_df, farm_ids)
-    event_id_to_local = {
-        ev.event_id: (farm_id, idx) for farm_id, events in farm_events.items() for idx, ev in enumerate(events)
-    }
-
     report: dict[str, dict] = {}
-    for arm_name, ckpt_rel in DEFAULT_ARMS.items():
-        ckpt_path = ROOT / ckpt_rel
+
+    for arm_name, spec in ARMS.items():
+        build_dir = spec["build_dir"]
+        ckpt_path = spec["ckpt"]
         if not ckpt_path.exists():
-            if args.use_last_ckpt_if_missing:
-                ckpt_path = ckpt_path.with_name("last.ckpt")
-            if not ckpt_path.exists():
-                print(f"[skip] {arm_name}: no checkpoint at {ckpt_path}")
-                continue
+            print(f"[skip] {arm_name}: no checkpoint at {ckpt_path}")
+            continue
+
+        training_events = build_dir / "training_events_v2.parquet"
+        events_path = build_dir / "events_tokenized_v2.parquet"
+        vocab_path = build_dir / "life2vec_token_registry_v2.json"
+        abspos_path = build_dir / "abspos_reference.json"
+
+        print(f"[{arm_name}] selecting narrative-template target events from {training_events} ...")
+        targets = find_narrative_targets(training_events)
+        sampled = stratified_sample_targets(targets, per_narrative_cap=args.per_narrative_cap, seed=args.seed)
+        print(f"  {len(sampled)} target events (cap={args.per_narrative_cap} x {spec['n_narratives']} narratives)")
+
+        vocab = RegistryVocabulary(registry_path=str(vocab_path), registry_version="v2")
+        abspos_reference = load_abspos_reference(abspos_path)
+
+        farm_ids = {t.farm_id for t in sampled}
+        events_df = load_events_frame(events_path, farm_ids)
+        farm_events = build_farm_event_lists(events_df, farm_ids)
+        event_id_to_local = {
+            ev.event_id: (farm_id, idx) for farm_id, events in farm_events.items() for idx, ev in enumerate(events)
+        }
 
         print(f"[{arm_name}] loading {ckpt_path} ...")
         model, hparams, _ = load_frozen_encoder(ckpt_path, vocab, device)
@@ -171,7 +155,7 @@ def main() -> None:
         print(f"  {arm_name}: done, {len(rows)} rows, skipped {skipped}")
 
         df = pd.DataFrame(rows)
-        report[arm_name] = {}
+        report[arm_name] = {"hp": spec["hp"], "n_narratives": spec["n_narratives"], "positions": {}}
         for position in POSITIONS:
             sub = df[df["position"] == position]
             means = np.array(sub["event_mean"].tolist(), dtype=np.float32)
@@ -180,9 +164,11 @@ def main() -> None:
                 means, dict_size=args.dict_size, top_k=args.top_k, epochs=args.epochs,
                 batch_size=args.batch_size, lr=args.lr, seed=args.seed,
             )
-            report[arm_name][position] = {"n": int(len(sub)), "effective_rank": rank, "sae": sae_report}
+            report[arm_name]["positions"][position] = {
+                "n": int(len(sub)), "effective_rank": rank, "sae": sae_report,
+            }
             print(
-                f"  {arm_name:20s} {position:14s} n={len(sub)} rank99={rank['pc_for_99pct']:3d} "
+                f"  {arm_name:28s} {position:14s} n={len(sub)} rank99={rank['pc_for_99pct']:3d} "
                 f"EV={sae_report['explained_variance']:.3f} dead={sae_report['dead_feature_ratio']:.3f}"
             )
 

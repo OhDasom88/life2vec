@@ -1,0 +1,87 @@
+# wandb Sweep config for the expanded-full corpus (88 curated + 1391 promoted
+# auto-generated narratives, see scripts/promote_auto_expansion_candidates.py).
+# Copy of wandb_sweep_v2_pretrain.yaml retargeted at
+# outputs/online2/v2_build_expanded_full -- same sop-reverse/sop-shuffle/lr grid,
+# epoch-based training, early stopping (built into run_v2_pretrain_loop.py's
+# val loop, independent of --epochs).
+#
+# grid(18개 이산 조합)+early_terminate:hyperband -- 18개는 bayes 서로게이트
+# 모델을 학습시키기엔 너무 작은 이산 공간이라(연속 range가 아님) bayes 대신
+# 그대로 grid로 다 등록하되, 중간 성능이 나쁜 run은 hyperband가 val/loss 기록
+# 3회차(= --val-every 100 기준 300 스텝)부터 조기 종료시켜 GPU 시간을 아낀다.
+# --max-length=3072: 실측 시퀀스 토큰 길이 샘플(40만 시퀀스, sequence_id 기준)
+# p50=172/p75=366/p90=624/p95=1548/p99=2064/max=3096 -- 1024는 8.5%가 잘리고
+# 하필 이번 세션에 늘린 crossfarm/crosszone N자간 비교 서사(최대 48이벤트)가
+# 긴 쪽에 몰려있어 그 부분이 우선적으로 잘림. 거의 다 보존하는 쪽으로 3072 선택
+# (사용자 확인). --batch-size는 calibrate_batch_size()의 시작값일 뿐, 실제 배치는
+# --target-vram-frac 0.80에 맞춰 자동으로 커진다(run_v2_pretrain_loop.py:616-631) --
+# 시퀀스가 길어져서 24GB GPU 기준 배치 크기는 예전(40)보다 훨씬 작아질 것으로 예상.
+#
+# `${env}`+`python`(원래 템플릿)은 wandb agent가 실제로 실행해보니 시스템 PATH의
+# python(torch 미설치)으로 풀려서 3개 trial이 즉시 죽고 flapping 감지로 agent가
+# 통째로 종료됐다(실측) -- life2vec conda env의 절대경로 인터프리터로 고정.
+#
+# --max-rows 기본값이 200이라(스모크 테스트용) 이걸 빼먹으면 "epoch"이 전체
+# 913만 시퀀스가 아니라 200행에 대한 pass가 돼서 --epochs 3이 단 7 step만에
+# 끝나버린다(실측: 첫 trial이 DONE PASS 7로 종료) -- --max-rows 0(무제한)을
+# 명시해야 진짜 전체 코퍼스로 학습한다.
+#
+# 규모 재계산(실측 처리량 -- max-rows 0, batch_size=16, max_length=3072로 60
+# step 타이밍): 초당 2~3.5 step. 1 epoch = 학습분할 약 868만 시퀀스 ÷ 16 ≈
+# 54.3만 step ≈ 1.8~3일. epochs=3이면 트라이얼당 5~9일, 18개 grid면 수주 규모라
+# 사용자 확인 후 축소: --epochs 3→1, hyperband min_iter 3→2 + eta 2로 더
+# 공격적으로 조기 가지치기(초기 신호만으로 승산 없는 조합을 더 빨리 끔).
+# --ckpt-every도 300→20000으로 올림 -- 체크포인트 1개가 142MB인데 300 step마다
+# 저장하면 1 epoch(54.3만 step)에 체크포인트만 약 1810개=257GB/트라이얼로 이전
+# 세션의 디스크 폭증 사고(--ckpt-every 10 → 440GB)가 재현될 뻔했다(실측 확인,
+# 코드에 오래된 체크포인트 자동 정리 로직이 없음).
+#
+# 실행:
+#   wandb sweep scripts/online2_v2/wandb_sweep_v2_pretrain_expanded_full.yaml
+#   wandb agent <sweep_id 출력값>
+
+program: scripts/online2_v2/run_v2_pretrain_loop.py
+method: grid
+metric:
+  name: val/loss
+  goal: minimize
+early_terminate:
+  type: hyperband
+  min_iter: 2
+  eta: 2
+parameters:
+  sop-reverse:
+    values: [0.2, 0.33, 0.4]
+  sop-shuffle:
+    values: [0.2, 0.33, 0.4]
+  lr:
+    values: [0.0005, 0.0002]
+command:
+  - /home/dasom/miniconda3/envs/life2vec/bin/python
+  - ${program}
+  - --mode
+  - full
+  - --build-dir
+  - outputs/online2/v2_build_expanded_full
+  - --parquet
+  - outputs/online2/v2_build_expanded_full/training_events_v2.parquet
+  - --max-rows
+  - "0"
+  - --run-dir
+  - outputs/online2/v2_runs/sweeps/expanded_full_sop_lr_sweep
+  - --epochs
+  - "1"
+  - --max-length
+  - "3072"
+  - --batch-size
+  - "8"
+  - --target-vram-frac
+  - "0.80"
+  - --ckpt-every
+  - "20000"
+  - --wandb
+  - --wandb-project
+  - Berry2Vec
+  - --wandb-tags
+  - online2_v2,sweep,sop_lr,expanded_full
+  - ${args}

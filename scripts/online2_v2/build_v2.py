@@ -138,6 +138,7 @@ def build_registries(out: Path, legacy_build: Path, audit: Path) -> dict[str, An
         problem_count=problem_n,
         code_commit_hash=git_commit(),
         policy=policy,
+        bins=100,  # Phase 2: 10 -> 100분위, VALUE_ABS를 원본에 더 가깝게 세분화(분석 전용 check_raw_narrative_time_location_diversity.py와 동일 기준)
     )
     binning.save(out / "binning_registry_v2_transductive.json")
     # Compact machine-readable policy snapshot (hash + counts).
@@ -156,7 +157,9 @@ def build_registries(out: Path, legacy_build: Path, audit: Path) -> dict[str, An
             "policy_yaml": str(policy_path) if policy_path.exists() else None,
         },
     )
-    vocab = build_vocab_v2(schema, binning, code_commit_hash=git_commit())
+    catalog_path = legacy_build / "normalized_catalog.csv"
+    narrative_ids = sorted(pd.read_csv(catalog_path)["narrative_id"].astype(str).unique())
+    vocab = build_vocab_v2(schema, binning, code_commit_hash=git_commit(), narrative_ids=narrative_ids)
     vocab.save(out / "vocab_v2.json")
     save_token_usage_policy(out / "token_usage_policy_v2.json")
     write_json(
@@ -214,6 +217,8 @@ def tokenize_events(
             "observation_timestamp",
             "modality",
             "is_null",
+            "source_file_id",
+            "source_row_id",
         ],
     )
     mappings = pd.read_parquet(
@@ -267,6 +272,8 @@ def tokenize_events(
                 "raw_display",
                 "is_null",
                 "atomic_value_id",
+                "source_file_id",
+                "source_row_id",
             ]
         ].itertuples(index=False, name=None)
     )
@@ -284,20 +291,36 @@ def tokenize_events(
         tokens: list[str] = []
         group_ids: list[str] = []
         roles: list[str] = []
+        # source_file_ids/source_row_ids: per-token raw-cell provenance, aligned 1:1
+        # with tokens/group_ids/roles exactly like measurement_group_ids already is.
+        # "" means "this token has no single raw cell behind it" (separators, meta,
+        # slot tokens) -- only value/quality/literal/circular tokens from a real
+        # cell_occurrences row get a real (source_file_id, source_row_id) pair.
+        source_file_ids: list[str] = []
+        source_row_ids: list[str] = []
         if ev.event_kind == "IMAGE":
             tokens = ["[IMAGE_SLOT]", "IMAGE_ROLE|UNRESOLVED", "VIEW|IMAGE", "EVENT_KIND|IMAGE"]
             group_ids = ["NONE"] * len(tokens)
             roles = ["slot", "meta", "meta", "meta"]
+            source_file_ids = [""] * len(tokens)
+            source_row_ids = [""] * len(tokens)
         elif ev.event_kind == "INTERPRETATION":
             tokens = ["[TEXT_SLOT]", "VIEW|INTERPRETATION", "EVENT_KIND|INTERPRETATION"]
             group_ids = ["NONE"] * len(tokens)
             roles = ["slot", "meta", "meta"]
+            source_file_ids = [""] * len(tokens)
+            source_row_ids = [""] * len(tokens)
         elif grp is not None:
+            # 2026-07-26: [MEAS_SEP] 제거 -- 셀 하나가 이제 토큰 하나(`FEATURE|value`)라
+            # 구간 구분자가 필요 없다(예전엔 셀 하나가 최대 6개 토큰이라 어디까지가
+            # 한 측정인지 표시해야 했음).
             for cell in grp:
                 column_name = cell[4]
                 if column_name in skip_cols:
                     continue
                 raw = "" if bool(cell[8]) else str(cell[7])
+                cell_source_file_id = str(cell[10] or "")
+                cell_source_row_id = str(cell[11] or "")
                 measured = tokenizer.tokenize_value(
                     str(column_name),
                     raw,
@@ -305,22 +328,25 @@ def tokenize_events(
                     cell_id=str(cell[5]),
                     atomic_value_id=str(cell[9] or ""),
                 )
-                tokens.append("[MEAS_SEP]")
-                group_ids.append(measured.measurement_group_id)
-                roles.append("sep")
                 for tok, role in zip(measured.tokens, measured.roles):
                     tokens.append(tok)
                     group_ids.append(measured.measurement_group_id)
                     roles.append(role)
+                    source_file_ids.append(cell_source_file_id)
+                    source_row_ids.append(cell_source_row_id)
             view_name = str(ev.view)
             view_tok = view_name.split("_")[-1].upper() if "_" in view_name else view_name.upper()
             tokens = ["[EVENT_SEP]", f"VIEW|{view_tok}", "EVENT_KIND|OBSERVATION"] + tokens
             group_ids = ["NONE", "NONE", "NONE"] + group_ids
             roles = ["sep", "meta", "meta"] + roles
+            source_file_ids = ["", "", ""] + source_file_ids
+            source_row_ids = ["", "", ""] + source_row_ids
         else:
             tokens = ["[EVENT_SEP]", "EVENT_KIND|OBSERVATION", "[MISSING]"]
             group_ids = ["NONE"] * 3
             roles = ["sep", "meta", "quality"]
+            source_file_ids = [""] * 3
+            source_row_ids = [""] * 3
 
         token_ids = [vocab.get(t) for t in tokens]
         rows.append(
@@ -334,6 +360,8 @@ def tokenize_events(
                 "SENTENCE": " ".join(tokens),
                 "measurement_group_ids": json.dumps(group_ids),
                 "token_roles": json.dumps(roles),
+                "source_file_ids": json.dumps(source_file_ids),
+                "source_row_ids": json.dumps(source_row_ids),
                 "token_ids": json.dumps(token_ids),
                 "embedding_status": getattr(ev, "embedding_status", ""),
                 "tokenization_version": "v2",
@@ -362,6 +390,7 @@ def materialize_sequences(out: Path, legacy_build: Path, events_v2: pd.DataFrame
 
     sent_map = events_v2.set_index("event_id")["SENTENCE"].astype(str).to_dict()
     farm_map = events_v2.set_index("event_id")["farm_id"].astype(str).to_dict()
+    zone_map = events_v2.set_index("event_id")["zone_id"].astype(str).to_dict()
     stg_map = events_v2.set_index("event_id")["same_time_group_id"].astype(str).to_dict()
     role_map = events_v2.set_index("event_id")["token_roles"].astype(str).to_dict()
     mg_map = events_v2.set_index("event_id")["measurement_group_ids"].astype(str).to_dict()
@@ -421,13 +450,16 @@ def materialize_sequences(out: Path, legacy_build: Path, events_v2: pd.DataFrame
         meta = seq_meta.loc[sequence_id]
         narrative_id = str(meta["narrative_id"])
         farms = [farm_map[eid] for eid in event_ids]
+        zones = [zone_map[eid] for eid in event_ids]
+        farm_local, zone_local = local_spatial_maps(farms, zones)
+        narrative_tok = f"NARRATIVE|{narrative_id}"
         stgs: list[str] = []
         parts: list[str] = []
         flat_groups: list[str] = []
         flat_roles: list[str] = []
         prev_ts = None
         start_ts = ts_map[event_ids[0]]
-        for eid in event_ids:
+        for eid, farm, zone in zip(event_ids, farms, zones):
             ts = ts_map[eid]
             prefix: list[str] = []
             if prev_ts is not None:
@@ -436,6 +468,10 @@ def materialize_sequences(out: Path, legacy_build: Path, events_v2: pd.DataFrame
             days = (ts - start_ts).total_seconds() / 86400.0
             prefix.append(day_from_start_bucket(days))
             prefix.append(f"LOCAL_HOUR|H{ts.tz_convert('Asia/Seoul').hour:02d}")
+            prefix.append(narrative_tok)
+            prefix.append(farm_local[farm])
+            if zone in zone_local:
+                prefix.append(zone_local[zone])
             prefix.append("[GROUP_SEP]")
             prev_ts = ts
             body = str(sent_map[eid]).split()
@@ -447,7 +483,6 @@ def materialize_sequences(out: Path, legacy_build: Path, events_v2: pd.DataFrame
                 ["temporal"] * (len(prefix) - 1) + ["sep"] + roles + ["sep"]
             )
             stgs.append(stg_map[eid])
-        farm_local, _ = local_spatial_maps(farms, [])
         spatial = list(dict.fromkeys(farm_local[f] for f in farms))
         full_tokens = spatial + parts
         serialization = " ".join(full_tokens)
@@ -716,7 +751,17 @@ def export_training(out: Path, vocab: VocabV2) -> dict[str, Any]:
         tmp_path.replace(export_path)
     else:
         pd.DataFrame([]).to_parquet(export_path, index=False)
-    # life2vec compatible registry
+    write_life2vec_token_registry(out, vocab)
+    return {"rows": int(n_rows), "path": str(export_path), "vocab_size": vocab.size()}
+
+
+def write_life2vec_token_registry(out: Path, vocab: VocabV2) -> None:
+    """`life2vec_token_registry_v2.json` -- RegistryVocabulary(모델 embedding table
+    크기를 여기서 정함)가 읽는 파일. vocab_v2.json에서 파생될 뿐 시퀀스와는 무관한데,
+    예전엔 export_training()(옛 flat export, --skip-sequences로 건너뛰는 무거운 경로)
+    안에서만 같이 썼다 -- registries만 다시 만들 때(예: tokenizer 변경) 이 파일이
+    안 갱신되면 vocab_v2.json과 어긋나서 embedding index-out-of-range로 학습이
+    죽는다(2026-07-26 실제로 겪음). 그래서 독립 함수로 빼서 main()에서 항상 부른다."""
     tokens = [
         {
             "token_id": i,
@@ -728,33 +773,33 @@ def export_training(out: Path, vocab: VocabV2) -> dict[str, Any]:
         }
         for i in range(vocab.size())
     ]
-    # Map new specials into categories; ensure PAD=0
     write_json(out / "life2vec_token_registry_v2.json", {"tokens": tokens, "registry_version": "v2", "schema_version": "online2-v2"})
-    return {"rows": int(n_rows), "path": str(export_path), "vocab_size": vocab.size()}
 
 
 def validate_grouped_masking(out: Path) -> dict[str, Any]:
+    """2026-07-26: 셀 하나 = 토큰 하나(FEATURE|value)로 단순화된 뒤로는 measurement
+    group도 항상 크기 1이다 -- GroupedMLMMasker가 여기서는 사실상 life2vec 원본의
+    평평한 per-token 80/10/10 마스킹과 동등하게 동작한다는 걸 확인한다."""
     vocab = VocabV2.load(out / "vocab_v2.json")
     masker = GroupedMLMMasker(vocab, mask_ratio=1.0, seed=2023)
-    abs_tok = next(t for t in vocab.token_to_id if t.startswith("VALUE_ABS|ABS_B"))
-    glob_tok = next(t for t in vocab.token_to_id if t.startswith("VALUE_GLOBAL_REL|GLOBAL_REL_B"))
-    farm_tok = next(t for t in vocab.token_to_id if t.startswith("VALUE_FARM_REL|FARM_REL_B"))
-    tokens = ["FEATURE|INSIDE_TEMP_C", abs_tok, glob_tok, farm_tok, "QUALITY|OK"]
+    abs_tok = next(
+        t for t in vocab.token_to_id if "|ABS_B" in t and not t.startswith("VALUE_ABS|")
+    )
+    tokens = [abs_tok, "[EVENT_SEP]"]
     for tok in tokens:
         if tok not in vocab.token_to_id:
             raise AssertionError(f"missing token {tok}")
-    roles = ["feature_identity", "value_abs", "value_global", "value_farm", "quality"]
+    roles = ["value_abs_combined", "sep"]
     ids = [vocab.get(t) for t in tokens]
-    groups = ["mg1"] * len(tokens)
+    groups = ["mg1", "NONE"]
     masked, pos, tgt, report = masker.mask(ids, groups, roles)
-    assert masked[0] == ids[0]
     assert report.masked_group_count == 1
-    assert set(pos.tolist()) == {1, 2, 3, 4}
+    assert set(pos.tolist()) == {0}
+    assert masked[0] == vocab.get("[MASK]")
     narr = [i for t, i in vocab.token_to_id.items() if t.startswith("NARRATIVE|")]
     assert not any(int(x) in narr for x in masked)
     payload = {
         "report": report.__dict__,
-        "feature_identity_preserved": bool(masked[0] == ids[0]),
         "masked_positions": pos.tolist(),
         "pass": True,
     }
@@ -787,6 +832,14 @@ def main() -> None:
 
     print("== grouped masking validation ==")
     print(validate_grouped_masking(out))
+
+    # vocab_v2.json이 바뀌었을 수 있는 모든 경로(registries 새로 빌드 OR 캐시 재사용
+    # 둘 다) 뒤에 항상 동기화 -- life2vec_token_registry_v2.json이 뒤처지면
+    # RegistryVocabulary(모델 embedding table 크기 결정)가 vocab_v2.json과 어긋나서
+    # 학습이 index-out-of-range로 죽는다.
+    vocab_for_registry = VocabV2.load(out / "vocab_v2.json")
+    write_life2vec_token_registry(out, vocab_for_registry)
+    print(f"== life2vec_token_registry_v2.json synced (vocab_size={vocab_for_registry.size()}) ==")
 
     max_events = args.max_events or None
     if args.skip_tokenize and (out / "events_tokenized_v2.parquet").exists():

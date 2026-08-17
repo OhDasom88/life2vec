@@ -1,0 +1,68 @@
+# wandb Sweep config for the expanded_full1517 corpus (1479개 서사 + 신규
+# lag_response 지연반응 38개 = 1517개, outputs/online2/v2_build_expanded_full1517).
+# expanded_full(1479개) sweep과 완전히 동일한 grid/설정을 재사용 -- 같은 조건으로
+# 돌려서 (1) 이전에 찾은 최적 하이퍼파라미터(lr=0.0005, sop-reverse=0.2,
+# sop-shuffle=0.2, best_val_loss 1.68)가 이 코퍼스에서도 재현되는지, (2) 새로
+# 추가된 지연반응 서사가 결과를 바꾸는지 확인한다.
+#
+# --max-length=3072: 이 코퍼스에서도 실측 재확인(40만 시퀀스 샘플) -- p99=2064,
+# 3072 초과 비율 0.65%로 이전 코퍼스와 사실상 동일한 분포. 그대로 유지.
+#
+#
+# 2026-07-26 업데이트: 토큰화를 셀당 토큰 1개(`FEATURE|value`)로 단순화하고
+# ([MEAS_SEP]/QUALITY/STATE_SEMANTICS/RAW_CODE_CLASS/bare FEATURE 식별 토큰 제거),
+# training_events_v2.parquet(260배 중복 펼친 flat 파일, 수시간 소요)를 더 이상
+# 만들지 않고 sequences_v2.parquet+events_tokenized_v2.parquet를 로딩 시점에
+# 조인하는 --corpus-format normalized로 바꿨다. 이벤트당 평균 토큰 수 46→12개
+# (74.6% 감소)로 이전 기준값(best_val_loss 1.68, top-line 위 참조)은 vocab/토큰
+# 스킴이 달라져서 더 이상 직접 비교 불가 -- 이 코퍼스로 새로 기준을 잡아야 한다.
+#
+# 실행:
+#   wandb sweep scripts/online2_v2/wandb_sweep_v2_pretrain_expanded_full1517.yaml
+#   wandb agent <sweep_id 출력값>
+
+program: scripts/online2_v2/run_v2_pretrain_loop.py
+method: grid
+metric:
+  name: val/loss
+  goal: minimize
+early_terminate:
+  type: hyperband
+  min_iter: 2
+  eta: 2
+parameters:
+  sop-reverse:
+    values: [0.2, 0.33, 0.4]
+  sop-shuffle:
+    values: [0.2, 0.33, 0.4]
+  lr:
+    values: [0.0005, 0.0002]
+command:
+  - /home/dasom/miniconda3/envs/life2vec/bin/python
+  - ${program}
+  - --mode
+  - full
+  - --build-dir
+  - outputs/online2/v2_build_expanded_full1517
+  - --corpus-format
+  - normalized
+  - --max-rows
+  - "0"
+  - --run-dir
+  - outputs/online2/v2_runs/sweeps/expanded_full1517_sop_lr_sweep
+  - --epochs
+  - "1"
+  - --max-length
+  - "3072"
+  - --batch-size
+  - "8"
+  - --target-vram-frac
+  - "0.80"
+  - --ckpt-every
+  - "20000"
+  - --wandb
+  - --wandb-project
+  - Berry2Vec
+  - --wandb-tags
+  - online2_v2,sweep,sop_lr,expanded_full1517
+  - ${args}
