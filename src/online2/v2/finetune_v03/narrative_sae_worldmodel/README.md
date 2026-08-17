@@ -19,7 +19,7 @@
 | [sae/](sae/README.md) | §9 | Phase 4 | 핵심 구현 완료(상태 머신·모델·평가·dead feature resampling, 34개 테스트) + 표본 구성 9종 + encoder 6개 layer 비교 + 랜덤 초기화·MLM/SOP 디코더 헤드 비교 + **SOP 재조정·서사 다양성 6-arm 실제 재학습 비교** 실측 — **근본 원인 특정**(데이터셋 자체의 PCA 유효 차원이 384 중 29뿐, 표본 선별 방식과 무관) **+ 개선 방향 2개 발견**(최종 layer 대신 layer 2, dead 0.500→0.391 / SOP 0.33균형 재학습, dead 0.734→0.391, 재현된 대조 실험) **+ 압축이 학습으로 생긴 것임을 확인**(랜덤 초기화는 ReZero 항등식으로 6개 layer가 전부 동일하고 유효 차원도 훨씬 높음(118) — 단 학습량-압축 관계는 비단조적, 5000 step에서 rank9로 급락했다가 18600 step에서 rank29로 부분 회복) **+ 서사 다양성 효과는 확인되나 epoch 교란변수로 원인 미확정** → §18 중단 조건 여전히 발동하나 다음 시도 경로가 명확해짐 |
 | [representation_explorer/](representation_explorer/README.md) | §10 | Phase 4 | 구현 완료 — 진짜 신규(기존 코드는 1회성 노트북뿐)였음을 확인, 실제 scikit-learn/umap-learn으로 PCA/UMAP+trustworthiness+split overlap 구현(29개 테스트) |
 | [concept_governance/](concept_governance/README.md) | §11 | Phase 5 | 미착수 (기존 `cf1s/core_locks.py` 원칙 확장) |
-| [world_model/](world_model/README.md) | §12 | Phase 6 | 미착수 — §14 실측 리스크 있음 |
+| [world_model/](world_model/README.md) | §12 | Phase 6 | 부분 구현(2026-07-24) — bounded-edit 보조 scorer(기존 diagnosis_critic 재노출) + §12.3 promotion_gate(코드 레벨 RL 차단) 완료. dynamics/plausibility/uncertainty/action_dataset은 §14 실측 리스크 근거로 명시적 범위 제외(사용자 선택) |
 | [edit_policy_rl/](edit_policy_rl/README.md) | §13 | Phase 7 | 미착수 — 1~2단계는 기존 CF1S 재사용, 3단계부터 신규 |
 | [ui/](ui/README.md) | §15 | Phase 1~7 병행 | 미착수, 8개 서브앱 |
 

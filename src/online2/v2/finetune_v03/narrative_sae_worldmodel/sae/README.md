@@ -156,6 +156,75 @@ dict_size를 PCA 유효 차원(29)에 거의 맞춘 32~64에서도 dead ratio가
 
 **결론**: 재학습 전 세웠던 두 가설 중 SOP 불균형 쪽은 **긍정적으로 검증됐다**(더 균형 잡을수록 더 좋아짐, 재현 가능한 대조 실험). 서사 다양성 쪽은 **효과가 있는 건 분명해 보이지만 방향과 원인이 예상과 다르고 행 수(epoch 노출량) 교란변수가 있어 이 실험만으로 확정할 수 없다** — narrative_id 필터가 아니라 epoch 수를 통제 변수로 고정한 후속 실험이 필요하다. dedup(중복 제거)은 dead ratio 쪽에서 뚜렷한 개선을 보였다.
 
+### micro-event 분리(event 경계 재정의) — 결과 5의 원인 절반만 검증, 혼재된 결과
+
+위 6-arm 실험과는 다른 축의 개입이다. `build_v2.py`의 `tokenize_events()`는 하나의 raw 관측 행(예: 한 시각의 E_environment 판독값)에 있는 여러 컬럼(co2_ppm, inside_humidity_pct, ...)을 `[MEAS_SEP]`로만 구분해 **하나의 event 토큰 스팬**으로 번들링한다. `GroupedMLMMasker`는 마스킹할 group(measurement_group_id)은 올바르게 고르지만, **고른 group 안에서는** 각 토큰(FEATURE/VALUE_ABS/VALUE_GLOBAL_REL/...)마다 독립적으로 80/10/10을 추첨한다 — 절대/전역상대/농장상대 3개 척도로 같은 물리량을 중복 표현한 토큰이 서로 다른 bin으로 랜덤 치환돼 물리적으로 불가능한 조합이 섞여 들어갈 수 있다는 뜻이다. 이게 **결과 5**(sop_transform이 조건과 무관하게 항상 가장 압축된 지점)의 원인일 수 있다는 가설을 세우고, `scripts/online2_v2/build_microevent_training_corpus.py`로 검증했다.
+
+**주의 — 이 개입은 이 문제의 절반만 다룬다.** 위에서 말한 두 문제 중 "event 경계 자체가 여러 물리량을 부적절하게 묶는다"는 부분만 고쳤다(원래 life2vec처럼 원자값 하나 = 한 measurement group을 그 자체로 독립된 event로 재정의, `training_events_v2.parquet`을 스트리밍으로 다시 읽어 SENTENCE를 group별로 쪼갬, 원시 빌드 재실행 없음). **"고른 group 안에서도 각 토큰이 여전히 독립적으로 마스킹된다"는 절반의 문제는 그대로 남아 있다** — `masking.py`의 per-token 추첨 로직 자체는 손대지 않았다. 즉 이번 실험은 "물리량이 서로 다른 group끼리 한 event에 섞이는 것"만 없앴을 뿐, "같은 group 안에서도 절대/전역상대/농장상대 표현이 서로 다르게 마스킹되는 것"은 여전히 가능하다 — 이건 마스킹 알고리즘 자체를 고치는 별도 작업이 필요하다.
+
+control과 동일 조건(batch_size=40·max_length=1024·5000 step·SOP 0.2/0.2·`--no-early-stop`)으로 micro-event 코퍼스를 재학습하고, 같은 `compare_narrative_ablation_checkpoints.py`(14,544개 narrative-selected 타깃, control과 동일한 원본 event 구조로 평가 — vocab·평가 window는 안 바꿨고 학습 데이터만 바뀌었다)로 비교했다:
+
+| arm | layer5 rank99 | layer5 dead | mlm_transform rank99 | mlm_transform EV | mlm_transform dead | sop_transform rank99 | sop_transform EV | sop_transform dead |
+|---|---|---|---|---|---|---|---|---|
+| control | 9 | 0.734 | 19 | 0.925 | 0.500 | 6 | 0.920 | 0.781 |
+| microevent_split | **17** | **0.625** | 19 | 0.855 | 0.547 | **10** | **0.319** | **0.875** |
+
+(원본 checkpoint: `outputs/online2/v2_runs/narrative_ablation/microevent_split/checkpoint_step_5000.pt`, 전체 결과는 `outputs/online2/sae_pilot/report_narrative_ablation.json`의 `microevent_split` 항목.)
+
+**결과가 깨끗하지 않다 — 지점마다 반대 방향으로 움직였다.** layer5는 sop_balanced와 비슷한 방향으로 개선됐다(rank99 9→17, dead 0.734→0.625) — event 경계를 좁히는 것도 SOP 재조정과 마찬가지로 최종 layer의 압축을 어느 정도 풀어주는 것으로 보인다. 하지만 애초에 이 개입으로 고치려던 sop_transform은 **오히려 악화됐다**: rank99는 6→10으로 올랐지만 dead_feature_ratio는 0.781→0.875로 더 나빠졌고, explained_variance는 0.920→0.319로 크게 떨어졌다 — SAE가 이 activation을 거의 재구성하지 못한다는 뜻이라 rank99 상승을 "다양성 개선"으로 곧이곧대로 읽을 수 없다(분산 구조 자체가 달라졌을 가능성이 크다). mlm_transform은 rank는 그대로(19)인데 EV·dead 모두 소폭 나빠졌다. 즉 **"결과 5의 원인이 event 경계 번들링이었다"는 가설은 기각**됐다 — 최소한 마스킹 로직을 손대지 않은 채로는 sop_transform의 압축을 풀지 못했고, 오히려 SAE 재구성 안정성만 떨어뜨렸다. 위에서 밝힌 대로 이 실험은 문제의 절반(event 경계)만 다뤘으므로, 나머지 절반(group 내부 per-token 독립 마스킹)을 고치기 전까지는 이 가설을 완전히 기각했다고 보기도 이르다 — 두 문제가 함께 얽혀 있어서 하나만 고쳐서는 개선이 안 보였을 가능성도 배제할 수 없다.
+
+### 모델을 안 거치고 직접 확인 — 상대 bin 제거+세분화 / narrative·시각·장소를 추가하면 정보가 느는가
+
+사용자 요청: "원본 데이터에 최대한 가까운 피쳐 사용(분석 목적), 지금 장소별·전체 데이터별 상대 bin을 제거, token 세분화, narrative 추가 — 이벤트 내용이 동일해도 어떤 서사에 속하는지, 어느 시점·장소인지가 중요할 것 같다." 이 네 가지를 사전학습 corpus/vocab을 바꾸지 않고(사용자 확인: 먼저 분석 전용으로 빠르게 확인) `scripts/online2_v2/check_raw_narrative_time_location_diversity.py`로 직접 검증했다 — 학습 가능한 파라미터가 전혀 없는 `check_token_bag_diversity.py`와 같은 계열의 대조 실험이다.
+
+**왜 이게 필요한가.** 지금 `tokenize_events()`(`scripts/online2_v2/build_v2.py`)는 연속형 피쳐마다 `VALUE_ABS`(절대 bin, 기본 10개 안팎) + `VALUE_GLOBAL_REL`(전체 데이터셋 대비 상대 bin) + `VALUE_FARM_REL`(그 농장 대비 상대 bin) 3벌을 동시에 넣는다(`src/online2/v2/tokenizer.py:126-148`). 그리고 `narrative_id`는 순수 메타데이터일 뿐 이벤트 SENTENCE에 전혀 안 들어가고(코드로 확인: vocab 728개 토큰 중 `NARRATIVE` 접두어는 하나도 없음), 이벤트별 정확한 관측 시각·농장/구역 정체성도 이벤트 토큰엔 없다(`FARM_LOCAL`/`ZONE_LOCAL` 토큰은 있지만 시퀀스 레벨 static prefix로만 들어가고 이벤트별은 아님, `LOCAL_HOUR`/`DAY_FROM_START` 파생 bin만 일부 존재).
+
+**방법.** `legacy_build/cell_occurrences.parquet`(build_v2.py의 `tokenize_events()`가 쓰는 것과 동일한 원본 raw 소스)에서 직접 raw 값을 읽어, GLOBAL_REL/FARM_REL 없이 VALUE_ABS만 남기고 bin 개수를 10→**100**(quantile)으로 세분화한 벡터를 만들었다(요청대로 "상대 bin 제거"+"bin 개수를 늘림"). 여기에 narrative_id/farm_id·zone_id/정확한 관측 시각(hour-of-day sin·cos + day-from-start)을 채널로 하나씩 추가하며, 같은 14,544개 narrative-selected 타깃(다른 모든 pilot과 동일 샘플링)에 대해 조합별 PCA 유효 차원을 쟀다. **주의**: 컬럼 표준화(z-score) 없이 돌렸더니 연속값(sin/cos/day)이 큰 스케일로 분산을 독차지해서 rank99가 오히려 떨어지는 인위적 결과가 나왔다 — 전체 컬럼을 표준화한 뒤 재측정했다(스케일이 다른 one-hot·연속 채널을 섞은 PCA는 표준화 없이는 신뢰할 수 없다는 걸 직접 확인).
+
+| 조합 | 차원 | rank99 | rank90 | (추가 차원 대비) rank 기여율 |
+|---|---|---|---|---|
+| abs_fine(상대 bin 제거+100bin)만 | 2000 | 1267 | 1020 | — (기준) |
+| + narrative_id | 2080(+80) | 1335(+68) | 1072 | **85%** |
+| + 정확한 시각(sin/cos/day) | 2003(+3) | 1270(+3) | 1022 | 100% |
+| + farm/zone 위치 | 2060(+60) | 1322(+55) | 1061 | 92% |
+| + 전부 | 2143(+143) | 1391(+124) | 1114 | 87% |
+
+(전체 결과는 `outputs/online2/sae_pilot/report_raw_narrative_time_location.json`.)
+
+**결과 — 사용자 가설이 맞았다: narrative/시각/장소는 실제로 지금 모델이 못 보는 구분 가능한 정보다.** 넷 중 narrative_id가 가장 큰 기여(추가한 80차원 중 68개, 85%가 새 분산을 설명)를 보였고, 정확한 관측 시각은 100%(3차원 전부 기존 벡터로 설명 안 되는 새 정보), farm/zone 위치도 92% — 어느 것도 무시할 만한 수준이 아니다. **단, 이 숫자를 모델의 rank99(control layer5=9, sop_transform=6, 384차원 중)와 직접 비교하면 안 된다** — 여기 쓴 벡터는 대부분 one-hot(희소)이라 구조적으로 rank가 차원 수에 비례해 크게 나온다(학습된 dense 임베딩과는 다른 종류의 공간). 이 실험이 실제로 답하는 건 "raw 데이터 자체의 절대적 정보량"이 아니라 **"narrative/시각/장소가 raw 센서값만으로는 설명 안 되는 독립적 변량을 갖고 있는가"** — 답은 그렇다. 사전학습 자체가 이 정보를 아예 못 보는 지금 구조에서는, 다양성 결핍(§18)의 일부가 "물리 데이터의 근본 한계"가 아니라 "안 넣어준 정보"에서 온다는 뜻일 수 있다.
+
+**다음 단계 — 실제로 진행함(아래 두 섹션).** 이 결과가 유의미해서, 사용자 확인 후 (1) 서사 카탈로그를 80→88개로 확장하고 (2) 실제 사전학습 corpus/vocab을 바꾸는 재학습(Phase 2)까지 진행했다.
+
+### 서사 카탈로그 확장 — 80 → 88개, 짧은/긴 시간축·횡단·이미지 축 보강
+
+기존 80개 서사는 세 축 모두 불균형했다(실측): 시간축은 60/80이 시간~2일 스케일에 몰려 있고 13일급은 `G01-G10`(장기생육) 10개뿐, 종단(`STRICT_CHRONOLOGICAL`) 72/80 대비 횡단(`SET_COMPARISON`)은 3개뿐(`A11`/`X04`류, 전부 동일 농장 내 구역 비교 — 농장 *간* 비교는 전무), 이미지 사용 서사는 3/80(`X08-X10`, 전부 "이미지 한 장 + 과거 센서 맥락"이라 이미지 자체의 시간 변화는 없음). `scripts/generate_online2_narrative_catalog.py`(SPECS 목록)와 `src/online2/materializers.py`(매처)에 8개를 추가했다:
+
+- **횡단 4개(신규 카테고리 "환경비교")**: `X13`/`X14`(동시각 여러 농장 온습도·CO2 비교), `X15`(동일 생육조사 순번의 여러 농장 비교). **설계 이슈 하나 실측으로 발견**: 농장 간 절대 timestamp가 거의 안 겹친다(정확히 같은 시각을 공유하는 농장이 최대 9개/55개 — 농장마다 관측 캘린더 기간 자체가 다름). 그래서 절대 시각 대신 "지역시각(hour-of-day)"·"생육조사 순번(0=첫 조사, 1=둘째 조사)"으로 정렬했더니 이 기준으로는 55개 농장 전부가 존재해서 매칭이 됐다 — `_crossfarm_by_hour`/`_crossfarm_by_survey_index`(`materializers.py`).
+- **이미지 장기 서사 1개**: `X12`(농장별 최초·최근 이미지 페어, 최대 약 13일 스팬). **실측으로 걸린 함정**: 이미지 이벤트는 토큰이 `IMAGE_EMBED_SLOT` 1개뿐이라 이미지 두 장만으로는 최소 유효 토큰 수(16)를 못 채워 16건 후보 전부 `TOO_SHORT`로 드롭됐다 — 각 이미지 직전 환경 맥락(최대 3개)을 붙여서 해결(`_image_longitudinal_pair`).
+- **짧은(sub-hour) 단일시점 4개**: `D16`/`D17`(양액시스템 전환·순환팬 가동 순간)/`S13`/`S14`(풍속·pH 이상 순간) — 안 쓰이던 raw 컬럼 위주로 골라 max_events=1(사실상 지속시간 0)로 만듦.
+
+원시 빌드(`scripts/online2 build`, 실제 `MaterializerRegistry` 매칭이 일어나는 단계 — `build_v2.py`가 아니라 `src/online2/cli.py`/`builder.py`라는 걸 이번에 확인함)를 88개 카탈로그로 재실행: **88/88 전부 정상 매칭**(`unsupported_template_count=0`), 967,012→1,006,023 시퀀스.
+
+### Phase 2 — 상대 bin 제거 + narrative/시각/장소를 실제 토큰으로
+
+사용자 요청("원본 데이터에 가까운 피쳐, 상대 bin 제거, token 세분화, narrative/시각/장소 추가")을 위 분석 전용 검증 이후 실제 사전학습 파이프라인에 반영:
+
+1. **`src/online2/v2/tokenizer.py`**: `VALUE_GLOBAL_REL`/`VALUE_FARM_REL` 및 그 `_combined` 토큰 생성 코드를 제거, `VALUE_ABS`만 유지.
+2. **`scripts/online2_v2/build_v2.py`**: `fit_binning_v2(..., bins=100)`로 절대값 bin을 10→100분위 세분화(분석 전용 스크립트와 동일 기준).
+3. **이벤트별 narrative/farm/zone 토큰 추가** — 처음에 `build_v2.py`의 `materialize_sequences()`에 넣었지만, **이게 실제로는 죽은 코드였다는 걸 뒤늦게 발견**: control이 실제로 학습한 이벤트 단위 `training_events_v2.parquet`(1,500만 행, event_position/AGE 등 실제값)은 `build_v2.py`의 `export_training()`이 아니라 **별도 스크립트 `scripts/online2_v2/export_training_events_v2_event_grain.py`**가 만든다(`export_training()`은 코드 주석에 "Placeholder only for flat sequence export"라고 명시돼 있고, AGE=0.0·시퀀스당 1행 고정이라 실제 학습에 쓰인 적이 없다 — 처음엔 이걸 못 보고 그대로 재학습을 돌릴 뻔했다). 게다가 `export_training_events_v2_event_grain.py`는 SENTENCE를 `sequences_v2.parquet`가 아니라 `events_tokenized_v2.parquet`에서 이벤트별로 새로 조립하기 때문에, `materialize_sequences()`에 넣은 토큰은 이 실제 경로에 아예 도달하지 않았다. **`export_training_events_v2_event_grain.py`의 `expand_sequence_rows()`에 직접** 토큰 주입 로직을 옮겨 고쳤다 — 시퀀스 안에 실제로 등장하는 farm/zone만 골라 로컬 순서번호를 매기고, 매 이벤트 SENTENCE 앞에 `NARRATIVE|<id> FARM_LOCAL|<i> ZONE_LOCAL|<i>`를 붙인다. (정확한 관측 시각은 이미 `AGE`라는 연속값 컬럼으로 모델에 들어가고 있어서 — Phase 1이 확인한 "정확한 시각의 기여율 100%"를 이미 만족한다 — 별도 토큰을 추가하지 않았다.)
+4. **`src/online2/v2/vocab.py`**: `FARM_LOCAL` 슬롯을 8→24로 확장(횡단 서사 `X13`/`X14`가 시퀀스 하나에 최대 20개 서로 다른 농장을 담으므로 기존 8칸으로는 out-of-vocab이 나서 전부 `[UNK]`로 새 나갈 뻔했다), 88개 `NARRATIVE|<id>` 토큰 추가. vocab_size 728→832.
+
+새 lineage(`outputs/online2/v2_build_expanded88_phase2/`, `training_events_v2.parquet` 920,254시퀀스·14,348,896행)로 control과 동일 조건(batch=40·max_length=1024·5000 step·SOP 0.2/0.2)으로 재학습 후 같은 14,544~15,470개 narrative-selected 타깃으로 비교:
+
+| arm | layer5 rank99 | layer5 dead | mlm_transform rank99 | mlm_transform EV | mlm_transform dead | sop_transform rank99 | sop_transform EV | sop_transform dead |
+|---|---|---|---|---|---|---|---|---|
+| control | 9 | 0.734 | 19 | 0.925 | 0.500 | 6 | 0.920 | 0.781 |
+| expanded88_phase2 | **13** | **0.547** | 15 | 0.924 | **0.625** | 6 | **0.948** | **0.750** |
+
+(전체 결과는 `outputs/online2/sae_pilot/report_narrative_ablation.json`의 `expanded88_phase2` 항목.)
+
+**또 혼재된 결과다 — 지점마다 다른 방향.** layer5는 뚜렷이 개선됐다(rank99 9→13, dead 0.734→0.547) — micro-event 분리 실험(rank 9→17, dead 0.734→0.625)과 비슷한 방향·비슷한 크기다. sop_transform은 rank99는 그대로(6)지만 EV(0.920→0.948)와 dead(0.781→0.750) 둘 다 소폭 개선됐다 — 이번 세션에서 sop_transform이 개선된 유일한 개입이다. 반면 **mlm_transform은 악화됐다**: rank99가 19→15로 줄고 dead_feature_ratio도 0.500→0.625로 나빠졌다 — EV는 거의 그대로(0.925→0.924)인데 rank·dead 둘 다 나빠진 조합이라 이 지점에서는 새 토큰·bin 구성이 오히려 표현을 더 압축시킨 것으로 보인다. **결론**: "상대 bin 제거 + 세분화 + narrative/farm/zone 토큰 추가"는 이번 세션의 다른 개입들과 마찬가지로 §18(dead ratio)을 깨끗이 해소하지 못했다 — 한 지점(layer5)은 확실히 좋아졌고, 한 지점(sop_transform)은 소폭 좋아졌고, 한 지점(mlm_transform)은 나빠졌다. sop_balanced(SOP 재조정)가 지금까지 유일하게 세 지점 모두에서 일관되게 개선된 개입이라는 점은 여전히 유효하다.
+
 ### 서사 유형이 앞으로 늘어난다면 — 자동 매칭 vs 사람이 직접 검토하는 것의 차이
 
 오늘 결과를 근거로 이 질문에 답한다: 서사 템플릿을 지금(80개)보다 늘리고 그에 따라 학습에 쓰이는 이벤트 시퀀스 구성이 자동으로 달라진다면, 자동 규칙 매칭(`src/online2/materializers.py`/`builder.py`/`catalog.py`)과 사람이 서사-원시데이터 관계를 직접 검토하는 것(`ui/data_grounding_curation/`의 §5.3 검토 큐가 이미 이 역할을 하는 화면이다)은 구조적으로 다른 실패 모드를 갖는다 — 오늘 실측이 그 차이를 구체적으로 보여준다.
@@ -179,7 +248,14 @@ dict_size를 PCA 유효 차원(29)에 거의 맞춘 32~64에서도 dead ratio가
 - [`scripts/online2_v2/check_token_bag_diversity.py`](../../../../../../scripts/online2_v2/check_token_bag_diversity.py) — bag-of-tokens 대조 실험(학습 파라미터 없이 토큰 co-occurrence만으로 만든 벡터의 PCA 유효 차원).
 - [`scripts/online2_v2/build_pretrain_narrative_ablation_subsets.py`](../../../../../../scripts/online2_v2/build_pretrain_narrative_ablation_subsets.py) — `training_events_v2.parquet`를 `narrative_id`로 스트리밍 필터링해 narrow_subset/single_table_only/multi_table_only/dedup_reduced 4종 부분 코퍼스 생성(원시 빌드 재실행 없음, 필터링만).
 - [`scripts/online2_v2/run_narrative_ablation_pretrain_sweep.sh`](../../../../../../scripts/online2_v2/run_narrative_ablation_pretrain_sweep.sh) — SOP 재조정 + 서사 다양성 6-arm 재학습 드라이버. 이미 끝난 arm은 건너뛰고 중단된 arm은 `last.ckpt`에서 자동 resume하는 멱등 스크립트(세션 중단에도 안전하게 재실행 가능하도록 설계, 실제로 한 번 중단됐다가 이 덕분에 재개함).
-- [`scripts/online2_v2/compare_narrative_ablation_checkpoints.py`](../../../../../../scripts/online2_v2/compare_narrative_ablation_checkpoints.py) — 6개 재학습 체크포인트의 layer5/mlm_transform/sop_transform PCA 유효 차원 + SAE dead_feature_ratio 비교.
+- [`scripts/online2_v2/compare_narrative_ablation_checkpoints.py`](../../../../../../scripts/online2_v2/compare_narrative_ablation_checkpoints.py) — 재학습 체크포인트(6-arm + microevent_split)의 layer5/mlm_transform/sop_transform PCA 유효 차원 + SAE dead_feature_ratio 비교.
+- [`scripts/online2_v2/build_microevent_training_corpus.py`](../../../../../../scripts/online2_v2/build_microevent_training_corpus.py) — 번들된 measurement group을 독립된 micro-event로 쪼갠 대안 학습 코퍼스 생성(원시 빌드 재실행 없음, `training_events_v2.parquet` 스트리밍 재파싱만).
+- [`scripts/online2_v2/check_raw_narrative_time_location_diversity.py`](../../../../../../scripts/online2_v2/check_raw_narrative_time_location_diversity.py) — 모델 없이 raw 값(상대 bin 제거+세분화)+narrative_id+정확한 시각/장소를 조합별로 PCA 유효 차원 비교(`check_token_bag_diversity.py`와 같은 계열의 무학습 대조 실험).
+- [`scripts/generate_online2_narrative_catalog_auto_expansion.py`](../../../../../../scripts/generate_online2_narrative_catalog_auto_expansion.py) — 88개 카탈로그를 넘어 feature×matcher×파라미터 변형을 조합적으로 생성하고 실데이터로 dry-run 검증하는 확장 생성기(아직 실제 카탈로그 미반영, 검토용). 733개(기존 88 + 검증 통과 645)까지 확장, 결과는 `outputs/online2/sae_pilot/narrative_auto_expansion_report.json`.
+- [`ui/narrative_evidence_explorer/`](../ui/narrative_evidence_explorer/) — 서사(사람의 해석) ↔ 실제 매칭된 시퀀스(raw 데이터+토큰)를 나란히 보여주는 별도 Streamlit 앱(자체 디렉토리+README, `pipeline_explorer`와 별개).
+- [`scripts/generate_online2_narrative_catalog.py`](../../../../../../scripts/generate_online2_narrative_catalog.py) — 서사 카탈로그 생성기에 8개 신규 spec 추가(`D16`/`D17`/`S13`/`S14`/`X12`/`X13`/`X14`/`X15`, 80→88개).
+- [`src/online2/materializers.py`](../../../../../../src/online2/materializers.py) — `_crossfarm_by_hour`/`_crossfarm_by_survey_index`(농장 간 절대시각 대신 지역시각·조사순번 기준 비교) / `_image_longitudinal_pair`(농장별 최초·최근 이미지 페어 + 환경 맥락) 3개 매처 추가.
+- [`scripts/online2_v2/export_training_events_v2_event_grain.py`](../../../../../../scripts/online2_v2/export_training_events_v2_event_grain.py) — control이 실제로 학습한 이벤트 단위 `training_events_v2.parquet`를 만드는 진짜 경로(`build_v2.py`의 `export_training()`은 placeholder, 쓰면 안 됨). Phase 2의 `NARRATIVE`/`FARM_LOCAL`/`ZONE_LOCAL` 토큰 주입을 여기 `expand_sequence_rows()`에 구현.
 
 ## 아직 없는 것
 
@@ -200,4 +276,4 @@ D1(복원), D2(dead feature ratio 일부) 계산 가능. D3–D6(개념 매핑, 
 
 ## 중단 조건 연결
 
-§18 "SAE feature 대부분이 dead 또는 불안정" — **실측으로 발동, 표본 구성 9종 비교 + 6-arm 재학습 이후에도 해소 안 됨**(위 pilot 결과 표 참조). 근본 원인을 특정했다: (1) 이 데이터셋(55농장×14일, 원시 이벤트 222,309건) 자체의 낮은 유효 차원(PCA로 384차원 중 29개가 99% 분산 설명 — **원인 특정 완료, 표본을 dense/narrative-selected 어느 쪽으로 구성해도 동일함을 직접 검증**), (2) dict_size를 그 차원(29)에 맞춰도 남는 TopK "승자독식" 학습 역학(dict=32~64에서도 dead ratio가 0.40~0.50 바닥). (1)은 "더 넓거나 더 잘 고른 표본"으로 해결되는 문제가 아님이 확인됐지만, 개선 방향을 두 개 더 실측으로 찾았다: **6개 encoder layer를 비교한 결과 최종 layer(지금까지 모든 pilot이 쓴 것) 대신 layer 2를 쓰면 dead ratio가 0.500→0.391로 개선**(seed 1개 결과, 재현성 확인 전), **SOP 비율을 더 균형 있게(0.2/0.2→0.33/0.33) 재학습하면 dead ratio가 0.734→0.391로 개선**(control vs sop_balanced 순수 대조 실험, 재현됨). §18 해소를 위한 다음 시도는 (a) layer 2/4 기준 dict_size·sparsity 재sweep, (b) SOP 0.33/0.33 이상으로 재학습한 체크포인트 기준 재sweep, (c) 서사 다양성의 실제 효과를 확인하려면 narrative_id가 아니라 epoch 수를 통제 변수로 고정한 후속 재학습 — 이 순서로 시작할 것.
+§18 "SAE feature 대부분이 dead 또는 불안정" — **실측으로 발동, 표본 구성 9종 비교 + 6-arm 재학습 + micro-event 분리 재학습 + 서사 88개 확장/상대 bin 제거/narrative·farm·zone 토큰 추가(Phase 2) 재학습 이후에도 해소 안 됨**(위 pilot 결과 표 참조). 근본 원인을 특정했다: (1) 이 데이터셋(55농장×14일, 원시 이벤트 222,309건) 자체의 낮은 유효 차원(PCA로 384차원 중 29개가 99% 분산 설명 — **원인 특정 완료, 표본을 dense/narrative-selected 어느 쪽으로 구성해도 동일함을 직접 검증**), (2) dict_size를 그 차원(29)에 맞춰도 남는 TopK "승자독식" 학습 역학(dict=32~64에서도 dead ratio가 0.40~0.50 바닥). (1)은 "더 넓거나 더 잘 고른 표본"으로 해결되는 문제가 아님이 확인됐지만, 개선 방향을 몇 개 더 실측으로 찾았다: **6개 encoder layer를 비교한 결과 최종 layer(지금까지 모든 pilot이 쓴 것) 대신 layer 2를 쓰면 dead ratio가 0.500→0.391로 개선**(seed 1개 결과, 재현성 확인 전), **SOP 비율을 더 균형 있게(0.2/0.2→0.33/0.33) 재학습하면 dead ratio가 0.734→0.391로 개선**(control vs sop_balanced 순수 대조 실험, 재현됨, 지금까지 유일하게 세 지점 모두에서 일관되게 개선). event 경계를 좁힌 micro-event 재학습과 서사 확장+상대 bin 제거+narrative/farm/zone 토큰 추가(Phase 2) 재학습은 둘 다 **layer5는 뚜렷이 개선**(dead 0.734→0.625, 0.734→0.547)시켰지만 **mlm_transform 또는 sop_transform 중 하나는 오히려 악화**시켰다 — micro-event는 sop_transform이 악화(dead 0.781→0.875, EV 0.920→0.319), Phase 2는 mlm_transform이 악화(rank99 19→15, dead 0.500→0.625)됐고 sop_transform만 소폭 개선(EV 0.920→0.948, dead 0.781→0.750). 즉 **지금까지 시도한 개입 중 SOP 재조정만 세 지점 모두에서 일관되게 좋아졌고, 나머지(micro-event 분리, 서사 확장+토큰화 개편)는 전부 "한 지점은 좋아지고 다른 지점은 나빠지는" 트레이드오프였다** — 아직 어느 것도 §18을 깨끗이 해소하지 못했다. §18 해소를 위한 다음 시도는 (a) layer 2/4 기준 dict_size·sparsity 재sweep, (b) SOP 0.33/0.33 이상으로 재학습한 체크포인트 기준 재sweep, (c) 서사 다양성의 실제 효과를 확인하려면 narrative_id가 아니라 epoch 수를 통제 변수로 고정한 후속 재학습, (d) `masking.py`의 group-내부 per-token 독립 마스킹을 group 전체 단일 치환으로 바꾼 뒤 micro-event 분리·Phase 2 토큰화와 함께 재실험, (e) SOP 재조정과 Phase 2 토큰화를 함께 적용한 재학습(둘 다 layer5는 개선시켰으므로 조합 효과 확인 가치 있음) — 이 순서로 시작할 것.
