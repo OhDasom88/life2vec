@@ -1,0 +1,104 @@
+# Sweep 1c — pos_weight(0.05 steps) x lr(wider) x weight_decay, weighted_sampler FIXED False
+#
+# Follows sweep1b (conf/sweep/finetune_v03_s1b_pos_weight_sampler.yaml), which found
+# weighted_sampler=True degrades mean macro-F1 by ~5x (0.640 -> 0.130) on this 35-case
+# dataset -- oversampling repeats the 4 normal cases ~4.4x/epoch (~655x over 150 epochs),
+# which Anthropic's "Superposition, Memorization, and Double Descent"
+# (transformer-circuits.pub/2023/toy-double-descent) frames as the model storing data
+# points rather than features. weight_decay is that paper's own mitigation, tested here
+# as a real swept axis (previously always applied at a fixed 1e-2, never varied).
+#
+# User request (2026-07-24): keep weighted_sampler=False, re-confirm pos_weight at 0.05
+# resolution now that sampler isn't confounding it, widen the lr search, and sweep
+# weight_decay. See src/online2/v2/finetune_v03/README.md "전체 하이퍼파라미터 정리"
+# for the full parameter reference this was designed against.
+#
+# Grid = 20 (pos_weight) x 6 (lr) x 4 (weight_decay) = 480 trials, n_repeats=1
+# (search phase -- rerun the winning corner at n_repeats=3 for a final number).
+#
+#   wandb sweep --project Berry2Vec --entity dasom-oh conf/sweep/finetune_v03_s1c_pos_weight_lr_wd.yaml
+#   wandb agent dasom-oh/Berry2Vec/<ID>
+
+program: scripts/online2_v2/v03/run_diagnosis_finetune_v03.py
+method: grid
+metric:
+  name: cv/mean_best_macro_f1
+  goal: maximize
+command:
+  - /home/dasom/miniconda3/envs/life2vec/bin/python
+  - ${program}
+  - ${args}
+
+parameters:
+  mode:
+    value: cv_repeated
+  n_folds:
+    value: 3
+  n_repeats:
+    value: 1
+  epochs:
+    value: 150
+  monitor:
+    value: val_loss
+  wandb:
+    value: true
+  wandb_group:
+    value: finetune_v03_improvement_r1
+  wandb_job_type:
+    value: sweep_1c_pos_weight_lr_wd
+  wandb_tags:
+    value: v03,multitask,repeated3fold,open-set,attention-pooling,sweep1c,pos_weight_fine,lr_wide,weight_decay
+
+  # architecture fixed, same as sweep1/1b (isolate loss/optimizer effects only)
+  task_specific_query:
+    value: false
+  attention_residual:
+    value: false
+  token_attention_pool:
+    value: false
+  lambda_supcon:
+    value: 0.0
+  lambda_prototype:
+    value: 0.0
+  use_image_adapter:
+    value: true
+  lambda_binary:
+    value: 1.0
+  lambda_consistency:
+    value: 0.05
+
+  # fixed per 2026-07-24 request + sweep1b evidence
+  weighted_sampler:
+    value: false
+
+  binary_threshold:
+    value: 0.5
+  binary_thresholds:
+    value: "0.25,0.5,0.75"
+
+  lr:
+    values: [1.0e-5, 3.0e-5, 1.0e-4, 3.0e-4, 1.0e-3, 3.0e-3]
+  weight_decay:
+    values: [0.0, 1.0e-3, 1.0e-2, 1.0e-1]
+  pos_weight:
+    values:
+      - "0.05"
+      - "0.10"
+      - "0.15"
+      - "0.20"
+      - "0.25"
+      - "0.30"
+      - "0.35"
+      - "0.40"
+      - "0.45"
+      - "0.50"
+      - "0.55"
+      - "0.60"
+      - "0.65"
+      - "0.70"
+      - "0.75"
+      - "0.80"
+      - "0.85"
+      - "0.90"
+      - "0.95"
+      - "1.00"

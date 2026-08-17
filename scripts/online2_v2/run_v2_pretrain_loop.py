@@ -24,6 +24,8 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 import torch
+import torch.nn.functional as F
+import torchmetrics
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -99,14 +101,93 @@ def detect_shadow_val(parquet: Path, max_row_groups: int = 8) -> bool:
     return False
 
 
+def _iter_person_batches_normalized(
+    sequences_parquet: Path,
+    events_parquet: Path,
+    batch_size: int,
+    max_rows: int | None,
+    *,
+    id_filter: Callable[[pd.DataFrame, list[int]], list[int]] | None = None,
+):
+    """2026-07-26: `training_events_v2.parquet`(사전에 260배 중복 펼쳐 놓은 flat
+    파일)를 미리 만들어두지 않고, `sequences_v2.parquet`(시퀀스당 1행, event_ids만
+    참조) + `events_tokenized_v2.parquet`(고유 이벤트당 1행, 222k행, 전체를
+    메모리에 캐시)를 로딩 시점에 조인해서 그때그때 펼친다. build 단계의
+    `export_training_events_v2_event_grain.py`가 disk에 쓰던 것과 정확히 같은
+    행 스키마를 만들어야 하므로, 그 스크립트의 `load_event_lookup`/
+    `expand_sequence_rows`를 그대로 재사용한다(로직 중복 없음) — 그래서
+    이 함수가 만드는 프레임은 flat 경로가 만들던 것과 컬럼이 100% 동일하고,
+    아래 `encode_batch`/`task.get_document`는 어느 경로든 손댈 필요가 없다.
+    """
+    from export_training_events_v2_event_grain import (  # noqa: E402
+        expand_sequence_rows,
+        load_event_lookup,
+    )
+
+    event_lookup = load_event_lookup(events_parquet)
+    light_cols = [
+        "sequence_id",
+        "narrative_id",
+        "PERSON_ID",
+        "event_ids",
+        "farm_ids",
+        "canonical_context_id",
+        "split_group_id",
+        "training_mode",
+        "sampling_weight",
+        "shadow_split",
+    ]
+    pf = pq.ParquetFile(sequences_parquet)
+    available = set(pf.schema_arrow.names)
+    cols = [c for c in light_cols if c in available]
+    seen = 0
+    for i in range(pf.metadata.num_row_groups):
+        part = pf.read_row_group(i, columns=cols).to_pandas()
+        if max_rows is not None:
+            remain = max_rows - seen
+            if remain <= 0:
+                break
+            part = part.head(remain)
+        seen += len(part)
+        ids = part["PERSON_ID"].astype(int).unique().tolist()
+        if id_filter is not None:
+            ids = id_filter(part, ids)
+        if not ids:
+            continue
+        for start in range(0, len(ids), batch_size):
+            chosen = ids[start : start + batch_size]
+            sub = part[part["PERSON_ID"].isin(chosen)]
+            rows: list[dict[str, Any]] = []
+            for rec in sub.itertuples(index=False):
+                expanded, _stats = expand_sequence_rows(rec, event_lookup, build_id="v2_event_grain_lazy")
+                rows.extend(expanded)
+            if not rows:
+                continue
+            yield pd.DataFrame(rows), chosen
+        if max_rows is not None and seen >= max_rows:
+            break
+
+
 def iter_person_batches(
     parquet: Path,
     batch_size: int,
     max_rows: int | None,
     *,
     id_filter: Callable[[pd.DataFrame, list[int]], list[int]] | None = None,
+    events_parquet: Path | None = None,
 ):
-    """Yield dataframe chunks without requiring the full corpus in RAM."""
+    """Yield dataframe chunks without requiring the full corpus in RAM.
+
+    events_parquet가 주어지면 `parquet`는 flat training_events_v2가 아니라
+    `sequences_v2.parquet`로 취급하고, 로딩 시점 조인으로 정규화 경로를 탄다
+    (`_iter_person_batches_normalized`). None(기본값)이면 기존처럼 이미 펼쳐진
+    flat parquet를 그대로 스트리밍한다 -- 기존 호출부·동작은 완전히 그대로다.
+    """
+    if events_parquet is not None:
+        yield from _iter_person_batches_normalized(
+            parquet, events_parquet, batch_size, max_rows, id_filter=id_filter
+        )
+        return
     pf = pq.ParquetFile(parquet)
     seen = 0
     for i in range(pf.metadata.num_row_groups):
@@ -178,6 +259,76 @@ def encode_batch(
     return batch
 
 
+SOP_CLASS_NAMES = ("normal_order", "reversed", "shuffled")
+
+
+def make_sop_metrics(device: torch.device) -> dict[str, dict[str, torchmetrics.Metric]]:
+    """SOP(3-class: 0=정상순서, 1=역순, 2=셔플, src/tasks/grouped_mlm.py:321-331 라벨
+    규칙과 동일)의 마스크(target_cls_mask==1, 즉 SOP 적용 가능했던 문서만) 반영
+    accuracy/F1 + 클래스별 F1을 별도로 관리한다.
+
+    model.train_cls_acc/train_cls_f1(model.py)은 마스크를 안 봐서 SOP 미적용
+    문서(다수인 정상순서 placeholder)까지 다 섞여 점수가 부풀려진다 -- 여기서는
+    실제로 SOP 판정이 걸린 문서만 골라 계산. model 자체에 새 서브모듈을 추가하면
+    기존 체크포인트 state_dict 로드가 깨질 수 있어(strict load) model 밖의 별도
+    dict로 관리한다.
+    """
+    def _make() -> dict[str, torchmetrics.Metric]:
+        return {
+            "acc": torchmetrics.Accuracy(num_classes=3, average="macro").to(device),
+            "f1_macro": torchmetrics.F1Score(num_classes=3, average="macro").to(device),
+            "f1_per_class": torchmetrics.F1Score(num_classes=3, average=None).to(device),
+        }
+
+    return {"train": _make(), "val": _make()}
+
+
+def compute_mlm_sop_metrics(
+    model: torch.nn.Module,
+    sop_metrics: dict[str, dict[str, torchmetrics.Metric]],
+    mlm_preds: torch.Tensor,
+    mlm_targs: torch.Tensor,
+    cls_preds: torch.Tensor,
+    cls_targs: torch.Tensor,
+    cls_mask: Optional[torch.Tensor],
+    stage: str,
+) -> dict[str, float]:
+    """MLM(top-5, vocab 전체)과 SOP(3-class, 마스크 적용) 상세 지표 한 스텝/배치분.
+
+    model.{train,val}_{accuracy,precision,recall,f1}는 model.py에 이미 정의돼
+    있었지만 원래 Lightning의 training_step/validation_step 안에서만 호출되게
+    짜여 있어서(self.log 경유) 이 커스텀 루프에서는 한 번도 안 불렸다 -- 여기서
+    직접 호출해 값만 꺼내 쓴다(Lightning self.log는 self.trainer가 필요해서
+    이 루프에서는 못 씀).
+    """
+    out: dict[str, float] = {}
+    mlm_preds_sm = F.softmax(mlm_preds.detach(), dim=-1).permute(0, 2, 1)
+    mlm_acc = model.train_accuracy if stage == "train" else model.val_accuracy
+    mlm_prec = model.train_precision if stage == "train" else model.val_precision
+    mlm_rec = model.train_recall if stage == "train" else model.val_recall
+    mlm_f1 = model.train_f1 if stage == "train" else model.val_f1
+    out[f"{stage}/mlm_top5_accuracy"] = float(mlm_acc(mlm_preds_sm, mlm_targs))
+    out[f"{stage}/mlm_top5_precision"] = float(mlm_prec(mlm_preds_sm, mlm_targs))
+    out[f"{stage}/mlm_top5_recall"] = float(mlm_rec(mlm_preds_sm, mlm_targs))
+    out[f"{stage}/mlm_top5_f1"] = float(mlm_f1(mlm_preds_sm, mlm_targs))
+
+    if torch.is_tensor(cls_mask):
+        mask_flat = cls_mask.detach().reshape(-1).bool()
+        if mask_flat.any():
+            cls_preds_flat = F.softmax(cls_preds.detach(), dim=-1).reshape(-1, cls_preds.shape[-1])
+            cls_targs_flat = cls_targs.detach().reshape(-1)
+            preds_m = cls_preds_flat[mask_flat]
+            targs_m = cls_targs_flat[mask_flat]
+            m = sop_metrics[stage]
+            out[f"{stage}/sop_masked_accuracy"] = float(m["acc"](preds_m, targs_m))
+            out[f"{stage}/sop_masked_f1"] = float(m["f1_macro"](preds_m, targs_m))
+            per_class = m["f1_per_class"](preds_m, targs_m)
+            for i, name in enumerate(SOP_CLASS_NAMES):
+                out[f"{stage}/sop_f1_{name}"] = float(per_class[i])
+            out[f"{stage}/sop_eligible_n"] = float(mask_flat.sum())
+    return out
+
+
 @torch.no_grad()
 def evaluate_validation(
     model: torch.nn.Module,
@@ -186,8 +337,15 @@ def evaluate_validation(
     device: torch.device,
     *,
     max_batches: int,
+    sop_metrics: Optional[dict[str, dict[str, torchmetrics.Metric]]] = None,
 ) -> dict[str, float]:
-    """Average val losses over up to ``max_batches`` person-batches."""
+    """Average val losses over up to ``max_batches`` person-batches.
+
+    sop_metrics(옵션)를 넘기면 MLM top-5/SOP masked 상세 지표도 val window
+    전체에 대해 누적(update)한 뒤 마지막에 한 번만 .compute()해서 반환한다
+    (배치별 F1을 단순 평균하는 것보다 통계적으로 올바름 -- 배치별 metric은
+    버려지고 window 전체 pooled 값만 씀).
+    """
     from src.transformer.models import masked_sop_loss
 
     model.eval()
@@ -198,6 +356,7 @@ def evaluate_validation(
         "sop_mask_mean": 0.0,
         "n": 0.0,
     }
+    sop_eligible_seen = 0.0
     for _ in range(max_batches):
         try:
             frame, chosen = next(data_iter)
@@ -221,10 +380,42 @@ def evaluate_validation(
         if torch.is_tensor(batch.get("target_cls_mask")):
             totals["sop_mask_mean"] += float(batch["target_cls_mask"].float().mean().cpu())
         totals["n"] += 1.0
+        if sop_metrics is not None:
+            compute_mlm_sop_metrics(
+                model, sop_metrics,
+                mlm_preds, batch["target_tokens"].long(),
+                cls_preds, batch["target_cls"].long(),
+                batch.get("target_cls_mask"),
+                stage="val",
+            )
+            mask = batch.get("target_cls_mask")
+            if torch.is_tensor(mask):
+                sop_eligible_seen += float(mask.detach().sum().cpu())
         del batch, mlm_preds, cls_preds, loss, mlm_loss, sop_loss
     model.train()
     n = max(totals["n"], 1.0)
+    detailed: dict[str, float] = {}
+    if sop_metrics is not None:
+        m = sop_metrics["val"]
+        detailed["val/mlm_top5_accuracy"] = float(model.val_accuracy.compute())
+        detailed["val/mlm_top5_precision"] = float(model.val_precision.compute())
+        detailed["val/mlm_top5_recall"] = float(model.val_recall.compute())
+        detailed["val/mlm_top5_f1"] = float(model.val_f1.compute())
+        model.val_accuracy.reset()
+        model.val_precision.reset()
+        model.val_recall.reset()
+        model.val_f1.reset()
+        if sop_eligible_seen > 0:
+            detailed["val/sop_masked_accuracy"] = float(m["acc"].compute())
+            detailed["val/sop_masked_f1"] = float(m["f1_macro"].compute())
+            per_class = m["f1_per_class"].compute()
+            for i, name in enumerate(SOP_CLASS_NAMES):
+                detailed[f"val/sop_f1_{name}"] = float(per_class[i])
+        m["acc"].reset()
+        m["f1_macro"].reset()
+        m["f1_per_class"].reset()
     return {
+        **detailed,
         "val/loss": totals["loss"] / n,
         "val/mlm_loss": totals["mlm_loss"] / n,
         "val/sop_loss": totals["sop_loss"] / n,
@@ -391,6 +582,17 @@ def main() -> None:
     parser.add_argument("--build-dir", type=Path, default=ROOT / "outputs/online2/v2_build")
     parser.add_argument("--run-dir", type=Path, default=ROOT / "outputs/online2/v2_runs/sanity")
     parser.add_argument("--parquet", type=Path, default=None)
+    parser.add_argument(
+        "--corpus-format",
+        choices=["auto", "flat", "normalized"],
+        default="auto",
+        help=(
+            "flat=training_events_v2.parquet(사전에 260배 중복 펼쳐 저장). "
+            "normalized=sequences_v2.parquet+events_tokenized_v2.parquet를 로딩 "
+            "시점에 조인(중복 저장 없음, 2026-07-26 권장). "
+            "auto=flat 파일이 있으면 flat, 없으면 normalized."
+        ),
+    )
     parser.add_argument("--max-rows", type=int, default=200)
     parser.add_argument(
         "--steps",
@@ -398,12 +600,21 @@ def main() -> None:
         default=None,
         help="Max training steps (sanity default 30; full default 100000 with early stop).",
     )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=0,
+        help="0=disabled (use --steps). If >0, train until this many full passes over the "
+        "training split (or early-stop patience) instead of a fixed step count -- avoids "
+        "confounding corpus-size differences with training-amount differences across arms.",
+    )
     parser.add_argument("--batch-size", type=int, default=2)
     parser.add_argument("--max-length", type=int, default=512)
     parser.add_argument("--ckpt-every", type=int, default=10)
     parser.add_argument("--resume", type=Path, default=None)
     parser.add_argument("--mode", choices=["sanity", "full"], default="sanity")
     parser.add_argument("--target-vram-frac", type=float, default=0.70)
+    parser.add_argument("--lr", type=float, default=None, help="Override default learning rate.")
     parser.add_argument("--sop-reverse", type=float, default=0.20)
     parser.add_argument("--sop-shuffle", type=float, default=0.20)
     parser.add_argument("--skip-vram-calibrate", action="store_true")
@@ -460,12 +671,40 @@ def main() -> None:
 
     build = args.build_dir
     run_dir = args.run_dir
+    sweep_run_id = os.environ.get("WANDB_RUN_ID") or os.environ.get("WANDB_SWEEP_ID")
+    if sweep_run_id and os.environ.get("WANDB_SWEEP_ID"):
+        # Under `wandb agent`, multiple trials share one --run-dir from the sweep
+        # command template -- disambiguate so concurrent/sequential trials don't
+        # clobber each other's checkpoints.
+        run_dir = run_dir.parent / f"{run_dir.name}_{sweep_run_id[:8]}"
     run_dir.mkdir(parents=True, exist_ok=True)
-    parquet = args.parquet or (
+    # 2026-07-26: normalized 경로 -- sequences_v2.parquet(시퀀스당 1행) +
+    # events_tokenized_v2.parquet(고유 이벤트당 1행)를 로딩 시점에 조인한다.
+    # training_events_v2.parquet(260배 중복 펼친 flat 파일)를 미리 만들 필요가
+    # 없어져서, 그 export 단계(수시간)를 통째로 건너뛴다. auto는 flat 파일이
+    # 있으면 flat, 없으면 normalized로 자동 선택.
+    flat_parquet = args.parquet or (
         build / "training_events_v2_smoke.parquet"
         if args.mode == "sanity" and (build / "training_events_v2_smoke.parquet").exists()
         else build / "training_events_v2.parquet"
     )
+    sequences_parquet = build / "sequences_v2.parquet"
+    events_tokenized_parquet = build / "events_tokenized_v2.parquet"
+    corpus_format = args.corpus_format
+    if corpus_format == "auto":
+        corpus_format = "flat" if flat_parquet.exists() else "normalized"
+    if corpus_format == "normalized":
+        if not (sequences_parquet.exists() and events_tokenized_parquet.exists()):
+            raise FileNotFoundError(
+                f"--corpus-format normalized 이려면 {sequences_parquet}와 "
+                f"{events_tokenized_parquet}가 둘 다 있어야 합니다."
+            )
+        parquet = sequences_parquet
+        events_parquet = events_tokenized_parquet
+    else:
+        parquet = flat_parquet
+        events_parquet = None
+    print({"corpus_format": corpus_format, "parquet": str(parquet)}, flush=True)
     registry = build / "life2vec_token_registry_v2.json"
     vocab_v2 = build / "vocab_v2.json"
 
@@ -542,7 +781,7 @@ def main() -> None:
         "attention_type": "performer",
         "multihead_dc": False,
         "num_random_features": 64 if args.mode == "sanity" else 128,
-        "learning_rate": 1e-3 if args.mode == "sanity" else 5e-4,
+        "learning_rate": args.lr if args.lr is not None else (1e-3 if args.mode == "sanity" else 5e-4),
         "weight_decay": 0.01,
         "beta1": 0.9,
         "beta2": 0.999,
@@ -558,6 +797,7 @@ def main() -> None:
     model = TransformerEncoder(hparams).to(device)
     model.train()
     opt = torch.optim.AdamW(model.parameters(), lr=hparams["learning_rate"], weight_decay=0.01)
+    sop_metrics = make_sop_metrics(device)
 
     use_shadow_val = detect_shadow_val(parquet)
     train_filter = make_split_predicate(
@@ -600,7 +840,7 @@ def main() -> None:
     batch_size = args.batch_size if args.mode == "sanity" else max(args.batch_size, 8)
     if full and not args.skip_vram_calibrate and device.type == "cuda":
         cal_iter = iter_person_batches(
-            parquet, max(2, batch_size), max_rows, id_filter=train_filter
+            parquet, max(2, batch_size), max_rows, id_filter=train_filter, events_parquet=events_parquet
         )
         batch_size = calibrate_batch_size(
             model,
@@ -653,7 +893,8 @@ def main() -> None:
         "val_batches": args.val_batches,
         "early_stop_patience": None if args.no_early_stop else args.early_stop_patience,
         "early_stop_min_delta": args.early_stop_min_delta,
-        "max_steps": steps,
+        "max_steps": steps if args.epochs <= 0 else None,
+        "target_epochs": args.epochs if args.epochs > 0 else None,
         "wandb_watch": bool(args.wandb_watch),
         "wandb_watch_log": args.wandb_watch_log,
         "wandb_watch_freq": args.wandb_watch_freq,
@@ -677,20 +918,35 @@ def main() -> None:
     from src.transformer.models import masked_sop_loss
 
     step = start_step
+    epoch = 0
+    epoch_boundary_val = False
     data_iter = iter_person_batches(
-        parquet, batch_size, max_rows, id_filter=train_filter
+        parquet, batch_size, max_rows, id_filter=train_filter, events_parquet=events_parquet
     )
     val_iter = iter_person_batches(
-        parquet, batch_size, max_rows, id_filter=val_filter
+        parquet, batch_size, max_rows, id_filter=val_filter, events_parquet=events_parquet
     )
+
+    def _loop_active() -> bool:
+        if args.epochs > 0:
+            return epoch < args.epochs
+        return step < start_step + steps
+
     try:
-        while step < start_step + steps:
+        while _loop_active():
             try:
                 try:
                     frame, chosen = next(data_iter)
                 except StopIteration:
+                    epoch += 1
+                    epoch_boundary_val = True
+                    # Don't break here even if the epoch target is now reached --
+                    # let this one extra step run through so the normal end-of-step
+                    # val/checkpoint code below actually executes (checkpointing on
+                    # a bare `break` here would skip it and leave no last.ckpt/best.ckpt).
+                    # The outer while-condition catches the epoch limit next iteration.
                     data_iter = iter_person_batches(
-                        parquet, batch_size, max_rows, id_filter=train_filter
+                        parquet, batch_size, max_rows, id_filter=train_filter, events_parquet=events_parquet
                     )
                     frame, chosen = next(data_iter)
                 people = list(chosen)
@@ -711,6 +967,10 @@ def main() -> None:
                 loss = model.cls_w * sop_loss + model.mlm_w * mlm_loss
                 if not torch.isfinite(loss):
                     raise RuntimeError(f"non-finite loss {loss}")
+                detailed_train_metrics = compute_mlm_sop_metrics(
+                    model, sop_metrics, mlm_preds, mlm_targs, cls_preds, cls_targs,
+                    batch.get("target_cls_mask"), stage="train",
+                )
                 loss.backward()
                 grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 opt.step()
@@ -722,6 +982,7 @@ def main() -> None:
                     "step": step,
                     "train/loss": float(loss.detach().cpu()),
                     "train/mlm_loss": float(mlm_loss.detach().cpu()),
+                    "train/mlm_perplexity": float(torch.exp(mlm_loss.detach()).cpu()),
                     "train/sop_loss": sop_v,
                     "train/sop_mask_mean": float(batch["target_cls_mask"].float().mean().cpu())
                     if torch.is_tensor(batch.get("target_cls_mask"))
@@ -730,6 +991,7 @@ def main() -> None:
                     if torch.is_tensor(grad_norm)
                     else float(grad_norm),
                     "batch_size": batch_size,
+                    **detailed_train_metrics,
                 }
                 if device.type == "cuda" and step % 20 == 0:
                     rec["train/vram_alloc_gb"] = round(
@@ -750,7 +1012,12 @@ def main() -> None:
 
                     wandb.log({k: v for k, v in rec.items() if k != "step"}, step=step)
 
-                do_val = step % args.val_every == 0 or step == start_step + steps
+                do_val = (
+                    step % args.val_every == 0
+                    or (args.epochs <= 0 and step == start_step + steps)
+                    or epoch_boundary_val
+                )
+                epoch_boundary_val = False
                 if do_val:
                     val_metrics = evaluate_validation(
                         model,
@@ -758,11 +1025,12 @@ def main() -> None:
                         val_iter,
                         device,
                         max_batches=args.val_batches,
+                        sop_metrics=sop_metrics,
                     )
                     if val_metrics["val/batches"] == 0:
                         # Restart val iterator if exhausted mid-run.
                         val_iter = iter_person_batches(
-                            parquet, batch_size, max_rows, id_filter=val_filter
+                            parquet, batch_size, max_rows, id_filter=val_filter, events_parquet=events_parquet
                         )
                         val_metrics = evaluate_validation(
                             model,
@@ -770,7 +1038,9 @@ def main() -> None:
                             val_iter,
                             device,
                             max_batches=args.val_batches,
+                            sop_metrics=sop_metrics,
                         )
+                    val_metrics["val/mlm_perplexity"] = float(np.exp(val_metrics["val/mlm_loss"]))
                     val_rec = {"step": step, **val_metrics}
                     val_history.append(val_rec)
                     print(val_rec, flush=True)
@@ -832,7 +1102,12 @@ def main() -> None:
                                 flush=True,
                             )
 
-                if step % args.ckpt_every == 0 or step == start_step + steps or stopped_early:
+                if (
+                    step % args.ckpt_every == 0
+                    or (args.epochs <= 0 and step == start_step + steps)
+                    or (args.epochs > 0 and not _loop_active())
+                    or stopped_early
+                ):
                     ckpt_path = run_dir / f"checkpoint_step_{step}.pt"
                     torch.save(
                         {
@@ -871,7 +1146,7 @@ def main() -> None:
                     if batch_size > 1:
                         batch_size = max(1, batch_size // 2)
                         data_iter = iter_person_batches(
-                            parquet, batch_size, max_rows, id_filter=train_filter
+                            parquet, batch_size, max_rows, id_filter=train_filter, events_parquet=events_parquet
                         )
                         print(f"OOM_RECOVERY batch_size->{batch_size}", flush=True)
                         torch.cuda.empty_cache()
@@ -897,6 +1172,7 @@ def main() -> None:
             {
                 "status": "PASS",
                 "final_step": step,
+                "final_epoch": epoch,
                 "stopped_early": stopped_early,
                 "best_val_loss": best_val if best_val < float("inf") else None,
                 "best_step": best_step if best_step else None,
