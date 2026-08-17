@@ -12,7 +12,7 @@ UI 화면 상태는 정본(source of truth)으로 사용하지 않는다. 모든
 | 서브앱 | 근거 백엔드 | 생성 artifact |
 |---|---|---|
 | [data_grounding_curation/](data_grounding_curation/README.md) | `../narrative_grounding/` | grounding decision — **구현 완료**(§5.3 검토 큐, §5.1 검색 화면은 아직) |
-| [pipeline_explorer/](pipeline_explorer/README.md) | `../narrative_grounding/` + `../sae/` + 6-arm 재학습 산출물 | (조회 전용, artifact 생성 안 함) — **구현 완료**(원시데이터↔토큰↔시퀀스 추적, 인코딩·dead-ratio 트레이스, SAE 개념/시퀀스 유사도, 학습 버전 브라우저 4탭). 원래 `sequence_composer_ui`/`sae_feature_dashboard`/`run_artifact_control`로 나뉘어 있던 계획 중 **조회 영역만** 통합 구현 — 아래 세 항목 참조 |
+| [pipeline_explorer/](pipeline_explorer/README.md) | `../narrative_grounding/` + `../sae/` + `../representation_explorer/` + `../concept_tcav/` + `../../llm_evidence/` + 6-arm 재학습 산출물 | (조회 전용 + TCAV는 버튼으로 즉석 계산) — **구현 완료**(원시데이터↔토큰↔시퀀스 추적, 인코딩·dead-ratio 트레이스, SAE 개념/시퀀스 유사도, 학습 버전 브라우저, **Entity Summary — finetune 정상/비정상 concept space·유사사례·TCAV 5탭**). 원래 `sequence_composer_ui`/`sae_feature_dashboard`/`run_artifact_control`로 나뉘어 있던 계획 중 **조회 영역만** 통합 구현 — 아래 세 항목 참조 |
 | [sequence_composer_ui/](sequence_composer_ui/README.md) | 기존 `cf1s/core_raw_transaction.py` + `../sequence_curation/` | sequence transaction — 원시↔토큰↔시퀀스 **조회**는 `pipeline_explorer/`가 구현. **편집 액션**(`curation_actions` 트리거)은 여전히 미착수 |
 | [explorer_3d/](explorer_3d/README.md) | `../representation_explorer/` | projection artifact |
 | [sae_feature_dashboard/](sae_feature_dashboard/README.md) | `../sae/` | feature evaluation — encoding trace·dead ratio·**근사적** concept 유사도는 `pipeline_explorer/`가 구현. feature 상태 머신 뷰·`concept_mapping`(N:M)·`feature_alignment` 뷰는 그 백엔드 모듈 자체가 없어 여전히 미착수 |
